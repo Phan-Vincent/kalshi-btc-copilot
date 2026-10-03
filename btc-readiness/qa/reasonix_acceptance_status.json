@@ -1,0 +1,31 @@
+{
+  "reviews": [
+    {
+      "partition": 0,
+      "ok": false,
+      "exit_code": 124,
+      "error": "Reasonix run timed out",
+      "scope": "read-only candidate review",
+      "reported_cost_usd": null
+    },
+    {
+      "partition": 1,
+      "ok": false,
+      "exit_code": 1,
+      "error": "error_during_execution",
+      "scope": "read-only candidate review",
+      "reported_cost_usd": 0.023477028
+    },
+    {
+      "partition": "narrow persistence retry",
+      "tier": "pro",
+      "ok": false,
+      "exit_code": 124,
+      "error": "Reasonix run timed out",
+      "reported_cost_usd": null
+    }
+  ],
+  "complete_independent_reasonix_signoff": false,
+  "claims": "Partial data-review suggestions were adjudicated and tested locally; timeout results are not acceptance evidence.",
+  "known_cost_total_is_incomplete": true
+}

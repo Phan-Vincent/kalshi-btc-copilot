@@ -1,0 +1,10 @@
+[Unit]
+Description=Deterministic KXBTC15M fee, read-budget and clock attestation (GET-only)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=%h/btc-study/current
+ExecStart=/usr/bin/python3 -B %h/btc-study/current/acer_ops.py attest
+UMask=0077

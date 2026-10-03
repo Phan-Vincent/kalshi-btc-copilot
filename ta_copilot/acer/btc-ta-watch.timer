@@ -1,0 +1,10 @@
+[Unit]
+Description=Check BTC TA dashboard health every five minutes
+
+[Timer]
+OnCalendar=*:0/5
+Persistent=true
+Unit=btc-ta-watch.service
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,17 @@
+{
+  "study_id": "btc-prospective-002",
+  "status": "PREPARED_NOT_ACTIVATED",
+  "files": {
+    "btc_copilot.py": "bcda27930e26ed6e9a6527bc6796887dc9f17f1ec1a9507bb5a2f0ad07957476",
+    "btc_copilot_evidence.py": "99be5599e8bfe46924d91725ddc732c48984762255a61002a6233082871eb155",
+    "btc_copilot_research.py": "2a378636522fa8b96d52a0edc6b7770829b2bbeff4246786e4f10af2741c828c",
+    "kalshi_readonly.py": "45f595fae210b617ad81b6e199f12120c079ee2219632109f948180bd8073b8e",
+    "study_policy.py": "79548d913d0ee80a1cba830cebbe88f815b59a41da558a33314b5e0388895c9d",
+    "btc_copilot_protocol.json": "1f67bba90077429de6ccdbd62970338da7da4cdda685feb1ee36038abb80ecd4",
+    "btc_copilot_settings.json": "47dedad12c34481024d90cc5fafa45293bafa990bc555bf5eaa6f4a8ab0c4eab",
+    "btc_copilot.html": "eef18ee4bc4bad3f12626c1bcde4e9972572ca78bc67ee5c09033b2dc185c06a",
+    "request_pacing.py": "29b3e4d546d1ea8c5fbf634213b73174f70833e2f04510b2d702624ff9d6e3b7",
+    "fee_reconciliation.py": "bc52011f63466bdd949ebf8296d7f1793c736ad9202b4c994626c02a807d003b"
+  },
+  "release": "4.2.0-study002-fee-review"
+}

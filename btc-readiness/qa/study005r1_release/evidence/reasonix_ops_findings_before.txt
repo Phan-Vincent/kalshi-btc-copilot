@@ -1,0 +1,99 @@
+......FF.FEFFF.....
+======================================================================
+ERROR: test_R3_transient_settlement_failure_degrades (test_operational_fixes.ReasonixOpsFindingTests.test_R3_transient_settlement_failure_degrades)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/you/Library/Application Support/Claude/scratch-workspaces/WORKSPACE/SESSION/scratch-2026-09-27-d7f3e5/btc-readiness/qa/readiness_release/tests/test_operational_fixes.py", line 194, in test_R3_transient_settlement_failure_degrades
+    result = run.run_authorized(f.ROOT, gate, max_cycles=2, **kwargs)
+  File "/Users/you/Library/Application Support/Claude/scratch-workspaces/WORKSPACE/SESSION/scratch-2026-09-27-d7f3e5/btc-readiness/qa/readiness_release/candidate/evidence_runner.py", line 181, in run_authorized
+    try:collector.reconcile_one()
+        ~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "/Users/you/Library/Application Support/Claude/scratch-workspaces/WORKSPACE/SESSION/scratch-2026-09-27-d7f3e5/btc-readiness/qa/readiness_release/candidate/evidence_runner.py", line 112, in reconcile_one
+    with background_reads():return self.store.settle_one(self.engine.client)
+                                   ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/Cellar/python@3.14/3.14.4_1/Frameworks/Python.framework/Versions/3.14/lib/python3.14/unittest/mock.py", line 1176, in __call__
+    return self._mock_call(*args, **kwargs)
+           ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/Cellar/python@3.14/3.14.4_1/Frameworks/Python.framework/Versions/3.14/lib/python3.14/unittest/mock.py", line 1180, in _mock_call
+    return self._execute_mock_call(*args, **kwargs)
+           ~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/Cellar/python@3.14/3.14.4_1/Frameworks/Python.framework/Versions/3.14/lib/python3.14/unittest/mock.py", line 1245, in _execute_mock_call
+    raise result
+coherent_runtime.RuntimeBlocked: Settlement ticker mismatch
+
+======================================================================
+FAIL: test_R1_sleep_during_request_degrades_not_halts (test_operational_fixes.ReasonixOpsFindingTests.test_R1_sleep_during_request_degrades_not_halts)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/you/Library/Application Support/Claude/scratch-workspaces/WORKSPACE/SESSION/scratch-2026-09-27-d7f3e5/btc-readiness/qa/readiness_release/tests/test_operational_fixes.py", line 142, in test_R1_sleep_during_request_degrades_not_halts
+    self.assertFalse(store.halted); self.assertFalse((root / 'runtime/HALTED').exists())
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^
+AssertionError: True is not false
+
+======================================================================
+FAIL: test_R2_long_sleep_during_settlement_read_degrades (test_operational_fixes.ReasonixOpsFindingTests.test_R2_long_sleep_during_settlement_read_degrades)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/you/Library/Application Support/Claude/scratch-workspaces/WORKSPACE/SESSION/scratch-2026-09-27-d7f3e5/btc-readiness/qa/readiness_release/tests/test_operational_fixes.py", line 183, in test_R2_long_sleep_during_settlement_read_degrades
+    self.assertEqual(self.settle([1000.0, 1300.0], 300), ('RuntimeBlocked', False))
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: Tuples differ: ('RuntimeBlocked', True) != ('RuntimeBlocked', False)
+
+First differing element 1:
+True
+False
+
+- ('RuntimeBlocked', True)
+?                    ^^^
+
++ ('RuntimeBlocked', False)
+?                    ^^^^
+
+
+======================================================================
+FAIL: test_R2_sleep_during_settlement_read_does_not_halt (test_operational_fixes.ReasonixOpsFindingTests.test_R2_sleep_during_settlement_read_does_not_halt)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/you/Library/Application Support/Claude/scratch-workspaces/WORKSPACE/SESSION/scratch-2026-09-27-d7f3e5/btc-readiness/qa/readiness_release/tests/test_operational_fixes.py", line 180, in test_R2_sleep_during_settlement_read_does_not_halt
+    self.assertEqual(self.settle([1000.0, 1016.0], 16), (True, False))
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: Tuples differ: ('RuntimeBlocked', True) != (True, False)
+
+First differing element 0:
+'RuntimeBlocked'
+True
+
+- ('RuntimeBlocked', True)
++ (True, False)
+
+======================================================================
+FAIL: test_R4_wall_step_between_polls_is_unclean_stop (test_operational_fixes.ReasonixOpsFindingTests.test_R4_wall_step_between_polls_is_unclean_stop)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/you/Library/Application Support/Claude/scratch-workspaces/WORKSPACE/SESSION/scratch-2026-09-27-d7f3e5/btc-readiness/qa/readiness_release/tests/test_operational_fixes.py", line 203, in test_R4_wall_step_between_polls_is_unclean_stop
+    with self.assertRaises(RuntimeBlocked):
+         ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^
+AssertionError: RuntimeBlocked not raised
+
+======================================================================
+FAIL: test_R5_integrity_mismatch_halts_immediately (test_operational_fixes.ReasonixOpsFindingTests.test_R5_integrity_mismatch_halts_immediately)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/you/Library/Application Support/Claude/scratch-workspaces/WORKSPACE/SESSION/scratch-2026-09-27-d7f3e5/btc-readiness/qa/readiness_release/tests/test_operational_fixes.py", line 217, in test_R5_integrity_mismatch_halts_immediately
+    self.assertTrue(store.halted); self.assertTrue((root / 'runtime/HALTED').exists())
+    ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^
+AssertionError: False is not true
+
+======================================================================
+FAIL: test_R6_external_halt_file_is_fatal_at_once (test_operational_fixes.ReasonixOpsFindingTests.test_R6_external_halt_file_is_fatal_at_once)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/you/Library/Application Support/Claude/scratch-workspaces/WORKSPACE/SESSION/scratch-2026-09-27-d7f3e5/btc-readiness/qa/readiness_release/tests/test_operational_fixes.py", line 226, in test_R6_external_halt_file_is_fatal_at_once
+    with self.assertRaises(RuntimeBlocked):
+         ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^
+AssertionError: RuntimeBlocked not raised
+
+----------------------------------------------------------------------
+Ran 19 tests in 0.398s
+
+FAILED (failures=6, errors=1)

@@ -1,0 +1,99 @@
+test_atomic_pre_replace_fsync_failure_preserves_file (__main__.Acceptance.test_atomic_pre_replace_fsync_failure_preserves_file) ... ok
+test_different_payload_same_observation_rejected (__main__.Acceptance.test_different_payload_same_observation_rejected) ... FAIL
+test_disk_full_state_write_does_not_mutate_memory (__main__.Acceptance.test_disk_full_state_write_does_not_mutate_memory) ... FAIL
+test_duplicate_observation_does_not_increment_count (__main__.Acceptance.test_duplicate_observation_does_not_increment_count) ... FAIL
+test_log_failure_cannot_leave_healthy_confirmation (__main__.Acceptance.test_log_failure_cannot_leave_healthy_confirmation) ... FAIL
+test_log_hardlink_cannot_modify_other_file (__main__.Acceptance.test_log_hardlink_cannot_modify_other_file) ... FAIL
+test_log_symlink_cannot_modify_other_file (__main__.Acceptance.test_log_symlink_cannot_modify_other_file) ... FAIL
+test_reversed_observation_rejected_before_state_write (__main__.Acceptance.test_reversed_observation_rejected_before_state_write) ... FAIL
+test_simultaneous_duplicate_study_records_only_one_succeeds (__main__.Acceptance.test_simultaneous_duplicate_study_records_only_one_succeeds) ... FAIL
+test_study_mid_transaction_crash_preserves_clock_and_slot (__main__.Acceptance.test_study_mid_transaction_crash_preserves_clock_and_slot) ... ok
+
+======================================================================
+FAIL: test_different_payload_same_observation_rejected (__main__.Acceptance.test_different_payload_same_observation_rejected)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/you/.codex/.chatgpt-projects/g-p-PROJECT/qa_btc_2026-09-27/test_acceptance.py", line 39, in test_different_payload_same_observation_rejected
+    with self.assertRaises((a.ReadError,ValueError)):b.Copilot.record(self.c,changed)
+         ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: (<class 'kalshi_readonly.ReadError'>, <class 'ValueError'>) not raised
+
+======================================================================
+FAIL: test_disk_full_state_write_does_not_mutate_memory (__main__.Acceptance.test_disk_full_state_write_does_not_mutate_memory)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/you/.codex/.chatgpt-projects/g-p-PROJECT/qa_btc_2026-09-27/test_acceptance.py", line 23, in test_disk_full_state_write_does_not_mutate_memory
+    self.assertEqual(self.c.state,before)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^
+AssertionError: {'previous': {'ticker': 'KXBTC15M-26SEP261400-00', 'ep[903 chars]'}}}} != {'previous': None, 'contracts': {}}
+Diff is 1787 characters long. Set self.maxDiff to None to see it.
+
+======================================================================
+FAIL: test_duplicate_observation_does_not_increment_count (__main__.Acceptance.test_duplicate_observation_does_not_increment_count)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/you/.codex/.chatgpt-projects/g-p-PROJECT/qa_btc_2026-09-27/test_acceptance.py", line 31, in test_duplicate_observation_does_not_increment_count
+    self.assertEqual(self.c.state['contracts'][self.s['ticker']]['observations'],1)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 2 != 1
+
+======================================================================
+FAIL: test_log_failure_cannot_leave_healthy_confirmation (__main__.Acceptance.test_log_failure_cannot_leave_healthy_confirmation)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/you/.codex/.chatgpt-projects/g-p-PROJECT/qa_btc_2026-09-27/test_acceptance.py", line 27, in test_log_failure_cannot_leave_healthy_confirmation
+    self.assertFalse((persisted.get('previous') or {}).get('confirmation_valid',False))
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: True is not false
+
+======================================================================
+FAIL: test_log_hardlink_cannot_modify_other_file (__main__.Acceptance.test_log_hardlink_cannot_modify_other_file)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/you/.codex/.chatgpt-projects/g-p-PROJECT/qa_btc_2026-09-27/test_acceptance.py", line 46, in test_log_hardlink_cannot_modify_other_file
+    with self.assertRaises((a.ReadError,OSError)):b.append(path,{'bad':True})
+         ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: (<class 'kalshi_readonly.ReadError'>, <class 'OSError'>) not raised
+
+======================================================================
+FAIL: test_log_symlink_cannot_modify_other_file (__main__.Acceptance.test_log_symlink_cannot_modify_other_file)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/you/.codex/.chatgpt-projects/g-p-PROJECT/qa_btc_2026-09-27/test_acceptance.py", line 42, in test_log_symlink_cannot_modify_other_file
+    with self.assertRaises((a.ReadError,OSError)):b.append(path,{'bad':True})
+         ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: (<class 'kalshi_readonly.ReadError'>, <class 'OSError'>) not raised
+
+======================================================================
+FAIL: test_reversed_observation_rejected_before_state_write (__main__.Acceptance.test_reversed_observation_rejected_before_state_write)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/you/.codex/.chatgpt-projects/g-p-PROJECT/qa_btc_2026-09-27/test_acceptance.py", line 35, in test_reversed_observation_rejected_before_state_write
+    with self.assertRaises((a.ReadError,ValueError)):b.Copilot.record(self.c,older)
+         ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: (<class 'kalshi_readonly.ReadError'>, <class 'ValueError'>) not raised
+
+======================================================================
+FAIL: test_simultaneous_duplicate_study_records_only_one_succeeds (__main__.Acceptance.test_simultaneous_duplicate_study_records_only_one_succeeds)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/you/.codex/.chatgpt-projects/g-p-PROJECT/qa_btc_2026-09-27/test_acceptance.py", line 60, in test_simultaneous_duplicate_study_records_only_one_succeeds
+    self.assertEqual(sorted(results),['committed','rejected'])
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: Lists differ: ['committed', 'committed'] != ['committed', 'rejected']
+
+First differing element 1:
+'committed'
+'rejected'
+
+- ['committed', 'committed']
+?                 -----
+
++ ['committed', 'rejected']
+?                ++++
+
+
+----------------------------------------------------------------------
+Ran 10 tests in 0.188s
+
+FAILED (failures=8)

@@ -1,0 +1,19 @@
+test_abrupt_exit_after_append_repeats_diagnostic_with_stable_identity (__main__.OperatingBounds.test_abrupt_exit_after_append_repeats_diagnostic_with_stable_identity) ... ok
+test_abrupt_exit_after_audit_commit_keeps_pending_state (__main__.OperatingBounds.test_abrupt_exit_after_audit_commit_keeps_pending_state) ... ok
+test_abrupt_exit_after_json_leaves_partial_but_nonconfirming_publication (__main__.OperatingBounds.test_abrupt_exit_after_json_leaves_partial_but_nonconfirming_publication) ... ok
+test_abrupt_exit_after_pending_recovers_without_duplicate_count (__main__.OperatingBounds.test_abrupt_exit_after_pending_recovers_without_duplicate_count) ... ok
+test_abrupt_exit_mid_sqlite_transaction_rolls_back (__main__.OperatingBounds.test_abrupt_exit_mid_sqlite_transaction_rolls_back) ... ok
+test_consistent_long_pause_records_gap_not_clock_reset (__main__.OperatingBounds.test_consistent_long_pause_records_gap_not_clock_reset) ... ok
+test_expiry_after_study_storage_rejects_before_publication (__main__.OperatingBounds.test_expiry_after_study_storage_rejects_before_publication) ... ok
+test_expiry_during_publication_prevents_confirmation_commit (__main__.OperatingBounds.test_expiry_during_publication_prevents_confirmation_commit) ... ok
+test_expiry_while_waiting_for_commit_lock_is_rejected (__main__.OperatingBounds.test_expiry_while_waiting_for_commit_lock_is_rejected) ... ok
+test_preserved_positive_price_cost_bound_cannot_make_positive_return (__main__.OperatingBounds.test_preserved_positive_price_cost_bound_cannot_make_positive_return) ... ok
+test_reboot_monotonic_reset_fails_closed (__main__.OperatingBounds.test_reboot_monotonic_reset_fails_closed) ... ok
+test_repeated_disk_full_never_advances_confirmation (__main__.OperatingBounds.test_repeated_disk_full_never_advances_confirmation) ... ok
+test_replay_retention_prunes_only_declared_observation_window (__main__.OperatingBounds.test_replay_retention_prunes_only_declared_observation_window) ... ok
+test_suspend_wall_only_jump_fails_closed (__main__.OperatingBounds.test_suspend_wall_only_jump_fails_closed) ... ok
+
+----------------------------------------------------------------------
+Ran 14 tests in 0.594s
+
+OK

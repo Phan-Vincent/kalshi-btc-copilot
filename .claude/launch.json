@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "btc-ta-copilot",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": ["/Users/you/Documents/kalshi-btc-readiness/ta_copilot/ta_copilot.py", "--port", "8770"],
+      "port": 8770
+    }
+  ]
+}

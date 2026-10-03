@@ -1,0 +1,11 @@
+[Unit]
+Description=Start the BTC study collector at the approved protocol start
+
+[Timer]
+# install.sh replaces this with the frozen protocol's start_utc.
+OnCalendar=__START_UTC__
+Persistent=false
+Unit=btc-study-collector.service
+
+[Install]
+WantedBy=timers.target

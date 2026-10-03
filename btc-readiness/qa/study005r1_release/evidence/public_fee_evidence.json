@@ -1,0 +1,24 @@
+{
+  "checked_date": "2026-09-27",
+  "method": "read-only web access to official public REST metadata and documentation",
+  "series": {
+    "url": "https://external-api.kalshi.com/trade-api/v2/series/KXBTC15M",
+    "fee_type": "quadratic",
+    "fee_multiplier": 1,
+    "last_updated_ts": "2026-09-18T15:20:18.321673Z"
+  },
+  "rounding_document": "https://docs.kalshi.com/getting_started/fee_rounding",
+  "quantity_document": "https://docs.kalshi.com/getting_started/fixed_point_migration",
+  "quantity_document_last_updated": "2026-08-20",
+  "general_documented_quantity_quantum": "0.01",
+  "series_specific_executable_fill_constraints_verified": false,
+  "account_precision_verified": false,
+  "terminal_accumulator_refund_verified": false,
+  "scheduled_changes": {
+    "url": "https://external-api.kalshi.com/trade-api/v2/series/fee_changes?series_ticker=KXBTC15M&show_historical=false",
+    "status": "UNVERIFIED: web tool could not access endpoint; this does not establish no scheduled changes"
+  },
+  "credentials_used": false,
+  "orders_or_messages_sent": false,
+  "cost_policy_changed": false
+}

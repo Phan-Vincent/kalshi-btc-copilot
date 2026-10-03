@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "status": "PROPOSED_NOT_AUTHORIZED",
+  "quota_bytes": 137438953472,
+  "free_reserve_bytes": 17179869184,
+  "interval_seconds": 15,
+  "port": 8769,
+  "bind_host": "127.0.0.1",
+  "runtime_subdirectory": "runtime",
+  "outcomes_per_poll": 1,
+  "advice_enabled": false,
+  "execution_enabled": false,
+  "sizing_basis": "Measured synthetic growth plus additive arm/outcome allowance and two-times planning headroom; not a worst-case guarantee. Capacity must be rechecked on the eventual approved destination."
+}

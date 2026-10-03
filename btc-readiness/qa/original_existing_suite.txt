@@ -1,0 +1,39 @@
+test_confirmed_setup_with_large_conservative_edge_can_qualify (test_btc_copilot.CollectorTests.test_confirmed_setup_with_large_conservative_edge_can_qualify) ... ok
+test_first_snapshot_abstains (test_btc_copilot.CollectorTests.test_first_snapshot_abstains) ... ok
+test_rolled_contract_rejected (test_btc_copilot.CollectorTests.test_rolled_contract_rejected) ... ok
+test_sixty_percent_probability_at_sixty_one_cent_ask_abstains (test_btc_copilot.CollectorTests.test_sixty_percent_probability_at_sixty_one_cent_ask_abstains) ... ok
+test_stale_benchmark_abstains (test_btc_copilot.CollectorTests.test_stale_benchmark_abstains) ... ok
+test_wrong_target_abstains (test_btc_copilot.CollectorTests.test_wrong_target_abstains) ... ok
+test_direction_and_uncertainty (test_btc_copilot.ModelTests.test_direction_and_uncertainty) ... ok
+test_empty_book_not_fabricated (test_btc_copilot.ModelTests.test_empty_book_not_fabricated) ... ok
+test_fees_and_subcent_grid (test_btc_copilot.ModelTests.test_fees_and_subcent_grid) ... ok
+test_fill_inventory_reductions_and_reversal (test_btc_copilot.ModelTests.test_fill_inventory_reductions_and_reversal) ... ok
+test_known_settlement_average_dominates_last_tick (test_btc_copilot.ModelTests.test_known_settlement_average_dominates_last_tick) ... ok
+test_missing_settlement_samples_fail_closed (test_btc_copilot.ModelTests.test_missing_settlement_samples_fail_closed) ... ok
+test_mutating_endpoints_rejected (test_btc_copilot.ModelTests.test_mutating_endpoints_rejected) ... ok
+test_changed_evaluator_cannot_relabel_old_results (test_copilot_evidence.EvidenceTests.test_changed_evaluator_cannot_relabel_old_results) ... ok
+test_checkpoint_matched_once (test_copilot_evidence.EvidenceTests.test_checkpoint_matched_once) ... ok
+test_day_blocks_need_days_not_snapshots (test_copilot_evidence.EvidenceTests.test_day_blocks_need_days_not_snapshots) ... ok
+test_duplicate_ticks_and_invalid_fill_rejected (test_copilot_evidence.EvidenceTests.test_duplicate_ticks_and_invalid_fill_rejected) ... ok
+test_fee_verification_refresh_does_not_change_behavior_version (test_copilot_evidence.EvidenceTests.test_fee_verification_refresh_does_not_change_behavior_version) ... ok
+test_first_delayed_quote_frozen_and_not_reselected (test_copilot_evidence.EvidenceTests.test_first_delayed_quote_frozen_and_not_reselected) ... ok
+test_fresh_shadow_signal_never_enables_advice (test_copilot_evidence.EvidenceTests.test_fresh_shadow_signal_never_enables_advice) ... ok
+test_holdout_not_in_report_before_release (test_copilot_evidence.EvidenceTests.test_holdout_not_in_report_before_release) ... ok
+test_late_observation_kept_as_missed (test_copilot_evidence.EvidenceTests.test_late_observation_kept_as_missed) ... ok
+test_no_promotion_even_after_release_with_tiny_sample (test_copilot_evidence.EvidenceTests.test_no_promotion_even_after_release_with_tiny_sample) ... ok
+test_operational_fault_blocks_every_shadow_arm (test_copilot_evidence.EvidenceTests.test_operational_fault_blocks_every_shadow_arm) ... ok
+test_partial_depth_and_outage_are_not_fills (test_copilot_evidence.EvidenceTests.test_partial_depth_and_outage_are_not_fills) ... ok
+test_public_settlement_does_not_require_private_fills (test_copilot_evidence.EvidenceTests.test_public_settlement_does_not_require_private_fills) ... ok
+test_shadow_snapshots_never_enter_legacy_scorecard (test_copilot_evidence.EvidenceTests.test_shadow_snapshots_never_enter_legacy_scorecard) ... ok
+test_version_change_does_not_reset_study (test_copilot_evidence.EvidenceTests.test_version_change_does_not_reset_study) ... ok
+test_wrong_market_and_invalid_book_fail_closed (test_copilot_evidence.EvidenceTests.test_wrong_market_and_invalid_book_fail_closed) ... ok
+test_delayed_signal_unavailable_is_not_a_fill (test_copilot_upgrade.UpgradeTests.test_delayed_signal_unavailable_is_not_a_fill) ... ok
+test_depth_complement_partial_and_fees (test_copilot_upgrade.UpgradeTests.test_depth_complement_partial_and_fees) ... ok
+test_replay_roundtrip_and_one_forecast_per_contract (test_copilot_upgrade.UpgradeTests.test_replay_roundtrip_and_one_forecast_per_contract) ... ok
+test_settings_reject_weaker_or_nonfinite_safety (test_copilot_upgrade.UpgradeTests.test_settings_reject_weaker_or_nonfinite_safety) ... ok
+test_unavailable_data_overrides_exit_and_target_fault (test_copilot_upgrade.UpgradeTests.test_unavailable_data_overrides_exit_and_target_fault) ... ok
+
+----------------------------------------------------------------------
+Ran 34 tests in 0.560s
+
+OK

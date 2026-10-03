@@ -1,0 +1,8 @@
+[Unit]
+Description=BTC study health check and Telegram alerts
+
+[Service]
+Type=oneshot
+WorkingDirectory=%h/btc-study/current
+ExecStart=/usr/bin/python3 -B %h/btc-study/current/acer_ops.py watch
+UMask=0077

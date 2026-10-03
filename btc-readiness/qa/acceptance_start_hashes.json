@@ -1,0 +1,19 @@
+{
+  "test_fee_reconciliation.py": "c132f1e4a7f5d368f2a812a2a43ad5c5641233de726662f95b101ac9de9e0ad6",
+  "kalshi_readonly.py": "36d12ebbe20abe0698045877db24e1904dc131ea964946efcc48fc29d8e761f7",
+  "QA_ONLY": "1eea7508538a92068f40e5280f434540913611fc51efed74c73ced3cc920d0db",
+  "test_study002.py": "fc4bef60f21e8f479c353b913a41710f34e1b270d0eafaf63ef481b3df797c82",
+  "btc_copilot_settings.json": "47dedad12c34481024d90cc5fafa45293bafa990bc555bf5eaa6f4a8ab0c4eab",
+  "btc_copilot_research.py": "18be68d416506ea244615492097ce849671a95c6a68ed85a38f9e08302f3c0cc",
+  "test_pacing.py": "d11871e7a0cd9861d213a3f9a0902be4c2a2ca0fe96f3222946097238855840a",
+  "btc_copilot.html": "051953269afbf9f260bd04a9bad218a862244b2ba3aafe2ee6e5e0bc6d61ee3c",
+  "study_policy.py": "6e2d9d092980bf8144aeaa987f0e5c85f30c1315dddd596625a86a7018c98909",
+  "test_lifecycle_evidence.py": "9268a96480011ad541f63b54936eec8eb1ea07eefbce75e10ca2ccfd1341c5b5",
+  "btc_copilot.py": "7e520973062ccda02232247158157deb5b0629faf85333ddae60499692f14632",
+  "README.md": "4c1980e5882bf9b044c0b593e3a73fc3b3f021ad1c106b820aac317be6036268",
+  "request_pacing.py": "29b3e4d546d1ea8c5fbf634213b73174f70833e2f04510b2d702624ff9d6e3b7",
+  "release_manifest.json": "08e784ef61441941b52335de5ff9f5d1b2b71598f4561977cfd3ac5bd7fdb7c0",
+  "btc_copilot_evidence.py": "bf33489f21f8ba83dfdef3bae1dd6bac73e3fb7c111e6694d80a8f2ff3ebbcb2",
+  "btc_copilot_protocol.json": "1f67bba90077429de6ccdbd62970338da7da4cdda685feb1ee36038abb80ecd4",
+  "fee_reconciliation.py": "bc52011f63466bdd949ebf8296d7f1793c736ad9202b4c994626c02a807d003b"
+}

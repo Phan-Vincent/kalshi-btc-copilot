@@ -1,0 +1,7 @@
+{
+  "model_version": "5.2.0-readiness-work-in-progress-97780b23d5fec957",
+  "working_manifest_sha256": "17df9077f825af9f1b15147b0e611ab032aa3b43e18d128110d715f4dcd1b5df",
+  "activation_allowed": false,
+  "source_files_match": true,
+  "not_a_final_release": true
+}

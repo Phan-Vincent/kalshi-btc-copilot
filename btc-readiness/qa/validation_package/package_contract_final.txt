@@ -1,0 +1,13 @@
+test_acceptance_thresholds_are_not_weakened (__main__.PackageContract.test_acceptance_thresholds_are_not_weakened) ... ok
+test_cost_settings_and_original_policy_bytes_preserved (__main__.PackageContract.test_cost_settings_and_original_policy_bytes_preserved) ... ok
+test_dates_are_future_provisional_utc_with_no_overlap (__main__.PackageContract.test_dates_are_future_provisional_utc_with_no_overlap) ... ok
+test_design_is_new_fixed_primary_not_tunable_or_promotable (__main__.PackageContract.test_design_is_new_fixed_primary_not_tunable_or_promotable) ... ok
+test_identity_matches_current_disabled_candidate (__main__.PackageContract.test_identity_matches_current_disabled_candidate) ... ok
+test_predeclared_calendar_is_seven_seven_fiftysix (__main__.PackageContract.test_predeclared_calendar_is_seven_seven_fiftysix) ... ok
+test_proposal_has_no_activation_or_inherited_approval (__main__.PackageContract.test_proposal_has_no_activation_or_inherited_approval) ... ok
+test_readiness_gates_remain_explicit_and_blocking (__main__.PackageContract.test_readiness_gates_remain_explicit_and_blocking) ... ok
+
+----------------------------------------------------------------------
+Ran 8 tests in 0.002s
+
+OK

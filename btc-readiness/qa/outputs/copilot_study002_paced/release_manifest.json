@@ -1,0 +1,16 @@
+{
+  "study_id": "btc-prospective-002",
+  "status": "PREPARED_NOT_ACTIVATED",
+  "files": {
+    "btc_copilot.py": "bcda27930e26ed6e9a6527bc6796887dc9f17f1ec1a9507bb5a2f0ad07957476",
+    "btc_copilot_evidence.py": "d62c49f47426a888988f2c8db3a9f5bb2755f2332ef2371a043fe62411c163eb",
+    "btc_copilot_research.py": "738863dd527868a17d6fe425e76561740a20e609ae9af0608cae556e0b5211cc",
+    "kalshi_readonly.py": "45f595fae210b617ad81b6e199f12120c079ee2219632109f948180bd8073b8e",
+    "study_policy.py": "82115c266f60866d6c8f759212a5183c71b7e95876ff5380d8077083b468b9b6",
+    "btc_copilot_protocol.json": "88b3ee8219fca3aae648b1f8f9296038ec2f566556326f64b9b67322de559ad5",
+    "btc_copilot_settings.json": "47dedad12c34481024d90cc5fafa45293bafa990bc555bf5eaa6f4a8ab0c4eab",
+    "btc_copilot.html": "eef18ee4bc4bad3f12626c1bcde4e9972572ca78bc67ee5c09033b2dc185c06a",
+    "request_pacing.py": "29b3e4d546d1ea8c5fbf634213b73174f70833e2f04510b2d702624ff9d6e3b7"
+  },
+  "release": "4.1.0-study002-paced"
+}

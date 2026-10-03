@@ -1,0 +1,116 @@
+{
+    "study_id": "btc-prospective-005r1-20261012",
+    "start_utc": "2026-10-12T00:00:00+00:00",
+    "validation_start_utc": "2026-10-19T00:00:00+00:00",
+    "holdout_start_utc": "2026-10-26T00:00:00+00:00",
+    "end_utc": "2026-12-21T00:00:00+00:00",
+    "release_utc": "2026-12-23T00:00:00+00:00",
+    "primary_strategy": "drift_free",
+    "fee_multiplier": "1",
+    "reaction_delay_seconds": 15,
+    "delay_window_seconds": 20,
+    "forecast_checkpoint": "First healthy observation at 570–600 seconds remaining; common checkpoint; all 96 scheduled slots/day required for favorable holdout review. No missing-period zero returns.",
+    "primary_exit": "Official settlement only; no learned exit strategy.",
+    "primary_acceptance": {
+        "matched_forecasts": 5376,
+        "filled_contracts": 100,
+        "distinct_days": 40,
+        "holdout_coverage": 1.0,
+        "stress_daily_lower_bound": 0,
+        "paired_zero_minus_market_brier_upper_bound": 0,
+        "calibration_ece": 0.05,
+        "unresolved_enrolled": 0,
+        "missing_calendar_days": 0,
+        "amended_results": 0,
+        "missing_execution_observations": 0
+    },
+    "holdout_policy": "Final outcomes withheld by default report until release. No parameter tuning or primary reselection. Changes require a new future study; no automatic reset or promotion.",
+    "comparison_policy": "Market midpoint is price-implied probability only; never assumed executable. Always abstain has zero trading return. Ablations are exploratory, never selected for promotion from these results.",
+    "risk_policy": "One-unit hypothetical experiments only. Personalized sizing requires user risk budget, maximum loss and constraints.",
+    "uncertainty": {
+        "method": "non-circular moving consecutive UTC-day blocks; resample then truncate to original length",
+        "block_days": [
+            1,
+            2,
+            7
+        ],
+        "replicates": 2000,
+        "seed": 719,
+        "minimum_days": 56,
+        "acceptance": "Every block-length stress lower bound >0 and paired Brier upper bound <0. Intersection of sensitivity tests, not simultaneous 95% confidence. Eight nonoverlapping weeks is still limited; stationarity not guaranteed."
+    },
+    "schema_version": 2,
+    "clock_policy": {
+        "request_start": "UTC seconds sampled immediately before GET dispatch, no rounding",
+        "origin": "persisted completed initial observation epoch t0",
+        "execution": "first successful serial observation with book dispatch >=t0+15 and observation completion <=t0+35; no price selection",
+        "wall_monotonic_tolerance_seconds": 1,
+        "max_request_seconds": 15,
+        "max_snapshot_age_seconds": 20,
+        "duplicate_policy": "reject duplicate/out-of-order observation; unique UTC opening slot; ambiguous discovery fails closed",
+        "retries": "client transport does not retry; failed collection produces a gap, subsequent poll may qualify within original window; initial signal never replaced",
+        "restart": "Persist observation UTC and continuity-clock epochs (CLOCK_BOOTTIME on Linux, CLOCK_MONOTONIC on macOS; both count through sleep). Reject wall-clock/continuity-clock disagreement beyond tolerance across polls and restarts, and reject any reboot (boot identity change); no silent reset. A suspend that keeps both clocks in agreement is a gap handled by the missing-data rule, not a discontinuity."
+    },
+    "missing_policy": "Fixed 900-second UTC slots; one unique active KXBTC15M contract per slot. No calendar deletions. Missing checkpoint, invalid source, outage or canceled/nonbinary outcome prevents favorable review. No restart budget, imputation, backfill or zero-return assumption for missing slots.",
+    "fee_policy": {
+        "coefficient": "0.07",
+        "type": "quadratic",
+        "multiplier": "1",
+        "hypothetical_quantity": "1.00",
+        "minimum_fill_quantity": "0.01",
+        "trade_fee_precision": "0.000001",
+        "balance_precisions": [
+            "0.0001"
+        ],
+        "scenario": "one taker fill per consumed displayed level; order-local rounding accumulator; no maker fees or settlement fees",
+        "acceptance": "Balance precision .0001 only, as established from this account's own Kalshi fee records (see fee_evidence_policy). Per consumed displayed level at price p and quantity q, the acceptance fee is the maximum of: (a) legacy conservative level fees; (b) the unit-split bound: split q into .01 units, ceil each unit model fee to six decimals, ceil each unit all-in debit to .0001, assume no rebates; (c) the closed-form bound q*(0.07*p*(1-p)+0.0101). Summed over levels. A change in account precision or classification, or any KXBTC15M fee change, blocks the study.",
+        "realized_fee_claim": false,
+        "sources": [
+            "https://kalshi.com/docs/kalshi-fee-schedule.pdf",
+            "https://docs.kalshi.com/getting_started/fee_rounding",
+            "https://docs.kalshi.com/getting_started/fixed_point_migration",
+            "fee_evidence_refresh_summary.json (aggregate account fee reconciliation; raw records private)",
+            "https://www.cftc.gov/sites/default/files/filings/orgrules/25/07/rules07012525155.pdf (KalshiEX Rulebook: Member, Self-Clearing Member, FCM/IB Customer)"
+        ],
+        "activation_requires": "fresh official schedule and KXBTC15M series verification plus minimum fill quantity verification; incompatible rules block study"
+    },
+    "outcome_policy": {
+        "retry_batch": 64,
+        "recheck_seconds": 21600,
+        "release_recheck_window_seconds": 21600,
+        "rule": "append every observed finalized public result; conflicting/nonbinary/revoked final status quarantines contract permanently; no overwrites of original result; pre-release recheck required; no final outcomes queried by report before release"
+    },
+    "approval_policy": {
+        "required": true,
+        "deadline_utc": "2026-10-11T00:00:00+00:00",
+        "approval_file": "activation_approval.json",
+        "binding": "SHA256 release_manifest.json; approved_at precedes start; approval does not enable advice",
+        "late_approval": "reject; prepare separately reviewed future-dated protocol, never shift automatically"
+    },
+    "candidate_release": "5.4.1-study005r1",
+    "pacing_policy": {
+        "interval_seconds": 15,
+        "tokens_per_second": 60,
+        "bucket_capacity": 60,
+        "background_tokens_per_second": 20,
+        "background_bucket_capacity": 10,
+        "maximum_wait_seconds": 5,
+        "default_cost": 10,
+        "benchmark_cost": 50,
+        "initial_tokens": 0,
+        "cooldown_seconds": [
+            2,
+            4,
+            8,
+            16,
+            30
+        ]
+    },
+    "fee_evidence_policy": "Adopted for this study only, from the account's own Kalshi fee records, not a Kalshi classification: GET-only reconciliation of all KXBTC15M taker orders, re-run within 72 h of sealing and again after the study ends; each run must show zero orders matching only .01, complete pagination and at least one decisive .0001 match. The sealing-time summary is archived with the release as fee_evidence_refresh_summary.json. The account was opened directly on kalshi.com under Kalshi's Member Agreement, not through an FCM or IB (account-holder statement). Kalshi support declined to state the classification (2026-09-30). Tripwire: any order matching only .01, at the freeze, after the study or before any advice is considered, invalidates this fee assumption; without a passing post-study refresh the release report leaves fee assumptions unverified. Reconciliation stays offline, taker-only and excluded from strategy evaluation.",
+    "profitability_validation_mode": "EVIDENCE_ONLY_0001_PRECISION_FROM_ACCOUNT_LEDGER",
+    "readiness_status": "SEALED_EVIDENCE_ONLY",
+    "activation_allowed": true,
+    "advice_allowed": false,
+    "execution_allowed": false,
+    "reuse_study002_approval_or_data": false
+}

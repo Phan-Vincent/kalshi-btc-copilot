@@ -1,0 +1,16 @@
+[Unit]
+Description=Deterministic KXBTC15M fee, read-budget and clock attestation (GET-only)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=%h/btc-study/current
+# Before any release code runs, a system binary checks the launcher's own hash (filled in by
+# release_tool.py seal); the launcher then verifies every other file against the approved manifest.
+ExecStartPre=/bin/sh -c 'cd %h/btc-study/current && echo "0d34f1736c869aaaaa0511a92645008a57ec76f89ee8b01ed183eb49bd273aa2  launch.py" | /usr/bin/sha256sum --check --quiet --strict -'
+ExecStartPre=/usr/bin/python3 -I -B %h/btc-study/current/launch.py --verify-only
+ExecStartPre=/bin/sh -c 'cd %h/btc-study/current && echo "3a5c0399e92eb605d08bf7187dffc7498c989e882a7d8466c043c726cea0fdb4  acer_ops.py" | /usr/bin/sha256sum --check --quiet --strict -'
+Environment=PYTHONDONTWRITEBYTECODE=1
+ExecStart=/usr/bin/python3 -B %h/btc-study/current/acer_ops.py attest
+UMask=0077

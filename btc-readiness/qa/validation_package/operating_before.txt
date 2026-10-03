@@ -1,0 +1,56 @@
+test_abrupt_exit_after_append_repeats_diagnostic_with_stable_identity (__main__.OperatingBounds.test_abrupt_exit_after_append_repeats_diagnostic_with_stable_identity) ... ERROR
+test_abrupt_exit_after_audit_commit_keeps_pending_state (__main__.OperatingBounds.test_abrupt_exit_after_audit_commit_keeps_pending_state) ... ok
+test_abrupt_exit_after_json_leaves_partial_but_nonconfirming_publication (__main__.OperatingBounds.test_abrupt_exit_after_json_leaves_partial_but_nonconfirming_publication) ... ok
+test_abrupt_exit_after_pending_recovers_without_duplicate_count (__main__.OperatingBounds.test_abrupt_exit_after_pending_recovers_without_duplicate_count) ... ok
+test_abrupt_exit_mid_sqlite_transaction_rolls_back (__main__.OperatingBounds.test_abrupt_exit_mid_sqlite_transaction_rolls_back) ... ok
+test_consistent_long_pause_records_gap_not_clock_reset (__main__.OperatingBounds.test_consistent_long_pause_records_gap_not_clock_reset) ... /opt/homebrew/Cellar/python@3.14/3.14.4_1/Frameworks/Python.framework/Versions/3.14/lib/python3.14/copy.py:110: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x109f3ea70>
+  def deepcopy(x, memo=None, _nil=[]):
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+/opt/homebrew/Cellar/python@3.14/3.14.4_1/Frameworks/Python.framework/Versions/3.14/lib/python3.14/copy.py:110: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x109f3e020>
+  def deepcopy(x, memo=None, _nil=[]):
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+/opt/homebrew/Cellar/python@3.14/3.14.4_1/Frameworks/Python.framework/Versions/3.14/lib/python3.14/copy.py:110: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x109f3eb60>
+  def deepcopy(x, memo=None, _nil=[]):
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+ok
+test_expiry_after_study_storage_rejects_before_publication (__main__.OperatingBounds.test_expiry_after_study_storage_rejects_before_publication) ... FAIL
+test_expiry_during_publication_prevents_confirmation_commit (__main__.OperatingBounds.test_expiry_during_publication_prevents_confirmation_commit) ... FAIL
+test_reboot_monotonic_reset_fails_closed (__main__.OperatingBounds.test_reboot_monotonic_reset_fails_closed) ... ok
+test_repeated_disk_full_never_advances_confirmation (__main__.OperatingBounds.test_repeated_disk_full_never_advances_confirmation) ... ok
+test_replay_retention_prunes_only_declared_observation_window (__main__.OperatingBounds.test_replay_retention_prunes_only_declared_observation_window) ... ok
+test_suspend_wall_only_jump_fails_closed (__main__.OperatingBounds.test_suspend_wall_only_jump_fails_closed) ... ok
+
+======================================================================
+ERROR: test_abrupt_exit_after_append_repeats_diagnostic_with_stable_identity (__main__.OperatingBounds.test_abrupt_exit_after_append_repeats_diagnostic_with_stable_identity)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/you/.codex/.chatgpt-projects/g-p-PROJECT/qa_btc_2026-09-27/validation_package/test_operating_bounds.py", line 79, in test_abrupt_exit_after_append_repeats_diagnostic_with_stable_identity
+    self.assertTrue(all(row['_observation_digest']==b.observation_digest(snapshot) for row in rows))
+                    ^^^
+  File "/Users/you/.codex/.chatgpt-projects/g-p-PROJECT/qa_btc_2026-09-27/validation_package/test_operating_bounds.py", line 79, in <genexpr>
+    self.assertTrue(all(row['_observation_digest']==b.observation_digest(snapshot) for row in rows))
+                        ~~~^^^^^^^^^^^^^^^^^^^^^^^
+KeyError: '_observation_digest'
+
+======================================================================
+FAIL: test_expiry_after_study_storage_rejects_before_publication (__main__.OperatingBounds.test_expiry_after_study_storage_rejects_before_publication)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/you/.codex/.chatgpt-projects/g-p-PROJECT/qa_btc_2026-09-27/validation_package/test_operating_bounds.py", line 27, in test_expiry_after_study_storage_rejects_before_publication
+    with self.assertRaises(a.ReadError):b.persist_observation(self.c,audit,study,copy.deepcopy(self.s))
+         ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+AssertionError: ReadError not raised
+
+======================================================================
+FAIL: test_expiry_during_publication_prevents_confirmation_commit (__main__.OperatingBounds.test_expiry_during_publication_prevents_confirmation_commit)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/you/.codex/.chatgpt-projects/g-p-PROJECT/qa_btc_2026-09-27/validation_package/test_operating_bounds.py", line 38, in test_expiry_during_publication_prevents_confirmation_commit
+    with patch.object(b,'atomic',side_effect=slow),self.assertRaises(a.ReadError):b.persist_observation(self.c,audit,study,copy.deepcopy(self.s))
+                                                   ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+AssertionError: ReadError not raised
+
+----------------------------------------------------------------------
+Ran 12 tests in 0.552s
+
+FAILED (failures=2, errors=1)

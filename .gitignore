@@ -1,0 +1,12 @@
+# Account data pulled from Kalshi (fills, orders): never commit.
+btc-readiness/private/
+# Runtime state and journals
+**/state/
+*.sqlite3
+# Caches and OS files
+__pycache__/
+*.pyc
+.DS_Store
+# Agent run transcripts (large; kept on disk under history/)
+*.log
+.claude/settings.local.json

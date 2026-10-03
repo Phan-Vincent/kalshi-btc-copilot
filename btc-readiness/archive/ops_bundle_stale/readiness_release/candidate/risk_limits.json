@@ -1,0 +1,14 @@
+{
+  "schema_version": 2,
+  "risk_fraction_of_account": ".05",
+  "max_loss_per_trade_ceiling": "25",
+  "daily_loss_limit": "30",
+  "daily_boundary_timezone": "America/Los_Angeles",
+  "max_simultaneous_positions": 1,
+  "exposure_policy": "max_loss_premium_fees_stress_including_pending",
+  "adding_enabled": false,
+  "max_evidence_age_seconds": "60",
+  "advice_enabled": false,
+  "trading_authorized": false,
+  "scope": "Offline conditional risk checks only. Per-trade maximum loss is 5% of verified total account value, capped at $25. Open-plus-pending exposure is measured as maximum loss (premium + fee bound + stress reserve) and capped at the same amount (one position). Daily limit: $30 of realized gross losses plus committed open/pending maximum loss per America/Los_Angeles day; wins do not replenish it. Account owner limits recorded 2026-09-27."
+}

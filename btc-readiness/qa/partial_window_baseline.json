@@ -1,0 +1,30 @@
+[
+  {
+    "target": "original",
+    "shadow_decision": "UP",
+    "data_quality_faults": [],
+    "eligible_arms": [
+      "current_full",
+      "drift_free",
+      "without_structure",
+      "without_confirmation",
+      "without_flow",
+      "without_imbalance",
+      "without_strike_chop"
+    ]
+  },
+  {
+    "target": "study002",
+    "shadow_decision": "UP",
+    "data_quality_faults": [],
+    "eligible_arms": [
+      "current_full",
+      "drift_free",
+      "without_structure",
+      "without_confirmation",
+      "without_flow",
+      "without_imbalance",
+      "without_strike_chop"
+    ]
+  }
+]

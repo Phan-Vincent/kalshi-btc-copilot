@@ -1,0 +1,56 @@
+test_ambiguous_order_and_conflicting_prices_excluded (test_fee_reconciliation.FeeRegression.test_ambiguous_order_and_conflicting_prices_excluded) ... ok
+test_arithmetic_agrees_with_preserved_buy_implementation (test_fee_reconciliation.FeeRegression.test_arithmetic_agrees_with_preserved_buy_implementation) ... ok
+test_distinguishing_precision_is_not_membership (test_fee_reconciliation.FeeRegression.test_distinguishing_precision_is_not_membership) ... ok
+test_incomplete_or_maker_or_duplicate_excluded (test_fee_reconciliation.FeeRegression.test_incomplete_or_maker_or_duplicate_excluded) ... ok
+test_invalid_values (test_fee_reconciliation.FeeRegression.test_invalid_values) ... ok
+test_missing_or_non_utc_timestamp_rejected (test_fee_reconciliation.FeeRegression.test_missing_or_non_utc_timestamp_rejected) ... ok
+test_official_buy_example_and_signed_sell (test_fee_reconciliation.FeeRegression.test_official_buy_example_and_signed_sell) ... ok
+test_other_series_excluded (test_fee_reconciliation.FeeRegression.test_other_series_excluded) ... ok
+test_side_asymmetry_sell_revenue (test_fee_reconciliation.FeeRegression.test_side_asymmetry_sell_revenue) ... ok
+test_summary_contains_no_trade_identifiers_or_values (test_fee_reconciliation.FeeRegression.test_summary_contains_no_trade_identifiers_or_values) ... ok
+test_failed_clock_does_not_reset_baseline_or_evidence (test_lifecycle_evidence.LifecycleEvidence.test_failed_clock_does_not_reset_baseline_or_evidence) ... ok
+test_missed_checkpoint_not_backfilled_after_restart (test_lifecycle_evidence.LifecycleEvidence.test_missed_checkpoint_not_backfilled_after_restart) ... ok
+test_unrelated_study001_sentinel_untouched (test_lifecycle_evidence.LifecycleEvidence.test_unrelated_study001_sentinel_untouched) ... ok
+test_429_shared_cooldown_exponential_no_retry (test_pacing.PacingTests.test_429_shared_cooldown_exponential_no_retry) ... ok
+test_all_gets_paced_before_auth_and_guard_rechecked (test_pacing.PacingTests.test_all_gets_paced_before_auth_and_guard_rechecked) ... ok
+test_background_batch_and_foreground_share_global_bound (test_pacing.PacingTests.test_background_batch_and_foreground_share_global_bound) ... ok
+test_background_cannot_consume_foreground_capacity_unbounded (test_pacing.PacingTests.test_background_cannot_consume_foreground_capacity_unbounded) ... ok
+test_cold_start_weighted_and_no_idle_burst (test_pacing.PacingTests.test_cold_start_weighted_and_no_idle_burst) ... ok
+test_global_singleton_shared_by_multiple_clients (test_pacing.PacingTests.test_global_singleton_shared_by_multiple_clients) ... ok
+test_invalid_cost_and_background_cost (test_pacing.PacingTests.test_invalid_cost_and_background_cost) ... ok
+test_invalid_wait_deadline (test_pacing.PacingTests.test_invalid_wait_deadline) ... ok
+test_lane_context_restored_after_exception (test_pacing.PacingTests.test_lane_context_restored_after_exception) ... ok
+test_launch_interval_rejected_before_approval_or_runtime (test_pacing.PacingTests.test_launch_interval_rejected_before_approval_or_runtime) ... ok
+test_oversleep_and_clock_reverse_fail_closed (test_pacing.PacingTests.test_oversleep_and_clock_reverse_fail_closed) ... ok
+test_pacing_failure_never_signs_or_dispatches (test_pacing.PacingTests.test_pacing_failure_never_signs_or_dispatches) ... ok
+test_same_instant_concurrent_requests_cannot_overspend (test_pacing.PacingTests.test_same_instant_concurrent_requests_cannot_overspend) ... ok
+test_actual_cli_denied_before_runtime_or_network (test_study002.Isolation.test_actual_cli_denied_before_runtime_or_network) ... ok
+test_approval_hash_expiry_paths_and_symlinks (test_study002.Isolation.test_approval_hash_expiry_paths_and_symlinks) ... ok
+test_get_only_transport_and_no_activate_command (test_study002.Isolation.test_get_only_transport_and_no_activate_command) ... ok
+test_incomplete_manifest_rejected (test_study002.Isolation.test_incomplete_manifest_rejected) ... ok
+test_reconciliation_cannot_read_when_guard_rejects (test_study002.Isolation.test_reconciliation_cannot_read_when_guard_rejects) ... ok
+test_accumulator_is_order_local (test_study002.Rules.test_accumulator_is_order_local) ... ok
+test_adversarial_fragmentation_bound (test_study002.Rules.test_adversarial_fragmentation_bound) ... ok
+test_bootstrap_seed_reproducibility_and_consecutive_days (test_study002.Rules.test_bootstrap_seed_reproducibility_and_consecutive_days) ... ok
+test_clock_discontinuity_duplicate_future_and_nan (test_study002.Rules.test_clock_discontinuity_duplicate_future_and_nan) ... ok
+test_depth_partial_and_invalid_grid (test_study002.Rules.test_depth_partial_and_invalid_grid) ... ok
+test_fractional_rebates_and_conservation (test_study002.Rules.test_fractional_rebates_and_conservation) ... ok
+test_future_utc_dates_and_holdout_duration (test_study002.Rules.test_future_utc_dates_and_holdout_duration) ... ok
+test_missing_calendar_not_zeros (test_study002.Rules.test_missing_calendar_not_zeros) ... ok
+test_official_fee_example (test_study002.Rules.test_official_fee_example) ... ok
+test_protocol_and_no_weak_threshold (test_study002.Rules.test_protocol_and_no_weak_threshold) ... ok
+test_tight_fragmentation_bound_for_random_groupings (test_study002.Rules.test_tight_fragmentation_bound_for_random_groupings) ... ok
+test_amendment_quarantined_original_preserved (test_study002.StudyTests.test_amendment_quarantined_original_preserved) ... ok
+test_duplicate_observation_and_slot_collision (test_study002.StudyTests.test_duplicate_observation_and_slot_collision) ... ok
+test_empty_study_cannot_pass_at_release (test_study002.StudyTests.test_empty_study_cannot_pass_at_release) ... ok
+test_exact_delay_boundary_and_expiry (test_study002.StudyTests.test_exact_delay_boundary_and_expiry) ... ok
+test_holdout_poison_never_parsed_before_unlock (test_study002.StudyTests.test_holdout_poison_never_parsed_before_unlock) ... ok
+test_late_quote_missed_no_best_price_replacement (test_study002.StudyTests.test_late_quote_missed_no_best_price_replacement) ... ok
+test_pending_exposure_retained_and_old_database_unchanged (test_study002.StudyTests.test_pending_exposure_retained_and_old_database_unchanged) ... ok
+test_request_before_deadline_waits_then_first_eligible_consumed (test_study002.StudyTests.test_request_before_deadline_waits_then_first_eligible_consumed) ... ok
+test_settlement_fairness_with_backlog (test_study002.StudyTests.test_settlement_fairness_with_backlog) ... ok
+
+----------------------------------------------------------------------
+Ran 51 tests in 0.778s
+
+OK

@@ -1,0 +1,27 @@
+{
+  "study_id": "btc-prospective-001",
+  "start_utc": "2026-09-27T00:00:00+00:00",
+  "validation_start_utc": "2026-10-04T00:00:00+00:00",
+  "holdout_start_utc": "2026-10-11T00:00:00+00:00",
+  "end_utc": "2026-11-08T00:00:00+00:00",
+  "release_utc": "2026-11-09T00:00:00+00:00",
+  "primary_strategy": "drift_free",
+  "fee_multiplier": "1",
+  "reaction_delay_seconds": 15,
+  "delay_window_seconds": 20,
+  "forecast_checkpoint": "First healthy observation at 570\u2013600 seconds remaining; same observation for every forecast model. Missed checkpoints excluded and counted against coverage.",
+  "primary_exit": "Official settlement only; no learned exit strategy.",
+  "primary_acceptance": {
+    "matched_forecasts": 1000,
+    "filled_contracts": 100,
+    "distinct_days": 20,
+    "holdout_coverage": 0.95,
+    "stress_daily_lower_bound": ">0",
+    "paired_zero_minus_market_brier_upper_bound": "<0",
+    "calibration_ece": 0.05
+  },
+  "holdout_policy": "Final outcomes withheld by default report until release. No parameter tuning or primary reselection. Changes require a new future study; no automatic reset or promotion.",
+  "comparison_policy": "Market midpoint is price-implied probability only; never assumed executable. Always abstain has zero trading return. Ablations are exploratory, never selected for promotion from these results.",
+  "risk_policy": "One-unit hypothetical experiments only. Personalized sizing requires user risk budget, maximum loss and constraints.",
+  "uncertainty": "Deterministic 2000-replicate UTC-day block bootstrap, seed719; <14 days unavailable. Fixed volatility split sigma2 USD/sqrt(second); fixed UTC sessions; small samples remain inconclusive."
+}

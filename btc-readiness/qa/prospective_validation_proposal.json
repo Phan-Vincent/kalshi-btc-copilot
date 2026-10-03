@@ -1,0 +1,94 @@
+{
+  "status": "PROPOSAL_ONLY_NOT_EXECUTABLE_NOT_APPROVED",
+  "study_id": "btc-candidate-005-PROPOSED",
+  "candidate_model_version": "5.1.0-offline-acceptance-candidate-a50cd329bcdd3b08",
+  "candidate_manifest_sha256": "84bdef14b9d97cbb2388d25130a587ef83f0c92f49bcd4bbf661338fc82399ad",
+  "activation_allowed": false,
+  "advice_allowed": false,
+  "execution_allowed": false,
+  "reuse_study002_approval_or_data": false,
+  "date_policy": {
+    "start_utc": null,
+    "start_selection": "New future UTC-midnight start after engineering review, official source/fee/rate verification, independent acceptance and explicit study approval; no backfill",
+    "development_days": 7,
+    "validation_days": 7,
+    "holdout_days": 56,
+    "release_utc": null,
+    "release_rule": "At least two days after collection end, with fresh official settlement rechecks and all outcomes resolved; never automatic date shifts"
+  },
+  "frozen_design": {
+    "primary_strategy": "drift_free",
+    "primary_strategy_selection": "Proposed before collection; no selection based on study002 outcomes. A changed primary needs a separately reviewed protocol before any new data is collected.",
+    "quantity_contracts": "1.00",
+    "exit": "Official settlement only",
+    "reaction_delay_seconds": 15,
+    "delay_window_seconds": 20,
+    "checkpoint_remaining_seconds": [
+      570,
+      600
+    ],
+    "scheduled_contracts_per_utc_day": 96,
+    "acceptance": {
+      "matched_forecasts": 5376,
+      "filled_contracts": 100,
+      "distinct_days": 40,
+      "holdout_coverage": 1.0,
+      "unresolved_enrolled": 0,
+      "missing_calendar_days": 0,
+      "amended_results": 0,
+      "missing_execution_observations": 0,
+      "calibration_ece_max": 0.05,
+      "stress_daily_lower_bound": "strictly > 0 for all predeclared block lengths",
+      "paired_zero_minus_market_brier_upper_bound": "strictly < 0 for all predeclared block lengths"
+    },
+    "uncertainty": {
+      "block_days": [
+        1,
+        2,
+        7
+      ],
+      "replicates": 2000,
+      "seed": 719,
+      "minimum_holdout_days": 56
+    }
+  },
+  "cost_policy": {
+    "conservative_precision_scenarios": [
+      "0.0001",
+      "0.01"
+    ],
+    "minimum_fill_quantum": "0.01",
+    "stress_scenario": "Preserve current conservative fragmentation bounds and predeclared slippage reserves. No weakening after results.",
+    "profitability_status": "BLOCKED_PENDING_FEE_AND_EXECUTION_EVIDENCE",
+    "required_evidence": "Independent official current KXBTC15M fee/multiplier, fill quantum, account precision and applicable read cost/rate verification; no account mutations or authenticated test launch in this proposal"
+  },
+  "persistence_policy": {
+    "confirmation": "Only previously completed observation with matching digest, logged state and committed completion marker, healthy source provenance and a newer source sample may confirm",
+    "authorities": "Study database transactions and unique slot/signal keys; observation JSONL diagnostic only",
+    "duplicate_policy": "Exact repeated state observation idempotent; conflicting same-time payload/reversed clock rejected; study clock read/check/write serialized",
+    "crash_policy": "Any uncommitted new observation stays nonconfirming across restart. Gaps/missing execution windows are retained, not backfilled or imputed. Pending diagnostics may duplicate after crash; never substitute them for authoritative outcomes.",
+    "remaining_gate": "Demonstrate separately reviewed machine power-loss, reboot/clock continuity, retention/disk-capacity and interrupted-publication recovery policy before activation"
+  },
+  "holdout_policy": {
+    "fresh_database": true,
+    "protected_prior_outcomes_unread": true,
+    "no_tuning_or_primary_reselection": true,
+    "result_access": "Separate evaluator and access controls; no analyst holdout queries before approved release",
+    "no_automatic_promotion": true
+  },
+  "approval_gates": [
+    "All engineering blockers addressed or explicitly reviewed with bounded operating scope",
+    "Successful independent acceptance review; Reasonix timeout/partial output is not sign-off",
+    "New source/protocol/dependency and configuration hashes archived together",
+    "Separate manifest-bound evidence-only approval before proposed start",
+    "No approval inheritance or modification of study002 sealed release",
+    "Prepare a separately reviewed research release; do not remove the offline candidate guard as an adoption shortcut"
+  ],
+  "not_supported": [
+    "Leveraged BTC positions",
+    "Collateral or liquidation sizing",
+    "Quantitative BTC stop risk",
+    "Live order execution",
+    "Validated trading advice"
+  ]
+}

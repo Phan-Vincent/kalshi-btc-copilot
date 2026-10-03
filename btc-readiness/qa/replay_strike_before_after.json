@@ -1,0 +1,16 @@
+[
+  {
+    "phase": "before",
+    "matches": true,
+    "mismatched_fields": [],
+    "compared_count": 31
+  },
+  {
+    "phase": "after",
+    "matches": false,
+    "mismatched_fields": [
+      "strike"
+    ],
+    "compared_count": 55
+  }
+]

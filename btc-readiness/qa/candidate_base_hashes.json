@@ -1,0 +1,18 @@
+{
+  "test_fee_reconciliation.py": "c132f1e4a7f5d368f2a812a2a43ad5c5641233de726662f95b101ac9de9e0ad6",
+  "kalshi_readonly.py": "45f595fae210b617ad81b6e199f12120c079ee2219632109f948180bd8073b8e",
+  "QA_ONLY": "1eea7508538a92068f40e5280f434540913611fc51efed74c73ced3cc920d0db",
+  "test_study002.py": "fc4bef60f21e8f479c353b913a41710f34e1b270d0eafaf63ef481b3df797c82",
+  "btc_copilot_settings.json": "47dedad12c34481024d90cc5fafa45293bafa990bc555bf5eaa6f4a8ab0c4eab",
+  "btc_copilot_research.py": "2a378636522fa8b96d52a0edc6b7770829b2bbeff4246786e4f10af2741c828c",
+  "test_pacing.py": "d11871e7a0cd9861d213a3f9a0902be4c2a2ca0fe96f3222946097238855840a",
+  "btc_copilot.html": "eef18ee4bc4bad3f12626c1bcde4e9972572ca78bc67ee5c09033b2dc185c06a",
+  "study_policy.py": "79548d913d0ee80a1cba830cebbe88f815b59a41da558a33314b5e0388895c9d",
+  "test_lifecycle_evidence.py": "9268a96480011ad541f63b54936eec8eb1ea07eefbce75e10ca2ccfd1341c5b5",
+  "btc_copilot.py": "bcda27930e26ed6e9a6527bc6796887dc9f17f1ec1a9507bb5a2f0ad07957476",
+  "request_pacing.py": "29b3e4d546d1ea8c5fbf634213b73174f70833e2f04510b2d702624ff9d6e3b7",
+  "release_manifest.json": "848151a08e737c1604c04d2ecdee58f38e6978b4314fca03b8f4e77893dede88",
+  "btc_copilot_evidence.py": "99be5599e8bfe46924d91725ddc732c48984762255a61002a6233082871eb155",
+  "btc_copilot_protocol.json": "1f67bba90077429de6ccdbd62970338da7da4cdda685feb1ee36038abb80ecd4",
+  "fee_reconciliation.py": "bc52011f63466bdd949ebf8296d7f1793c736ad9202b4c994626c02a807d003b"
+}

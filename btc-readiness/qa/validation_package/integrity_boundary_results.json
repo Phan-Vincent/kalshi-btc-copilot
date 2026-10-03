@@ -1,0 +1,32 @@
+[
+  {
+    "scenario": "valid_disabled_fixture",
+    "exit_code": 0,
+    "expected_exit": 0,
+    "passed": true
+  },
+  {
+    "scenario": "changed_manifest",
+    "exit_code": 1,
+    "expected_exit": 1,
+    "passed": true
+  },
+  {
+    "scenario": "changed_artifact",
+    "exit_code": 1,
+    "expected_exit": 1,
+    "passed": true
+  },
+  {
+    "scenario": "unexpected_approval",
+    "exit_code": 1,
+    "expected_exit": 1,
+    "passed": true
+  },
+  {
+    "scenario": "escaping_artifact_path",
+    "exit_code": 1,
+    "expected_exit": 1,
+    "passed": true
+  }
+]

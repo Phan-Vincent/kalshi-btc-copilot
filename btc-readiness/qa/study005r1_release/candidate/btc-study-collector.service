@@ -1,0 +1,22 @@
+[Unit]
+Description=BTC 15m evidence-only collector (no trading, no advice)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/btc-study/current
+# Before any release code runs, a system binary checks the launcher's own hash (filled in by
+# release_tool.py seal); the launcher then verifies every other file against the approved manifest.
+ExecStartPre=/bin/sh -c 'cd %h/btc-study/current && echo "__LAUNCH_SHA256__  launch.py" | /usr/bin/sha256sum --check --quiet --strict -'
+# -I: ignore PYTHONPATH and user site; -B plus the env var: never write bytecode.
+Environment=PYTHONDONTWRITEBYTECODE=1
+ExecStart=/usr/bin/python3 -I -B %h/btc-study/current/launch.py --collect
+# No automatic restart: an unclean exit or halt keeps its RUNNING/HALTED marker
+# for review, and the watch timer alerts on Telegram.
+Restart=no
+Nice=5
+UMask=0077
+
+[Install]
+WantedBy=default.target

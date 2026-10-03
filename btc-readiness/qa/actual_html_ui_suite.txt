@@ -1,0 +1,86 @@
+[
+  {
+    "target": "original",
+    "scenario": "expired",
+    "expected": "NO TRADE",
+    "actual": "NO TRADE",
+    "passed": true
+  },
+  {
+    "target": "original",
+    "scenario": "future",
+    "expected": "NO TRADE",
+    "actual": "NO TRADE",
+    "passed": true
+  },
+  {
+    "target": "original",
+    "scenario": "disconnected",
+    "expected": "NO TRADE",
+    "actual": "NO TRADE",
+    "passed": true
+  },
+  {
+    "target": "original",
+    "scenario": "missing_epoch",
+    "expected": "NO TRADE",
+    "actual": "UP",
+    "passed": false
+  },
+  {
+    "target": "original",
+    "scenario": "missing_expiry",
+    "expected": "NO TRADE",
+    "actual": "NO TRADE",
+    "passed": true
+  },
+  {
+    "target": "original",
+    "scenario": "nonfinite_epoch",
+    "expected": "NO TRADE",
+    "actual": "UP",
+    "passed": false
+  },
+  {
+    "target": "study002",
+    "scenario": "expired",
+    "expected": "NO TRADE",
+    "actual": "NO TRADE",
+    "passed": true
+  },
+  {
+    "target": "study002",
+    "scenario": "future",
+    "expected": "NO TRADE",
+    "actual": "NO TRADE",
+    "passed": true
+  },
+  {
+    "target": "study002",
+    "scenario": "disconnected",
+    "expected": "NO TRADE",
+    "actual": "NO TRADE",
+    "passed": true
+  },
+  {
+    "target": "study002",
+    "scenario": "missing_epoch",
+    "expected": "NO TRADE",
+    "actual": "UP",
+    "passed": false
+  },
+  {
+    "target": "study002",
+    "scenario": "missing_expiry",
+    "expected": "NO TRADE",
+    "actual": "NO TRADE",
+    "passed": true
+  },
+  {
+    "target": "study002",
+    "scenario": "nonfinite_epoch",
+    "expected": "NO TRADE",
+    "actual": "UP",
+    "passed": false
+  }
+]

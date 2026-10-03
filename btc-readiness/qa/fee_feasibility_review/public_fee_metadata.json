@@ -1,0 +1,16 @@
+[
+  {
+    "url": "https://external-api.kalshi.com/trade-api/v2/series/KXBTC15M",
+    "retrieved_utc": "2026-09-27T21:22:16.367119+00:00",
+    "error_type": "URLError",
+    "error": "<urlopen error [Errno 8] nodename nor servname provided, or not known>",
+    "authenticated": false
+  },
+  {
+    "url": "https://external-api.kalshi.com/trade-api/v2/series/fee_changes?series_ticker=KXBTC15M&show_historical=false",
+    "retrieved_utc": "2026-09-27T21:22:16.367504+00:00",
+    "error_type": "URLError",
+    "error": "<urlopen error [Errno 8] nodename nor servname provided, or not known>",
+    "authenticated": false
+  }
+]

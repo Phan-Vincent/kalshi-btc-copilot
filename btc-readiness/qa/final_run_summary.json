@@ -1,0 +1,128 @@
+[
+  {
+    "suite": "original_existing",
+    "exit_code": 0,
+    "command": [
+      "/opt/homebrew/opt/python@3.14/bin/python3.14",
+      "-B",
+      "-m",
+      "unittest",
+      "discover",
+      "-s",
+      "work",
+      "-p",
+      "test_*.py",
+      "-v"
+    ],
+    "cwd": "/Users/you/.codex/.chatgpt-projects/g-p-PROJECT/qa_btc_2026-09-27/original",
+    "tests": 34
+  },
+  {
+    "suite": "original_known_regressions",
+    "exit_code": 0,
+    "command": [
+      "/opt/homebrew/opt/python@3.14/bin/python3.14",
+      "-B",
+      "-m",
+      "unittest",
+      "discover",
+      "-s",
+      "outputs",
+      "-p",
+      "copilot_audit_regressions.py",
+      "-v"
+    ],
+    "cwd": "/Users/you/.codex/.chatgpt-projects/g-p-PROJECT/qa_btc_2026-09-27/original",
+    "tests": 10
+  },
+  {
+    "suite": "study002_existing_and_lifecycle",
+    "exit_code": 0,
+    "command": [
+      "/opt/homebrew/opt/python@3.14/bin/python3.14",
+      "-B",
+      "-m",
+      "unittest",
+      "discover",
+      "-s",
+      ".",
+      "-p",
+      "test_*.py",
+      "-v"
+    ],
+    "cwd": "/Users/you/.codex/.chatgpt-projects/g-p-PROJECT/qa_btc_2026-09-27/outputs/copilot_study002_fee_review",
+    "tests": 51
+  },
+  {
+    "suite": "supervision",
+    "exit_code": 0,
+    "command": [
+      "/opt/homebrew/opt/python@3.14/bin/python3.14",
+      "-B",
+      "-m",
+      "unittest",
+      "discover",
+      "-s",
+      ".",
+      "-p",
+      "test_supervise.py",
+      "-v"
+    ],
+    "cwd": "/Users/you/.codex/.chatgpt-projects/g-p-PROJECT/qa_btc_2026-09-27/outputs/study002_supervision",
+    "tests": 34
+  },
+  {
+    "suite": "original_existing_ui",
+    "exit_code": 0,
+    "command": [
+      "node",
+      "work/test_copilot_ui.cjs"
+    ],
+    "cwd": "/Users/you/.codex/.chatgpt-projects/g-p-PROJECT/qa_btc_2026-09-27/original"
+  },
+  {
+    "suite": "original_adversarial",
+    "exit_code": 1,
+    "command": [
+      "/opt/homebrew/opt/python@3.14/bin/python3.14",
+      "-B",
+      "adversarial_audit.py",
+      "original"
+    ],
+    "cwd": "/Users/you/.codex/.chatgpt-projects/g-p-PROJECT/qa_btc_2026-09-27",
+    "run": 40,
+    "passed": 24,
+    "failed_test_methods": 16,
+    "skipped": 0
+  },
+  {
+    "suite": "study002_adversarial",
+    "exit_code": 1,
+    "command": [
+      "/opt/homebrew/opt/python@3.14/bin/python3.14",
+      "-B",
+      "adversarial_audit.py",
+      "study002"
+    ],
+    "cwd": "/Users/you/.codex/.chatgpt-projects/g-p-PROJECT/qa_btc_2026-09-27",
+    "run": 40,
+    "passed": 26,
+    "failed_test_methods": 13,
+    "skipped": 1
+  },
+  {
+    "suite": "actual_html_ui",
+    "exit_code": 1,
+    "command": [
+      "node",
+      "audit_ui.cjs"
+    ],
+    "cwd": "/Users/you/.codex/.chatgpt-projects/g-p-PROJECT/qa_btc_2026-09-27"
+  },
+  {
+    "production_sources_unchanged": true,
+    "changed_paths": [],
+    "study002_seal_intact": true,
+    "study002_runtime_absent": true
+  }
+]

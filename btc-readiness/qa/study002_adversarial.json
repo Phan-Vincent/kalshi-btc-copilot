@@ -1,0 +1,66 @@
+{
+  "target": "study002",
+  "run": 40,
+  "passed": 26,
+  "failed_test_methods": 13,
+  "skipped": 1,
+  "failures": [
+    {
+      "test": "test_atomic_temporary_symlink_does_not_truncate_other_file (__main__.SafetyTests.test_atomic_temporary_symlink_does_not_truncate_other_file)",
+      "detail": "Traceback (most recent call last):\n  File \"/Users/you/.codex/.chatgpt-projects/g-p-PROJECT/qa_btc_2026-09-27/adversarial_audit.py\", line 292, in test_atomic_temporary_symlink_does_not_truncate_other_file\n    self.assertEqual(sentinel.read_text(),'PRESERVE')\n    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nAssertionError: '{\\n  \"revision\": 1\\n}\\n' != 'PRESERVE'\n+ PRESERVE\n- {\n-   \"revision\": 1\n- }\n- \n\n"
+    },
+    {
+      "test": "test_bad_previous_snapshot_cannot_confirm (__main__.SafetyTests.test_bad_previous_snapshot_cannot_confirm)",
+      "detail": "Traceback (most recent call last):\n  File \"/Users/you/.codex/.chatgpt-projects/g-p-PROJECT/qa_btc_2026-09-27/adversarial_audit.py\", line 139, in test_bad_previous_snapshot_cannot_confirm\n    s=collect(raw,prev,st,model);self.assertEqual(s['shadow_decision'],'NO TRADE')\n                                 ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nAssertionError: 'UP' != 'NO TRADE'\n- UP\n+ NO TRADE\n\n"
+    },
+    {
+      "test": "test_duplicate_book_levels_rejected_or_deduplicated (__main__.SafetyTests.test_duplicate_book_levels_rejected_or_deduplicated)",
+      "detail": "Traceback (most recent call last):\n  File \"/Users/you/.codex/.chatgpt-projects/g-p-PROJECT/qa_btc_2026-09-27/adversarial_audit.py\", line 135, in test_duplicate_book_levels_rejected_or_deduplicated\n    self.assertTrue(s['data_quality_faults'] or s['book']['yes_ask_size_fp']==D('.6'),'Duplicate rows manufactured 1.2 contracts from .6')\n    ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nAssertionError: False is not true : Duplicate rows manufactured 1.2 contracts from .6\n"
+    },
+    {
+      "test": "test_duplicate_trade_not_double_counted (__main__.SafetyTests.test_duplicate_trade_not_double_counted)",
+      "detail": "Traceback (most recent call last):\n  File \"/Users/you/.codex/.chatgpt-projects/g-p-PROJECT/qa_btc_2026-09-27/adversarial_audit.py\", line 243, in test_duplicate_trade_not_double_counted\n    s=collect(raw);self.assertTrue(s['data_quality_faults'] or s['recent_trades']['volume_fp']==D(10))\n                   ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nAssertionError: False is not true\n"
+    },
+    {
+      "test": "test_fee_multiplier_negative_rejected (__main__.SafetyTests.test_fee_multiplier_negative_rejected)",
+      "detail": "Traceback (most recent call last):\n  File \"/Users/you/.codex/.chatgpt-projects/g-p-PROJECT/qa_btc_2026-09-27/adversarial_audit.py\", line 173, in test_fee_multiplier_negative_rejected\n    with self.assertRaises((ValueError,ArithmeticError)):r.walk([['.5','1']],'1',True,-1)\n         ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nAssertionError: (<class 'ValueError'>, <class 'ArithmeticError'>) not raised\n"
+    },
+    {
+      "test": "test_future_candle_rejected_or_quarantined (__main__.SafetyTests.test_future_candle_rejected_or_quarantined)",
+      "detail": "Traceback (most recent call last):\n  File \"/Users/you/.codex/.chatgpt-projects/g-p-PROJECT/qa_btc_2026-09-27/adversarial_audit.py\", line 122, in test_future_candle_rejected_or_quarantined\n    self.rejects_or_marks_fault(raw)\n    ~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^\n  File \"/Users/you/.codex/.chatgpt-projects/g-p-PROJECT/qa_btc_2026-09-27/adversarial_audit.py\", line 67, in rejects_or_marks_fault\n    self.assertTrue(s['data_quality_faults'],'Input accepted without a data-quality fault')\n    ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nAssertionError: [] is not true : Input accepted without a data-quality fault\n"
+    },
+    {
+      "test": "test_grid_invalid_infinity_bounded (__main__.SafetyTests.test_grid_invalid_infinity_bounded)",
+      "detail": "Traceback (most recent call last):\n  File \"/Users/you/.codex/.chatgpt-projects/g-p-PROJECT/qa_btc_2026-09-27/adversarial_audit.py\", line 198, in test_grid_invalid_infinity_bounded\n    try:run=subprocess.run([sys.executable,'-B','-c',code],capture_output=True,timeout=.7)\n            ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/opt/homebrew/Cellar/python@3.14/3.14.4_1/Frameworks/Python.framework/Versions/3.14/lib/python3.14/subprocess.py\", line 557, in run\n    stdout, stderr = process.communicate(input, timeout=timeout)\n                     ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/opt/homebrew/Cellar/python@3.14/3.14.4_1/Frameworks/Python.framework/Versions/3.14/lib/python3.14/subprocess.py\", line 1221, in communicate\n    stdout, stderr = self._communicate(input, endtime, timeout)\n                     ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/opt/homebrew/Cellar/python@3.14/3.14.4_1/Frameworks/Python.framework/Versions/3.14/lib/python3.14/subprocess.py\", line 2154, in _communicate\n    self._check_timeout(endtime, orig_timeout, stdout, stderr)\n    ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/opt/homebrew/Cellar/python@3.14/3.14.4_1/Frameworks/Python.framework/Versions/3.14/lib/python3.14/subprocess.py\", line 1268, in _check_timeout\n    raise TimeoutExpired(\n    ...<2 lines>...\n            stderr=b''.join(stderr_seq) if stderr_seq else None)\nsubprocess.TimeoutExpired: Command '['/opt/homebrew/opt/python@3.14/bin/python3.14', '-B', '-c', \"import sys;sys.path.insert(0,'/Users/you/.codex/.chatgpt-projects/g-p-PROJECT/qa_btc_2026-09-27/outputs/copilot_study002_fee_review');import btc_copilot as b;b.grid_prices({'price_ranges':[{'start':'-Infinity','end':'1','step':'.01'}]})\"]' timed out after 0.7 seconds\n\nDuring handling of the above exception, another exception occurred:\n\nTraceback (most recent call last):\n  File \"/Users/you/.codex/.chatgpt-projects/g-p-PROJECT/qa_btc_2026-09-27/adversarial_audit.py\", line 199, in test_grid_invalid_infinity_bounded\n    except subprocess.TimeoutExpired:self.fail('grid_prices hung on nonfinite input')\n                                     ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nAssertionError: grid_prices hung on nonfinite input\n"
+    },
+    {
+      "test": "test_hour_coverage_must_be_proven (__main__.SafetyTests.test_hour_coverage_must_be_proven)",
+      "detail": "Traceback (most recent call last):\n  File \"/Users/you/.codex/.chatgpt-projects/g-p-PROJECT/qa_btc_2026-09-27/adversarial_audit.py\", line 109, in test_hour_coverage_must_be_proven\n    self.rejects_or_marks_fault(raw)\n    ~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^\n  File \"/Users/you/.codex/.chatgpt-projects/g-p-PROJECT/qa_btc_2026-09-27/adversarial_audit.py\", line 67, in rejects_or_marks_fault\n    self.assertTrue(s['data_quality_faults'],'Input accepted without a data-quality fault')\n    ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nAssertionError: [] is not true : Input accepted without a data-quality fault\n"
+    },
+    {
+      "test": "test_negative_trade_quantity_rejected (__main__.SafetyTests.test_negative_trade_quantity_rejected)",
+      "detail": "Traceback (most recent call last):\n  File \"/Users/you/.codex/.chatgpt-projects/g-p-PROJECT/qa_btc_2026-09-27/adversarial_audit.py\", line 130, in test_negative_trade_quantity_rejected\n    self.rejects_or_marks_fault(raw)\n    ~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^\n  File \"/Users/you/.codex/.chatgpt-projects/g-p-PROJECT/qa_btc_2026-09-27/adversarial_audit.py\", line 67, in rejects_or_marks_fault\n    self.assertTrue(s['data_quality_faults'],'Input accepted without a data-quality fault')\n    ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nAssertionError: [] is not true : Input accepted without a data-quality fault\n"
+    },
+    {
+      "test": "test_profit_target_recomputes_exit_fee_at_exit_price (__main__.SafetyTests.test_profit_target_recomputes_exit_fee_at_exit_price)",
+      "detail": "Traceback (most recent call last):\n  File \"/Users/you/.codex/.chatgpt-projects/g-p-PROJECT/qa_btc_2026-09-27/adversarial_audit.py\", line 187, in test_profit_target_recomputes_exit_fee_at_exit_price\n    self.assertGreaterEqual(net,reserve,'20c target nets 2c rather than planned 3c after exit fee')\n    ~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nAssertionError: Decimal('0.02') not greater than or equal to Decimal('0.03') : 20c target nets 2c rather than planned 3c after exit fee\n"
+    },
+    {
+      "test": "test_replay_detects_tampered_shadow_decision (__main__.SafetyTests.test_replay_detects_tampered_shadow_decision)",
+      "detail": "Traceback (most recent call last):\n  File \"/Users/you/.codex/.chatgpt-projects/g-p-PROJECT/qa_btc_2026-09-27/adversarial_audit.py\", line 237, in test_replay_detects_tampered_shadow_decision\n    self.assertFalse(result['matches'],'Replay accepted a forged shadow decision')\n    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nAssertionError: True is not false : Replay accepted a forged shadow decision\n"
+    },
+    {
+      "test": "test_upstream_error_with_payload_must_be_rejected (__main__.SafetyTests.test_upstream_error_with_payload_must_be_rejected)",
+      "detail": "Traceback (most recent call last):\n  File \"/Users/you/.codex/.chatgpt-projects/g-p-PROJECT/qa_btc_2026-09-27/adversarial_audit.py\", line 118, in test_upstream_error_with_payload_must_be_rejected\n    self.rejects_or_marks_fault(raw)\n    ~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^\n  File \"/Users/you/.codex/.chatgpt-projects/g-p-PROJECT/qa_btc_2026-09-27/adversarial_audit.py\", line 67, in rejects_or_marks_fault\n    self.assertTrue(s['data_quality_faults'],'Input accepted without a data-quality fault')\n    ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nAssertionError: [] is not true : Input accepted without a data-quality fault\n"
+    },
+    {
+      "test": "test_walk_zero_negative_null_quantities_fail_closed (__main__.SafetyTests.test_walk_zero_negative_null_quantities_fail_closed) (q='0')",
+      "detail": "Traceback (most recent call last):\n  File \"/Users/you/.codex/.chatgpt-projects/g-p-PROJECT/qa_btc_2026-09-27/adversarial_audit.py\", line 169, in test_walk_zero_negative_null_quantities_fail_closed\n    with self.subTest(q=q),self.assertRaises((ValueError,ArithmeticError,TypeError)):\n                           ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nAssertionError: (<class 'ValueError'>, <class 'ArithmeticError'>, <class 'TypeError'>) not raised\n"
+    },
+    {
+      "test": "test_walk_zero_negative_null_quantities_fail_closed (__main__.SafetyTests.test_walk_zero_negative_null_quantities_fail_closed) (q='-1')",
+      "detail": "Traceback (most recent call last):\n  File \"/Users/you/.codex/.chatgpt-projects/g-p-PROJECT/qa_btc_2026-09-27/adversarial_audit.py\", line 169, in test_walk_zero_negative_null_quantities_fail_closed\n    with self.subTest(q=q),self.assertRaises((ValueError,ArithmeticError,TypeError)):\n                           ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nAssertionError: (<class 'ValueError'>, <class 'ArithmeticError'>, <class 'TypeError'>) not raised\n"
+    }
+  ],
+  "errors": []
+}
