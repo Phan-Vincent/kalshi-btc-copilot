@@ -1,0 +1,12 @@
+[Unit]
+Description=BTC study health check and Telegram alerts
+
+[Service]
+Type=oneshot
+WorkingDirectory=%h/btc-study/current
+# Only acer_ops.py itself is hash-checked (filled in by seal), so alerts keep working if any other
+# release file is damaged: the watch then sends a 'Release verification failed' CRIT. If acer_ops.py
+# itself changed, the watch stops and the missing 9 am message is the alarm.
+ExecStartPre=/bin/sh -c 'cd %h/btc-study/current && echo "01f2323c27ce0b9c494bdc9627564ac44854f1a7df4ada1ad2fd44e2a6b30fd6  acer_ops.py" | /usr/bin/sha256sum --check --quiet --strict -'
+ExecStart=/usr/bin/python3 -B %h/btc-study/current/acer_ops.py watch
+UMask=0077

@@ -1,0 +1,34 @@
+test_accumulator_scope_is_order_not_account (__main__.FeeFeasibility.test_accumulator_scope_is_order_not_account) ... ok
+test_all_99_cent_prices_attain_pre_reserve_one_dollar (__main__.FeeFeasibility.test_all_99_cent_prices_attain_pre_reserve_one_dollar) ... ok
+test_cent_rebate_cap_defeats_large_accumulator (__main__.FeeFeasibility.test_cent_rebate_cap_defeats_large_accumulator) ... ok
+test_current_acceptance_keeps_both_precisions_and_stress (__main__.FeeFeasibility.test_current_acceptance_keeps_both_precisions_and_stress) ... ok
+test_direct_precision_fragmented_half_price (__main__.FeeFeasibility.test_direct_precision_fragmented_half_price) ... ok
+test_documented_buy_example (__main__.FeeFeasibility.test_documented_buy_example) ... ok
+test_endpoint_model_fees_are_zero (__main__.FeeFeasibility.test_endpoint_model_fees_are_zero) ... ok
+test_fragmentation_affects_direct_rounding_at_other_price (__main__.FeeFeasibility.test_fragmentation_affects_direct_rounding_at_other_price) ... ok
+test_invalid_fractional_granularity_is_rejected (__main__.FeeFeasibility.test_invalid_fractional_granularity_is_rejected) ... ok
+test_mixed_price_fractional_fills_agree_with_oracle (__main__.FeeFeasibility.test_mixed_price_fractional_fills_agree_with_oracle) ... ok
+test_one_contract_and_hundred_fragments_cent_precision (__main__.FeeFeasibility.test_one_contract_and_hundred_fragments_cent_precision) ... ok
+test_order_accumulator_does_rebate_when_fill_cap_permits (__main__.FeeFeasibility.test_order_accumulator_does_rebate_when_fill_cap_permits) ... ok
+test_precision_alone_does_not_guarantee_profit_at_high_price (__main__.FeeFeasibility.test_precision_alone_does_not_guarantee_profit_at_high_price) ... ok
+test_seeded_one_contract_groupings_are_bounded_without_rebates (__main__.FeeFeasibility.test_seeded_one_contract_groupings_are_bounded_without_rebates) ... ok
+test_signed_sell_alignment (__main__.FeeFeasibility.test_signed_sell_alignment) ... ok
+test_subcent_and_edge_prices_do_not_force_rebate (__main__.FeeFeasibility.test_subcent_and_edge_prices_do_not_force_rebate) ... ok
+
+----------------------------------------------------------------------
+Ran 16 tests in 0.073s
+
+OK
+
+{
+  "run": 16,
+  "passed": 16,
+  "failures": 0,
+  "errors": 0,
+  "skipped": 0,
+  "seeded_groupings": 200,
+  "cent_price_cases": 99,
+  "matrix_cases": 20,
+  "network_disabled": true,
+  "actual_execution": false
+}

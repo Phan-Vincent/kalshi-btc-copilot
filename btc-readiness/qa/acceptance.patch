@@ -1,0 +1,219 @@
+--- acceptance-baseline/btc_copilot.py
++++ offline-acceptance-candidate/btc_copilot.py
+@@ -11,6 +11,8 @@
+ from datetime import datetime, timezone
+ from decimal import Decimal, ROUND_CEILING, ROUND_FLOOR
+ import fcntl
++import hashlib
++from contextlib import contextmanager
+ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+ import json
+ import math
+@@ -67,10 +69,29 @@
+         temporary.unlink(missing_ok=True)
+ 
+ 
++@contextmanager
++def output_lock(path):
++    fd=os.open(path,os.O_RDWR|os.O_CREAT|os.O_NOFOLLOW,0o600)
++    try:
++        if os.fstat(fd).st_nlink!=1:raise ReadError('Linked output lock rejected')
++        os.fchmod(fd,0o600);fcntl.flock(fd,fcntl.LOCK_EX)
++        yield
++    finally:os.close(fd)
++
++
+ def append(path, value):
+-    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o600)
+-    with os.fdopen(fd, "w") as f:
+-        f.write(json.dumps(value, default=str, ensure_ascii=False) + "\n")
++    fd=os.open(path,os.O_WRONLY|os.O_CREAT|os.O_APPEND|os.O_NOFOLLOW,0o600)
++    with os.fdopen(fd,'w') as f:
++        if os.fstat(f.fileno()).st_nlink!=1:raise ReadError('Linked log destination rejected')
++        os.fchmod(f.fileno(),0o600);fcntl.flock(f.fileno(),fcntl.LOCK_EX)
++        f.write(json.dumps(value,default=str,ensure_ascii=False,allow_nan=False)+'\n')
++        f.flush();os.fsync(f.fileno())
++
++
++def observation_digest(snapshot):
++    # Runtime enrichments are appended after the deterministic observation.
++    payload={k:v for k,v in snapshot.items() if k not in ('scorecard','study')}
++    return hashlib.sha256(json.dumps(payload,sort_keys=True,default=str,allow_nan=False).encode()).hexdigest()
+ 
+ 
+ def spot_get():
+@@ -645,7 +666,29 @@
+         return snapshot
+ 
+     def record(self,s):
+-        t=s['ticker'];contracts=self.state['contracts']
++        digest=observation_digest(s)
++        if type(s['epoch']) not in (int,float) or not math.isfinite(s['epoch']):raise ReadError('Invalid observation epoch')
++        with output_lock(self.state_path.with_suffix('.lock')):
++            if self.state_path.is_symlink():raise ReadError('Linked state destination rejected')
++            staged=json.loads(self.state_path.read_text()) if self.state_path.exists() else copy.deepcopy(self.state)
++            if not isinstance(staged,dict) or not isinstance(staged.get('contracts'),dict):raise ReadError('Corrupted state schema')
++            last=staged.get('last_observation')
++            if last:
++                if s['epoch']<last['epoch']:raise ReadError('Reversed observation rejected')
++                if s['epoch']==last['epoch']:
++                    if digest!=last['digest']:raise ReadError('Conflicting duplicate observation rejected')
++                    if not last['logged']:
++                        compact={k:v for k,v in s.items() if k!='chart'}
++                        compact['structure']={k:v for k,v in s['structure'].items() if k!='bars'}
++                        append(WORK/'btc_copilot_observations.jsonl',compact)
++                        staged['last_observation']['logged']=True
++                        atomic(self.state_path,staged)
++                    self.state=staged
++                    return
++            self._record_pending(s,staged,digest)
++
++    def _record_pending(self,s,staged,digest):
++        t=s['ticker'];contracts=staged['contracts']
+         if t not in contracts:
+             contracts[t]={'ticker':t,'initial_bias':s['initial_bias'],'first_observed_at':s['timestamp'],
+                           'close_time':s['close_time'],'strike':str(s['strike']),'entry_signal':None,'observations':0,'journaled':False}
+@@ -670,9 +713,10 @@
+             bid=s['book']['yes_bid_dollars' if r['entry_signal']=='UP' else 'no_bid_dollars']
+             if bid is not None:
+                 r['min_observed_bid']=str(min(D(r['min_observed_bid']),bid));r['max_observed_bid']=str(max(D(r['max_observed_bid']),bid))
+-        previous=self.state.get('previous')
+-        self.state['previous']={'ticker':t,'epoch':s['epoch'],'btc':float(s['btc']),
+-            'confirmation_valid':not s['operational_vetoes'] and not s['data_quality_faults'],
++        previous=staged.get('previous')
++        staged['previous']={'ticker':t,'epoch':s['epoch'],'btc':float(s['btc']),
++            'confirmation_valid':False, # Pending until audit, study and outputs all succeed.
++            'data_confirmation_valid':not s['operational_vetoes'] and not s['data_quality_faults'],
+             'data_quality_faults':list(s['data_quality_faults']),'operational_vetoes':list(s['operational_vetoes']),
+             'source_epoch':dt(s['btc_observed_at']['utc']).timestamp(),
+             'up_ask':float(s['book']['yes_ask_dollars']) if s['book']['yes_ask_dollars'] is not None else None,
+@@ -684,11 +728,31 @@
+             'position_side':s['position'].get('side'),'held_edge':s['side_evaluations'].get(s['position'].get('side'),{}).get('conservative_net_edge_pp') or 0}
+         # Study002 outcome reconciliation is separate from fresh observation collection.
+         # Original study001 journals are untouched; durable study002 outcome_events are authoritative.
+-        self.state['contracts']={k:v for k,v in contracts.items() if dt(v['close_time']).timestamp()>s['epoch']-172800}
+-        atomic(self.state_path,self.state)
++        staged['contracts']={k:v for k,v in contracts.items() if dt(v['close_time']).timestamp()>s['epoch']-172800}
++        staged['last_observation']={'epoch':s['epoch'],'digest':digest,'logged':False,'committed':False}
++        atomic(self.state_path,staged)
+         compact={k:v for k,v in s.items() if k not in ('chart',)}
+         compact['structure']={k:v for k,v in s['structure'].items() if k!='bars'}
+         append(WORK/'btc_copilot_observations.jsonl',compact)
++
++        staged['last_observation']['logged']=True
++        atomic(self.state_path,staged)
++        self.state=staged
++
++    def commit_observation(self,s):
++        """Commit confirmation only after all caller persistence/publication stages succeed."""
++        with output_lock(self.state_path.with_suffix('.lock')):
++            if self.state_path.is_symlink():raise ReadError('Linked state destination rejected')
++            staged=json.loads(self.state_path.read_text())
++            last=staged.get('last_observation',{})
++            if last.get('digest')!=observation_digest(s) or not last.get('logged'):
++                raise ReadError('Unpersisted or mismatched observation cannot confirm')
++            if s['decision']!='NO TRADE' or s['position']['guidance_valid'] is not False:
++                raise ReadError('Candidate advice must remain disabled')
++            staged['previous']['confirmation_valid']=staged['previous']['data_confirmation_valid']
++            staged['last_observation']['committed']=True
++            atomic(self.state_path,staged)
++            self.state=staged
+ 
+ 
+ def report(s):
+@@ -761,6 +825,22 @@
+             return client.market(ticker)
+     from request_pacing import background_reads
+     with background_reads():study.settle(GuardedPublicClient(),time.time())
++
++def persist_observation(c,audit,study,s):
++    """Finish all persistence stages before enabling the next confirmation."""
++    audit.record(s,c.raw,c.prior,c.settings,ROOT/'btc_copilot_journal.jsonl')
++    s['scorecard']=audit.scorecard()
++    if time.time()>=s['valid_until_epoch']:raise ReadError('Observation expired during persistence')
++    study.record(s,c.raw,c.prior,c.settings)
++    s['study']=study.status(time.time())
++    if not hasattr(study,'last_report') or time.time()-study.last_report>=300:
++        atomic(ROOT/'btc_copilot_evidence_report.json',evidence_report(study.path,time.time()))
++        study.last_report=time.time()
++    atomic(ROOT/'btc_copilot_latest.json',s);atomic(ROOT/'btc_copilot_latest.txt',report(s))
++    # Never retain raw private-position responses in published data.
++    atomic(WORK/'btc_copilot_raw_latest.json',{k:v for k,v in c.raw.items() if k not in ('position','fills')})
++    c.commit_observation(s)
++
+ 
+ def main():
+     p=argparse.ArgumentParser(description=__doc__)
+@@ -790,17 +870,7 @@
+         start=time.monotonic()
+         try:
+             s=c.collect()
+-            audit.record(s,c.raw,c.prior,c.settings,ROOT/'btc_copilot_journal.jsonl')
+-            s['scorecard']=audit.scorecard()
+-            if time.time()>=s['valid_until_epoch']:raise ReadError('Observation expired during persistence')
+-            study.record(s,c.raw,c.prior,c.settings)
+-            s['study']=study.status(time.time())
+-            if not hasattr(study,'last_report') or time.time()-study.last_report>=300:
+-                atomic(ROOT/'btc_copilot_evidence_report.json',evidence_report(study.path,time.time()))
+-                study.last_report=time.time()
+-            atomic(ROOT/'btc_copilot_latest.json',s);atomic(ROOT/'btc_copilot_latest.txt',report(s))
+-            # Never retain raw private-position responses in published data.
+-            atomic(WORK/'btc_copilot_raw_latest.json',{k:v for k,v in c.raw.items() if k not in ('position','fills')})
++            persist_observation(c,audit,study,s)
+             print(s['timestamp']['utc']+' '+s['ticker']+' '+s['decision'],flush=True)
+         except Exception as error:
+             msg=str(error) if isinstance(error,ReadError) else 'Data retrieval or model processing failed'
+--- acceptance-baseline/btc_copilot_evidence.py
++++ offline-acceptance-candidate/btc_copilot_evidence.py
+@@ -108,9 +108,7 @@
+         opened=timestamp(s['open_time']);split=phase(self.protocol,opened);now=s['epoch']
+         if opened%900 or timestamp(s['close_time'])-opened!=900:raise ValueError('Invalid scheduled slot')
+         if abs(timestamp(s['close_time'])-now-s['time_remaining_seconds'])>.001:raise ValueError('Inconsistent remaining time')
+-        with self.db() as c:prior=c.execute("SELECT value FROM meta WHERE key='last_epoch'").fetchone()
+-        with self.db() as c:prior_mono=c.execute("SELECT value FROM meta WHERE key='last_monotonic'").fetchone()
+-        check_clock(s,float(prior[0]) if prior else None,float(prior_mono[0]) if prior_mono else None)
++        check_clock(s)
+         if split=='outside_study':return
+         if D(str(s['fee_multiplier']))!=D(str(self.protocol['fee_multiplier'])):raise ValueError('Fee multiplier differs from frozen study')
+         signals=s['shadow_strategies'];book=raw['book']['data']['orderbook_fp']
+@@ -122,6 +120,10 @@
+         snapshot={k:v for k,v in s.items() if k not in ('position','scorecard')}
+         decision_evidence=zlib.compress(canonical({'snapshot':snapshot,'raw':public,'previous':previous,'settings':settings}).encode())
+         with self.db() as c:
++            c.execute('BEGIN IMMEDIATE')
++            prior=c.execute("SELECT value FROM meta WHERE key='last_epoch'").fetchone()
++            prior_mono=c.execute("SELECT value FROM meta WHERE key='last_monotonic'").fetchone()
++            check_clock(s,float(prior[0]) if prior else None,float(prior_mono[0]) if prior_mono else None)
+             collision=c.execute('SELECT ticker FROM markets WHERE opened=?',(opened,)).fetchone()
+             if collision and collision[0]!=s['ticker']:raise ValueError('Ambiguous ticker for scheduled slot')
+             c.execute("INSERT OR REPLACE INTO meta VALUES ('last_epoch',?)",(str(now),))
+--- acceptance-baseline/btc_copilot_research.py
++++ offline-acceptance-candidate/btc_copilot_research.py
+@@ -9,7 +9,7 @@
+ import zlib
+ from decimal import Decimal as D, ROUND_CEILING
+ 
+-VERSION = '5.0.0-offline-QA-candidate'
++VERSION = '5.1.0-offline-acceptance-candidate'
+ SOURCE_TEXT={name:(Path(__file__).parent/name).read_text() for name in ('btc_copilot.py','btc_copilot_research.py','btc_copilot_evidence.py','kalshi_readonly.py','study_policy.py','request_pacing.py','fee_reconciliation.py')}
+ 
+ def load_settings(path):
+@@ -189,12 +189,16 @@
+             'structure','book','btc','btc_observed_at','btc_age_seconds','spot','spot_observed_at','basis_dollars',
+             'initial_bias','side_evaluations','quantity_previews','entry_blockers','data_quality_faults','operational_vetoes',
+             'recent_trades','kalshi_recent_candlesticks','target_boundary_matches','model_version','validation',
+-            'collection_epoch','analysis_epoch','epoch','valid_until_epoch','time_remaining_seconds')
++            'collection_epoch','analysis_epoch','epoch','valid_until_epoch','time_remaining_seconds',
++            'timestamp','ticker','event_ticker','question','strike','open_time','close_time','btc_source','spot_source',
++            'distance_dollars','distance_bps','changes','volume_fp','open_interest_fp','last_trade_price_dollars',
++            'rules_primary','rules_secondary','settlement_rule','fee_multiplier','fee_schedule_checked_on',
++            'book_imbalance_5c','chart','confidence','profit_taking_bid_zone')
+     def canonical(value):return json.dumps(value,sort_keys=True,separators=(',',':'),default=str,allow_nan=False)
+     mismatches=[key for key in fields if key not in expected or canonical(actual[key])!=canonical(expected[key])]
+     return {'observation_id':row[0],'matches':not mismatches,'mismatched_fields':mismatches,'compared_fields':list(fields),
+             'expected_decision':expected['decision'],'replayed_decision':actual['decision'],
+-            'scope':'Deterministic market, feature, cost, full shadow-candidate and public-decision fields; account guidance and wall/monotonic runtime metadata excluded; no network'}
++            'scope':'Deterministic market, feature, cost, shadow-candidate, public-decision, contract/source identity, chart and rule fields; account guidance and account-dependent narrative/invalidation, optional private retrieval times, scorecard/study statistics and wall/monotonic runtime metadata excluded; no network'}
+ 
+ if __name__=='__main__':
+     import argparse

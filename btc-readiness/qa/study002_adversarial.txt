@@ -1,0 +1,215 @@
+test_atomic_temporary_symlink_does_not_truncate_other_file (__main__.SafetyTests.test_atomic_temporary_symlink_does_not_truncate_other_file) ... FAIL
+test_bad_previous_snapshot_cannot_confirm (__main__.SafetyTests.test_bad_previous_snapshot_cannot_confirm) ... FAIL
+test_collect_network_faults_no_record (__main__.SafetyTests.test_collect_network_faults_no_record) ... ok
+test_corrupt_state_constructor_explicit_failure (__main__.SafetyTests.test_corrupt_state_constructor_explicit_failure) ... ok
+test_duplicate_book_levels_rejected_or_deduplicated (__main__.SafetyTests.test_duplicate_book_levels_rejected_or_deduplicated) ... FAIL
+test_duplicate_ticks_rejected (__main__.SafetyTests.test_duplicate_ticks_rejected) ... ok
+test_duplicate_trade_not_double_counted (__main__.SafetyTests.test_duplicate_trade_not_double_counted) ... FAIL
+test_empty_book_public_abstains (__main__.SafetyTests.test_empty_book_public_abstains) ... ok
+test_execution_routes_denied_before_transport (__main__.SafetyTests.test_execution_routes_denied_before_transport) ... ok
+test_fee_multiplier_negative_rejected (__main__.SafetyTests.test_fee_multiplier_negative_rejected) ... FAIL
+test_first_observation_abstains_full_strategy (__main__.SafetyTests.test_first_observation_abstains_full_strategy) ... ok
+test_forming_minute_not_closed (__main__.SafetyTests.test_forming_minute_not_closed) ... ok
+test_future_candle_rejected_or_quarantined (__main__.SafetyTests.test_future_candle_rejected_or_quarantined) ... FAIL
+test_future_tick_1_second_rejected (__main__.SafetyTests.test_future_tick_1_second_rejected) ... ok
+test_future_trade_rejected (__main__.SafetyTests.test_future_trade_rejected) ... ok
+test_grid_invalid_infinity_bounded (__main__.SafetyTests.test_grid_invalid_infinity_bounded) ... FAIL
+test_hour_coverage_must_be_proven (__main__.SafetyTests.test_hour_coverage_must_be_proven) ... FAIL
+test_identical_input_deterministic_5_runs (__main__.SafetyTests.test_identical_input_deterministic_5_runs) ... ok
+test_invalid_book_rejected (__main__.SafetyTests.test_invalid_book_rejected) ... ok
+test_journal_crash_retry_idempotent (__main__.SafetyTests.test_journal_crash_retry_idempotent) ... skipped 'Study002 removes original settlement journal writes'
+test_missing_credentials_sanitized (__main__.SafetyTests.test_missing_credentials_sanitized) ... ok
+test_missing_data_rejected (__main__.SafetyTests.test_missing_data_rejected) ... ok
+test_negative_trade_quantity_rejected (__main__.SafetyTests.test_negative_trade_quantity_rejected) ... FAIL
+test_notional_and_fee_independent (__main__.SafetyTests.test_notional_and_fee_independent) ... ok
+test_price_conflict_abstains (__main__.SafetyTests.test_price_conflict_abstains) ... ok
+test_prior_position_does_not_change_market_model (__main__.SafetyTests.test_prior_position_does_not_change_market_model) ... ok
+test_profit_target_recomputes_exit_fee_at_exit_price (__main__.SafetyTests.test_profit_target_recomputes_exit_fee_at_exit_price) ... FAIL
+test_public_shadow_gate_long_and_short (__main__.SafetyTests.test_public_shadow_gate_long_and_short) ... ok
+test_replay_detects_tampered_shadow_decision (__main__.SafetyTests.test_replay_detects_tampered_shadow_decision) ... FAIL
+test_scale_in_inventory_math_both_directions (__main__.SafetyTests.test_scale_in_inventory_math_both_directions) ... ok
+test_server_allowlist_no_files_served_to_bad_host_or_private_path (__main__.SafetyTests.test_server_allowlist_no_files_served_to_bad_host_or_private_path) ... ok
+test_settings_safety_floors (__main__.SafetyTests.test_settings_safety_floors) ... ok
+test_stale_data_every_shadow_arm_abstains (__main__.SafetyTests.test_stale_data_every_shadow_arm_abstains) ... ok
+test_state_files_owner_only_atomic_replacement (__main__.SafetyTests.test_state_files_owner_only_atomic_replacement) ... ok
+test_subsecond_sampling_must_be_rejected_or_normalized (__main__.SafetyTests.test_subsecond_sampling_must_be_rejected_or_normalized) ... ok
+test_timezone_dst_conversion (__main__.SafetyTests.test_timezone_dst_conversion) ... ok
+test_transport_network_timeout_no_fabricated_response (__main__.SafetyTests.test_transport_network_timeout_no_fabricated_response) ... ok
+test_unordered_ticks_normalized (__main__.SafetyTests.test_unordered_ticks_normalized) ... ok
+test_upstream_error_with_payload_must_be_rejected (__main__.SafetyTests.test_upstream_error_with_payload_must_be_rejected) ... FAIL
+test_walk_zero_negative_null_quantities_fail_closed (__main__.SafetyTests.test_walk_zero_negative_null_quantities_fail_closed) ... 
+  test_walk_zero_negative_null_quantities_fail_closed (__main__.SafetyTests.test_walk_zero_negative_null_quantities_fail_closed) (q='0') ... FAIL
+  test_walk_zero_negative_null_quantities_fail_closed (__main__.SafetyTests.test_walk_zero_negative_null_quantities_fail_closed) (q='-1') ... FAIL
+
+======================================================================
+FAIL: test_atomic_temporary_symlink_does_not_truncate_other_file (__main__.SafetyTests.test_atomic_temporary_symlink_does_not_truncate_other_file)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/you/.codex/.chatgpt-projects/g-p-PROJECT/qa_btc_2026-09-27/adversarial_audit.py", line 292, in test_atomic_temporary_symlink_does_not_truncate_other_file
+    self.assertEqual(sentinel.read_text(),'PRESERVE')
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: '{\n  "revision": 1\n}\n' != 'PRESERVE'
++ PRESERVE
+- {
+-   "revision": 1
+- }
+- 
+
+
+======================================================================
+FAIL: test_bad_previous_snapshot_cannot_confirm (__main__.SafetyTests.test_bad_previous_snapshot_cannot_confirm)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/you/.codex/.chatgpt-projects/g-p-PROJECT/qa_btc_2026-09-27/adversarial_audit.py", line 139, in test_bad_previous_snapshot_cannot_confirm
+    s=collect(raw,prev,st,model);self.assertEqual(s['shadow_decision'],'NO TRADE')
+                                 ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'UP' != 'NO TRADE'
+- UP
++ NO TRADE
+
+
+======================================================================
+FAIL: test_duplicate_book_levels_rejected_or_deduplicated (__main__.SafetyTests.test_duplicate_book_levels_rejected_or_deduplicated)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/you/.codex/.chatgpt-projects/g-p-PROJECT/qa_btc_2026-09-27/adversarial_audit.py", line 135, in test_duplicate_book_levels_rejected_or_deduplicated
+    self.assertTrue(s['data_quality_faults'] or s['book']['yes_ask_size_fp']==D('.6'),'Duplicate rows manufactured 1.2 contracts from .6')
+    ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: False is not true : Duplicate rows manufactured 1.2 contracts from .6
+
+======================================================================
+FAIL: test_duplicate_trade_not_double_counted (__main__.SafetyTests.test_duplicate_trade_not_double_counted)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/you/.codex/.chatgpt-projects/g-p-PROJECT/qa_btc_2026-09-27/adversarial_audit.py", line 243, in test_duplicate_trade_not_double_counted
+    s=collect(raw);self.assertTrue(s['data_quality_faults'] or s['recent_trades']['volume_fp']==D(10))
+                   ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: False is not true
+
+======================================================================
+FAIL: test_fee_multiplier_negative_rejected (__main__.SafetyTests.test_fee_multiplier_negative_rejected)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/you/.codex/.chatgpt-projects/g-p-PROJECT/qa_btc_2026-09-27/adversarial_audit.py", line 173, in test_fee_multiplier_negative_rejected
+    with self.assertRaises((ValueError,ArithmeticError)):r.walk([['.5','1']],'1',True,-1)
+         ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: (<class 'ValueError'>, <class 'ArithmeticError'>) not raised
+
+======================================================================
+FAIL: test_future_candle_rejected_or_quarantined (__main__.SafetyTests.test_future_candle_rejected_or_quarantined)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/you/.codex/.chatgpt-projects/g-p-PROJECT/qa_btc_2026-09-27/adversarial_audit.py", line 122, in test_future_candle_rejected_or_quarantined
+    self.rejects_or_marks_fault(raw)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^
+  File "/Users/you/.codex/.chatgpt-projects/g-p-PROJECT/qa_btc_2026-09-27/adversarial_audit.py", line 67, in rejects_or_marks_fault
+    self.assertTrue(s['data_quality_faults'],'Input accepted without a data-quality fault')
+    ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: [] is not true : Input accepted without a data-quality fault
+
+======================================================================
+FAIL: test_grid_invalid_infinity_bounded (__main__.SafetyTests.test_grid_invalid_infinity_bounded)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/you/.codex/.chatgpt-projects/g-p-PROJECT/qa_btc_2026-09-27/adversarial_audit.py", line 198, in test_grid_invalid_infinity_bounded
+    try:run=subprocess.run([sys.executable,'-B','-c',code],capture_output=True,timeout=.7)
+            ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/Cellar/python@3.14/3.14.4_1/Frameworks/Python.framework/Versions/3.14/lib/python3.14/subprocess.py", line 557, in run
+    stdout, stderr = process.communicate(input, timeout=timeout)
+                     ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/Cellar/python@3.14/3.14.4_1/Frameworks/Python.framework/Versions/3.14/lib/python3.14/subprocess.py", line 1221, in communicate
+    stdout, stderr = self._communicate(input, endtime, timeout)
+                     ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/Cellar/python@3.14/3.14.4_1/Frameworks/Python.framework/Versions/3.14/lib/python3.14/subprocess.py", line 2154, in _communicate
+    self._check_timeout(endtime, orig_timeout, stdout, stderr)
+    ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/Cellar/python@3.14/3.14.4_1/Frameworks/Python.framework/Versions/3.14/lib/python3.14/subprocess.py", line 1268, in _check_timeout
+    raise TimeoutExpired(
+    ...<2 lines>...
+            stderr=b''.join(stderr_seq) if stderr_seq else None)
+subprocess.TimeoutExpired: Command '['/opt/homebrew/opt/python@3.14/bin/python3.14', '-B', '-c', "import sys;sys.path.insert(0,'/Users/you/.codex/.chatgpt-projects/g-p-PROJECT/qa_btc_2026-09-27/outputs/copilot_study002_fee_review');import btc_copilot as b;b.grid_prices({'price_ranges':[{'start':'-Infinity','end':'1','step':'.01'}]})"]' timed out after 0.7 seconds
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/Users/you/.codex/.chatgpt-projects/g-p-PROJECT/qa_btc_2026-09-27/adversarial_audit.py", line 199, in test_grid_invalid_infinity_bounded
+    except subprocess.TimeoutExpired:self.fail('grid_prices hung on nonfinite input')
+                                     ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: grid_prices hung on nonfinite input
+
+======================================================================
+FAIL: test_hour_coverage_must_be_proven (__main__.SafetyTests.test_hour_coverage_must_be_proven)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/you/.codex/.chatgpt-projects/g-p-PROJECT/qa_btc_2026-09-27/adversarial_audit.py", line 109, in test_hour_coverage_must_be_proven
+    self.rejects_or_marks_fault(raw)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^
+  File "/Users/you/.codex/.chatgpt-projects/g-p-PROJECT/qa_btc_2026-09-27/adversarial_audit.py", line 67, in rejects_or_marks_fault
+    self.assertTrue(s['data_quality_faults'],'Input accepted without a data-quality fault')
+    ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: [] is not true : Input accepted without a data-quality fault
+
+======================================================================
+FAIL: test_negative_trade_quantity_rejected (__main__.SafetyTests.test_negative_trade_quantity_rejected)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/you/.codex/.chatgpt-projects/g-p-PROJECT/qa_btc_2026-09-27/adversarial_audit.py", line 130, in test_negative_trade_quantity_rejected
+    self.rejects_or_marks_fault(raw)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^
+  File "/Users/you/.codex/.chatgpt-projects/g-p-PROJECT/qa_btc_2026-09-27/adversarial_audit.py", line 67, in rejects_or_marks_fault
+    self.assertTrue(s['data_quality_faults'],'Input accepted without a data-quality fault')
+    ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: [] is not true : Input accepted without a data-quality fault
+
+======================================================================
+FAIL: test_profit_target_recomputes_exit_fee_at_exit_price (__main__.SafetyTests.test_profit_target_recomputes_exit_fee_at_exit_price)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/you/.codex/.chatgpt-projects/g-p-PROJECT/qa_btc_2026-09-27/adversarial_audit.py", line 187, in test_profit_target_recomputes_exit_fee_at_exit_price
+    self.assertGreaterEqual(net,reserve,'20c target nets 2c rather than planned 3c after exit fee')
+    ~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: Decimal('0.02') not greater than or equal to Decimal('0.03') : 20c target nets 2c rather than planned 3c after exit fee
+
+======================================================================
+FAIL: test_replay_detects_tampered_shadow_decision (__main__.SafetyTests.test_replay_detects_tampered_shadow_decision)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/you/.codex/.chatgpt-projects/g-p-PROJECT/qa_btc_2026-09-27/adversarial_audit.py", line 237, in test_replay_detects_tampered_shadow_decision
+    self.assertFalse(result['matches'],'Replay accepted a forged shadow decision')
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: True is not false : Replay accepted a forged shadow decision
+
+======================================================================
+FAIL: test_upstream_error_with_payload_must_be_rejected (__main__.SafetyTests.test_upstream_error_with_payload_must_be_rejected)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/you/.codex/.chatgpt-projects/g-p-PROJECT/qa_btc_2026-09-27/adversarial_audit.py", line 118, in test_upstream_error_with_payload_must_be_rejected
+    self.rejects_or_marks_fault(raw)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^
+  File "/Users/you/.codex/.chatgpt-projects/g-p-PROJECT/qa_btc_2026-09-27/adversarial_audit.py", line 67, in rejects_or_marks_fault
+    self.assertTrue(s['data_quality_faults'],'Input accepted without a data-quality fault')
+    ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: [] is not true : Input accepted without a data-quality fault
+
+======================================================================
+FAIL: test_walk_zero_negative_null_quantities_fail_closed (__main__.SafetyTests.test_walk_zero_negative_null_quantities_fail_closed) (q='0')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/you/.codex/.chatgpt-projects/g-p-PROJECT/qa_btc_2026-09-27/adversarial_audit.py", line 169, in test_walk_zero_negative_null_quantities_fail_closed
+    with self.subTest(q=q),self.assertRaises((ValueError,ArithmeticError,TypeError)):
+                           ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: (<class 'ValueError'>, <class 'ArithmeticError'>, <class 'TypeError'>) not raised
+
+======================================================================
+FAIL: test_walk_zero_negative_null_quantities_fail_closed (__main__.SafetyTests.test_walk_zero_negative_null_quantities_fail_closed) (q='-1')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/you/.codex/.chatgpt-projects/g-p-PROJECT/qa_btc_2026-09-27/adversarial_audit.py", line 169, in test_walk_zero_negative_null_quantities_fail_closed
+    with self.subTest(q=q),self.assertRaises((ValueError,ArithmeticError,TypeError)):
+                           ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: (<class 'ValueError'>, <class 'ArithmeticError'>, <class 'TypeError'>) not raised
+
+----------------------------------------------------------------------
+Ran 40 tests in 1.061s
+
+FAILED (failures=14, skipped=1)

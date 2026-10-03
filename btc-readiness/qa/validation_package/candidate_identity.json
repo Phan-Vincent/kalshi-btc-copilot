@@ -1,0 +1,11 @@
+{
+  "release": "5.1.1-offline-validation-candidate",
+  "model_version": "5.1.1-offline-validation-candidate-af40a3e74c4adfda",
+  "candidate_manifest_sha256": "f7ced1521d56d0537f0617306d95b8cfb50f8d634f957973f1e4515be674c069",
+  "settings_sha256": "47dedad12c34481024d90cc5fafa45293bafa990bc555bf5eaa6f4a8ab0c4eab",
+  "legacy_protocol_sha256": "1f67bba90077429de6ccdbd62970338da7da4cdda685feb1ee36038abb80ecd4",
+  "legacy_protocol_is_reference_only": true,
+  "activation_allowed": false,
+  "advice_allowed": false,
+  "execution_allowed": false
+}

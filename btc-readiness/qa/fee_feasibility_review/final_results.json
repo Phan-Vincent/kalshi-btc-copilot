@@ -1,0 +1,56 @@
+{
+  "processes": [
+    {
+      "suite": "fee",
+      "exit_code": 0,
+      "command": [
+        "/opt/homebrew/opt/python@3.14/bin/python3.14",
+        "-B",
+        "/Users/you/.codex/.chatgpt-projects/g-p-PROJECT/qa_btc_2026-09-27/fee_feasibility_review/test_fee_feasibility.py"
+      ]
+    },
+    {
+      "suite": "guarded_package",
+      "exit_code": 0,
+      "command": [
+        "/opt/homebrew/opt/python@3.14/bin/python3.14",
+        "-B",
+        "/Users/you/.codex/.chatgpt-projects/g-p-PROJECT/qa_btc_2026-09-27/validation_package/verify_package.py",
+        "--test"
+      ]
+    }
+  ],
+  "new_fee_tests": {
+    "run": 16,
+    "passed": 16,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "seeded_groupings": 200,
+    "cent_price_cases": 99,
+    "matrix_cases": 20,
+    "network_disabled": true,
+    "actual_execution": false
+  },
+  "guarded_existing": {
+    "python_passed": 148,
+    "python_skipped": 1,
+    "ui_passed": 24,
+    "golden_passed": 14,
+    "safety": {
+      "production_sources_unchanged": true,
+      "changed_paths": [],
+      "study002_seal_intact": true,
+      "study002_manifest_unchanged": true,
+      "study002_runtime_absent": true,
+      "candidate_runtime_absent": true,
+      "candidate_approval_absent": true
+    }
+  },
+  "preserved_candidate_and_package_unchanged": true,
+  "changed_paths": [],
+  "combined_python_methods_run": 165,
+  "combined_python_passed": 164,
+  "actual_execution": false,
+  "activation_performed": false
+}

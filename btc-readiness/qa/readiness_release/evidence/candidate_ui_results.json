@@ -1,0 +1,98 @@
+[
+  {
+    "scenario": "valid snapshot renders and remains explicitly shadow only",
+    "passed": true
+  },
+  {
+    "scenario": "missing epoch",
+    "passed": true
+  },
+  {
+    "scenario": "missing expiry",
+    "passed": true
+  },
+  {
+    "scenario": "NaN epoch",
+    "passed": true
+  },
+  {
+    "scenario": "infinite expiry",
+    "passed": true
+  },
+  {
+    "scenario": "string epoch",
+    "passed": true
+  },
+  {
+    "scenario": "boolean epoch",
+    "passed": true
+  },
+  {
+    "scenario": "future epoch",
+    "passed": true
+  },
+  {
+    "scenario": "expired",
+    "passed": true
+  },
+  {
+    "scenario": "reversed expiry",
+    "passed": true
+  },
+  {
+    "scenario": "extended TTL",
+    "passed": true
+  },
+  {
+    "scenario": "missing close",
+    "passed": true
+  },
+  {
+    "scenario": "malformed close",
+    "passed": true
+  },
+  {
+    "scenario": "expiry past close",
+    "passed": true
+  },
+  {
+    "scenario": "forged directional decision",
+    "passed": true
+  },
+  {
+    "scenario": "forged validation",
+    "passed": true
+  },
+  {
+    "scenario": "forged position advice",
+    "passed": true
+  },
+  {
+    "scenario": "error flag",
+    "passed": true
+  },
+  {
+    "scenario": "monotonic expiry",
+    "passed": true
+  },
+  {
+    "scenario": "wall clock moves backwards after render",
+    "passed": true
+  },
+  {
+    "scenario": "clock skew while source TTL still valid",
+    "passed": true
+  },
+  {
+    "scenario": "disconnection suppresses prior fresh view",
+    "passed": true
+  },
+  {
+    "scenario": "malformed response rejected",
+    "passed": true
+  },
+  {
+    "scenario": "network outage safe display",
+    "passed": true
+  }
+]

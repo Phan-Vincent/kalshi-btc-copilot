@@ -1,0 +1,58 @@
+{
+  "suites": [
+    {
+      "name": "candidate_existing",
+      "exit_code": 0,
+      "run": 51,
+      "skipped": 0
+    },
+    {
+      "name": "candidate_adversarial",
+      "exit_code": 0,
+      "run": 40,
+      "skipped": 1
+    },
+    {
+      "name": "candidate_added_regressions",
+      "exit_code": 0,
+      "run": 19,
+      "skipped": 0
+    },
+    {
+      "name": "candidate_acceptance",
+      "exit_code": 0,
+      "run": 17,
+      "skipped": 0
+    },
+    {
+      "name": "candidate_operating_bounds",
+      "exit_code": 0,
+      "run": 14,
+      "skipped": 0
+    },
+    {
+      "name": "candidate_ui",
+      "exit_code": 0,
+      "run": null,
+      "skipped": 0
+    },
+    {
+      "name": "readiness_added",
+      "exit_code": 0,
+      "run": 216,
+      "skipped": 0
+    }
+  ],
+  "python_methods_run": 357,
+  "python_skipped": 1,
+  "golden_passed": 14,
+  "golden_run": 14,
+  "ui_passed": 24,
+  "ui_run": 24,
+  "production_sources_unchanged": true,
+  "candidate_runtime_absent": true,
+  "candidate_approval_absent": true,
+  "candidate_QA_ONLY_present": true,
+  "scope": "Current in-progress candidate only; no independent acceptance sign-off or deployment. Frozen reference package tests are separately preserved.",
+  "passed": true
+}

@@ -1,0 +1,19 @@
+{
+  "fee_verified_at": "2026-09-26T17:54:30.316329+00:00",
+  "fee_source": "https://kalshi.com/docs/kalshi-fee-schedule.pdf",
+  "fee_schedule_effective_date": "2026-07-07",
+  "taker_coefficient": "0.07",
+  "model_uncertainty_reserve_pp": 7,
+  "minimum_conservative_net_edge_pp": 5,
+  "slippage_reserve_cents": "0.5",
+  "final_entry_cutoff_seconds": 90,
+  "notes": "These settings are loaded and validated each observation. Safety floors reject weakened thresholds. Model remains uncalibrated; fee verification expires after 24h.",
+  "maximum_snapshot_skew_seconds": 5,
+  "replay_retention_days": 7,
+  "preview_quantities": [
+    "1",
+    "5",
+    "10",
+    "25"
+  ]
+}

@@ -1,0 +1,48 @@
+{
+  "as_of": "2026-09-27",
+  "read_only": true,
+  "authentication_used": false,
+  "sources": [
+    {
+      "url": "https://docs.kalshi.com/getting_started/fee_rounding",
+      "retrieval": "Successful Codex web read; independently checked outside Reasonix",
+      "facts": ["Balance precisions .0001 for direct members and .01 for non-direct members", "Trade fee rounds upward to six dollar decimals", "Signed revenue minus trade fee is floored to balance precision", "Rounding excess accumulates per order across fills", "Rebate uses whole balance-precision quanta and cannot make a fill net fee negative"],
+      "ambiguity": "Overview says fees converge to equivalent single-fill cost; literal cap can prevent all rebates for tiny cent-balance fills. No terminal carry-refund rule or exception was located. Need venue clarification; do not assume a refund."
+    },
+    {
+      "url": "https://docs.kalshi.com/getting_started/fixed_point_migration",
+      "retrieval": "Successful Codex web read; page last updated August20,2026",
+      "facts": ["Prices up to four dollar decimals", "Quantities up to two decimals and .01 contract granularity", "Market price_ranges is the valid grid authority"],
+      "limit": "Global API representation is not proof of exact current KXBTC15M minimum order/fill permissions or fragmentation distribution."
+    },
+    {
+      "url": "https://kalshi.com/docs/kalshi-fee-schedule.pdf",
+      "retrieval": "Successful web PDF text and screenshot requests; effective July7,2026",
+      "facts": ["General taker model .07*M*C*P*(1-P), default multiplier1", "General maker coefficient .0175 with series applicability", "Settlement fee absent", "FCM customers may incur additional intermediary fees"],
+      "limit": "Formula alignment language and one-contract cent-rounded table must be reconciled with detailed account-specific rounding; schedule does not classify this account or attest December rules."
+    },
+    {
+      "url": "https://external-api.kalshi.com/trade-api/v2/series/KXBTC15M",
+      "retrieval": "Successful unauthenticated Codex web JSON read; no direct local transport success",
+      "observed_fields": {"ticker":"KXBTC15M", "fee_type":"quadratic", "fee_multiplier":1, "frequency":"fifteen_min", "last_updated_ts":"2026-09-18T15:20:18.321673Z"},
+      "limit": "Point-in-time public series evidence; not an account-precision or future-start attestation. Local direct GET failed DNS in restricted environment."
+    },
+    {
+      "url": "https://docs.kalshi.com/api-reference/exchange/get-series-fee-changes",
+      "retrieval": "Successful documentation read",
+      "facts": ["Documented GET /series/fee_changes supports series_ticker and show_historical filters"],
+      "limit": "Public fee-change API attempts were inaccessible through web; local unauthenticated GET failed DNS. Future schedule for KXBTC15M remains unknown."
+    },
+    {
+      "url": "https://kalshi.com/fee-schedule",
+      "retrieval": "Page accessible but web extraction exposed only iframe",
+      "limit": "Scheduled changes could not be conclusively inspected here; no assertion of no changes."
+    }
+  ],
+  "classification": {
+    "supported_general_documentation": ["two balance-precision branches", "six-decimal trade fee", "signed cash alignment", "order-local capped rebates", "API .01 quantity granularity", "current public KXBTC15M quadratic multiplier1 metadata"],
+    "conditional_model_assumptions": ["general taker1x applies to all hypothetical fills", "100 .01 fills can occur in one KXBTC15M one-contract order", "no terminal carry refund or external fee adjustment", "executable quote equals hypothetical displayed price before reserves"],
+    "unsupported_as_universal_claims": ["all fragments necessarily get rounding rebates", "every one-contract order costs1.005", "direct precision always makes a position profitable", "global .01 representation proves all current market-specific fill constraints"],
+    "unknown": ["user account balance precision", "actual KXBTC15M microfill constraints", "end-of-order carry disposition or exceptional rebate rules", "applicable FCM or other account adjustments", "scheduled future fee changes", "actual fill distribution/slippage"]
+  }
+}

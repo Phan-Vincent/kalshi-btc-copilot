@@ -1,0 +1,39 @@
+test_approval_binding (test_supervise.Decisions.test_approval_binding) ... ok
+test_approved_start (test_supervise.Decisions.test_approved_start) ... ok
+test_attestation_expiry_and_renewal (test_supervise.Decisions.test_attestation_expiry_and_renewal) ... ok
+test_before_start (test_supervise.Decisions.test_before_start) ... ok
+test_clock_and_rules_receipts (test_supervise.Decisions.test_clock_and_rules_receipts) ... ok
+test_crash_restart (test_supervise.Decisions.test_crash_restart) ... ok
+test_end_no_restart (test_supervise.Decisions.test_end_no_restart) ... ok
+test_healthy (test_supervise.Decisions.test_healthy) ... ok
+test_identity_conflicts (test_supervise.Decisions.test_identity_conflicts) ... ok
+test_invalid_wall_clock (test_supervise.Decisions.test_invalid_wall_clock) ... ok
+test_late_start_disclosed (test_supervise.Decisions.test_late_start_disclosed) ... ok
+test_live_stale_never_duplicate (test_supervise.Decisions.test_live_stale_never_duplicate) ... ok
+test_offline_25_hours_requires_renewal (test_supervise.Decisions.test_offline_25_hours_requires_renewal) ... ok
+test_paused_even_with_bad_approval (test_supervise.Decisions.test_paused_even_with_bad_approval) ... ok
+test_restart_backoff_budget_and_clock_reversal (test_supervise.Decisions.test_restart_backoff_budget_and_clock_reversal) ... ok
+test_unknown_previous_pid (test_supervise.Decisions.test_unknown_previous_pid) ... ok
+test_equal_clock_gap_does_not_prove_coverage (test_supervise.FrozenRules.test_equal_clock_gap_does_not_prove_coverage) ... ok
+test_frozen_launch_gate_real_sources_synthetic_approval (test_supervise.FrozenRules.test_frozen_launch_gate_real_sources_synthetic_approval) ... ok
+test_reboot_clock_rejected (test_supervise.FrozenRules.test_reboot_clock_rejected) ... ok
+test_same_boot_restart_continuity (test_supervise.FrozenRules.test_same_boot_restart_continuity) ... ok
+test_sleep_and_ntp_jump_rejected (test_supervise.FrozenRules.test_sleep_and_ntp_jump_rejected) ... ok
+test_actual_collector_lock_prevents_duplicate (test_supervise.LocalControls.test_actual_collector_lock_prevents_duplicate) ... ok
+test_cli_launch_refuses_prestart_no_spawn (test_supervise.LocalControls.test_cli_launch_refuses_prestart_no_spawn) ... ok
+test_failed_renewal_preserves_approval (test_supervise.LocalControls.test_failed_renewal_preserves_approval) ... ok
+test_health_read_allowlist_and_pid_identity (test_supervise.LocalControls.test_health_read_allowlist_and_pid_identity) ... ok
+test_invalid_pid_and_snapshot_types (test_supervise.LocalControls.test_invalid_pid_and_snapshot_types) ... ok
+test_launch_fixed_command_and_attempt_persisted (test_supervise.LocalControls.test_launch_fixed_command_and_attempt_persisted) ... ok
+test_linked_inputs_rejected (test_supervise.LocalControls.test_linked_inputs_rejected) ... ok
+test_mutex_excludes_second_supervisor (test_supervise.LocalControls.test_mutex_excludes_second_supervisor) ... ok
+test_pause_survives_bad_seal_and_blocks_launch (test_supervise.LocalControls.test_pause_survives_bad_seal_and_blocks_launch) ... ok
+test_pause_unknown_process_not_killed (test_supervise.LocalControls.test_pause_unknown_process_not_killed) ... ok
+test_renew_only_attestations_and_does_not_refresh_rules_from_clock (test_supervise.LocalControls.test_renew_only_attestations_and_does_not_refresh_rules_from_clock) ... ok
+test_resume_only_clears_latch_does_not_launch (test_supervise.LocalControls.test_resume_only_clears_latch_does_not_launch) ... ok
+test_verified_pause_signals_only_candidate_after_latch (test_supervise.LocalControls.test_verified_pause_signals_only_candidate_after_latch) ... ok
+
+----------------------------------------------------------------------
+Ran 34 tests in 0.026s
+
+OK

@@ -1,0 +1,11 @@
+[Unit]
+Description=Renew the BTC study attestation every 4 hours (collector refuses after 24 h)
+
+[Timer]
+OnBootSec=2min
+OnCalendar=*-*-* 00/4:17:00 UTC
+Persistent=true
+RandomizedDelaySec=60
+
+[Install]
+WantedBy=timers.target

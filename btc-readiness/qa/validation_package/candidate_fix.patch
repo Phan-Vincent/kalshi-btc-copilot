@@ -1,0 +1,102 @@
+--- before/README.md
++++ candidate/README.md
+@@ -1,6 +1,6 @@
+ # Offline QA remediation candidate
+ 
+-This is an isolated candidate based on study 002 release 4.2. It is not the original runtime, the sealed study 002 bundle, an approved study, or an adopted release. Model identity is 5.1.0-offline-acceptance-candidate plus source/settings hash. The unchanged study 002 protocol is retained only for synthetic compatibility tests; its dates and approvals do not authorize this candidate.
++This is an isolated candidate based on study 002 release 4.2. It is not the original runtime, the sealed study 002 bundle, an approved study, or an adopted release. Model identity is 5.1.1-offline-validation-candidate plus source/settings hash. The unchanged study 002 protocol is retained only for synthetic compatibility tests; its dates and approvals do not authorize this candidate.
+ 
+ The sealed source bundle had a future evidence-only approval at audit time. This candidate has no copied approval, credentials, account state, database, runtime, scheduler, or collector activation. `btc_copilot.py` refuses launch unconditionally; `study_policy.launch_guard` also refuses when QA_ONLY is present. Public outputs remain NO TRADE and all position advice remains disabled. UP/DOWN shadow outputs are hypothetical binary-contract research, not leveraged BTC orders.
+ 
+@@ -9,3 +9,5 @@
+ From the Investing workspace root, run `python3 -B qa_btc_2026-09-27/run_remediation.py`. Tests use public fixtures and synthetic data only. See ../../REMEDIATION_REPORT.md for findings and evidence (path without space: ../../REMEDIATION_REPORT.md).
+ 
+ Acceptance follow-up: persisted prior observations remain unconfirmed until audit, study and public-output stages complete. Study record clocks are checked in a serialized transaction. See ../../ACCEPTANCE_REPORT.md for fault-injection evidence, Reasonix limits and remaining adoption blockers.
++
++Validation package follow-up: completion rechecks expiry before publication and confirmation commit; diagnostic rows carry their observation digest for explicit duplicate detection. No collector or study activation is authorized. See ../../validation_package/VALIDATION_PACKAGE.md.
+--- before/btc_copilot.py
++++ candidate/btc_copilot.py
+@@ -679,6 +679,7 @@
+                     if digest!=last['digest']:raise ReadError('Conflicting duplicate observation rejected')
+                     if not last['logged']:
+                         compact={k:v for k,v in s.items() if k!='chart'}
++                        compact['_observation_digest']=digest
+                         compact['structure']={k:v for k,v in s['structure'].items() if k!='bars'}
+                         append(WORK/'btc_copilot_observations.jsonl',compact)
+                         staged['last_observation']['logged']=True
+@@ -732,6 +733,7 @@
+         staged['last_observation']={'epoch':s['epoch'],'digest':digest,'logged':False,'committed':False}
+         atomic(self.state_path,staged)
+         compact={k:v for k,v in s.items() if k not in ('chart',)}
++        compact['_observation_digest']=digest
+         compact['structure']={k:v for k,v in s['structure'].items() if k!='bars'}
+         append(WORK/'btc_copilot_observations.jsonl',compact)
+ 
+@@ -742,6 +744,8 @@
+     def commit_observation(self,s):
+         """Commit confirmation only after all caller persistence/publication stages succeed."""
+         with output_lock(self.state_path.with_suffix('.lock')):
++            if not s['epoch']<=time.time()<s['valid_until_epoch']:
++                raise ReadError('Expired or future observation cannot commit confirmation')
+             if self.state_path.is_symlink():raise ReadError('Linked state destination rejected')
+             staged=json.loads(self.state_path.read_text())
+             last=staged.get('last_observation',{})
+@@ -828,17 +832,23 @@
+ 
+ def persist_observation(c,audit,study,s):
+     """Finish all persistence stages before enabling the next confirmation."""
++    def fresh():
++        if not s['epoch']<=time.time()<s['valid_until_epoch']:
++            raise ReadError('Observation expired or clock reversed during persistence')
++    fresh()
+     audit.record(s,c.raw,c.prior,c.settings,ROOT/'btc_copilot_journal.jsonl')
+     s['scorecard']=audit.scorecard()
+-    if time.time()>=s['valid_until_epoch']:raise ReadError('Observation expired during persistence')
++    fresh()
+     study.record(s,c.raw,c.prior,c.settings)
+     s['study']=study.status(time.time())
+     if not hasattr(study,'last_report') or time.time()-study.last_report>=300:
+         atomic(ROOT/'btc_copilot_evidence_report.json',evidence_report(study.path,time.time()))
+         study.last_report=time.time()
++    fresh()
+     atomic(ROOT/'btc_copilot_latest.json',s);atomic(ROOT/'btc_copilot_latest.txt',report(s))
+     # Never retain raw private-position responses in published data.
+     atomic(WORK/'btc_copilot_raw_latest.json',{k:v for k,v in c.raw.items() if k not in ('position','fills')})
++    fresh()
+     c.commit_observation(s)
+ 
+ 
+--- before/btc_copilot_research.py
++++ candidate/btc_copilot_research.py
+@@ -9,7 +9,7 @@
+ import zlib
+ from decimal import Decimal as D, ROUND_CEILING
+ 
+-VERSION = '5.1.0-offline-acceptance-candidate'
++VERSION = '5.1.1-offline-validation-candidate'
+ SOURCE_TEXT={name:(Path(__file__).parent/name).read_text() for name in ('btc_copilot.py','btc_copilot_research.py','btc_copilot_evidence.py','kalshi_readonly.py','study_policy.py','request_pacing.py','fee_reconciliation.py')}
+ 
+ def load_settings(path):
+--- before/release_manifest.json
++++ candidate/release_manifest.json
+@@ -2,9 +2,9 @@
+   "study_id": "btc-prospective-002",
+   "status": "OFFLINE_QA_ONLY_NOT_APPROVED",
+   "files": {
+-    "btc_copilot.py": "95a680f7651cc42a77013fd2173ff1924fe6205f9960ff327250e58296498516",
++    "btc_copilot.py": "a0c2772ca76c04b6afedd6420e6210fb8790a3ab6913657fda0b8ca0a5e69fd9",
+     "btc_copilot_evidence.py": "ecd62771b40d07a0baf77e36c2019f553565699f840c8024f9a5345b07169505",
+-    "btc_copilot_research.py": "85bc7dc690d0738b9f3caa34aeb426b10403bb6c0df01709f7baad003e89bf11",
++    "btc_copilot_research.py": "50a1c84aaa61895d94290e33e189b876ff818f1a03c08e43e4c2235bf3d0511d",
+     "kalshi_readonly.py": "36d12ebbe20abe0698045877db24e1904dc131ea964946efcc48fc29d8e761f7",
+     "study_policy.py": "6e2d9d092980bf8144aeaa987f0e5c85f30c1315dddd596625a86a7018c98909",
+     "btc_copilot_protocol.json": "1f67bba90077429de6ccdbd62970338da7da4cdda685feb1ee36038abb80ecd4",
+@@ -13,7 +13,7 @@
+     "request_pacing.py": "29b3e4d546d1ea8c5fbf634213b73174f70833e2f04510b2d702624ff9d6e3b7",
+     "fee_reconciliation.py": "bc52011f63466bdd949ebf8296d7f1793c736ad9202b4c994626c02a807d003b"
+   },
+-  "release": "5.1.0-offline-acceptance-candidate",
++  "release": "5.1.1-offline-validation-candidate",
+   "candidate_only": true,
+   "not_a_new_study_approval": true,
+   "upstream_sealed_release": "4.2.0-study002-fee-review"

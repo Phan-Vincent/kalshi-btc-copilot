@@ -1,0 +1,12 @@
+{
+  "run": 16,
+  "passed": 16,
+  "failures": 0,
+  "errors": 0,
+  "skipped": 0,
+  "seeded_groupings": 200,
+  "cent_price_cases": 99,
+  "matrix_cases": 20,
+  "network_disabled": true,
+  "actual_execution": false
+}

@@ -1,0 +1,4 @@
+{
+  "redacted": true,
+  "reason": "Account-derived fee evidence (order and fill counts from the owner's Kalshi account). Removed from the public copy; regenerate with your own account using fee_evidence_refresh.py (read-only)."
+}

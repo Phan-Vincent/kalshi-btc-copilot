@@ -1,0 +1,5 @@
+{
+  "run": 24,
+  "passed": 24,
+  "failures": []
+}

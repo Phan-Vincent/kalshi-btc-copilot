@@ -1,0 +1,2 @@
+Completed the task. The polished window card was deployed at **14:29:12 UTC**, 48 seconds before the boundary. All **122 tests passed on both Mac and Acer**; the 14:30 rollover had no missing window, and the live browser pass found no console errors across all five timeframes, 375 px mobile, and dark mode. The per-finding results and CPU measurements are in [QA_REPORT_20261002.md](/Users/you/Documents/kalshi-btc-readiness/ta_copilot/QA_REPORT_20261002.md:177). **F10 remains partial:** SRI is in place, but CSP is still absent.
+

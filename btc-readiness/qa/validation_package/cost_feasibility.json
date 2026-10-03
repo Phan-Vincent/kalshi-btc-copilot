@@ -1,0 +1,37 @@
+[
+  {
+    "ask": ".01",
+    "cost": "1.0050",
+    "stress_cost": "1.0150",
+    "max_settlement_payoff": "1",
+    "even_a_winning_trade_net": "-0.0050"
+  },
+  {
+    "ask": ".15",
+    "cost": "1.0050",
+    "stress_cost": "1.0150",
+    "max_settlement_payoff": "1",
+    "even_a_winning_trade_net": "-0.0050"
+  },
+  {
+    "ask": ".41",
+    "cost": "1.0050",
+    "stress_cost": "1.0150",
+    "max_settlement_payoff": "1",
+    "even_a_winning_trade_net": "-0.0050"
+  },
+  {
+    "ask": ".50",
+    "cost": "1.0050",
+    "stress_cost": "1.0150",
+    "max_settlement_payoff": "1",
+    "even_a_winning_trade_net": "-0.0050"
+  },
+  {
+    "ask": ".99",
+    "cost": "1.0050",
+    "stress_cost": "1.0150",
+    "max_settlement_payoff": "1",
+    "even_a_winning_trade_net": "-0.0050"
+  }
+]

@@ -1,0 +1,190 @@
+{"ok": false, "reasons": ["Attestation read failed: OSError"]}
+{
+  "level": "CRIT",
+  "crit": [
+    "Runtime HALTED: X"
+  ],
+  "warn": [],
+  "service": "active"
+}
+{
+  "level": "CRIT",
+  "crit": [
+    "Runtime HALTED: X"
+  ],
+  "warn": [],
+  "service": "active"
+}
+Collection disabled: UNAPPROVED_PROTOCOL,NO_REVIEWED_EXECUTABLE_RELEASE,FEE_EXECUTION_EVIDENCE_UNRESOLVED,POSITIVE_PRICE_CENT_FRAGMENTATION_BOUND_INFEASIBLE,NO_COLLECTION_AUTHORIZATION
+test_any_change_blocks_renewal (test_acer_ops.AttestTests.test_any_change_blocks_renewal) ... ok
+test_clock_offset_bounds (test_acer_ops.AttestTests.test_clock_offset_bounds) ... ok
+test_failed_or_erroring_attest_never_renews (test_acer_ops.AttestTests.test_failed_or_erroring_attest_never_renews) ... ok
+test_only_get_allowlisted_routes (test_acer_ops.AttestTests.test_only_get_allowlisted_routes) ... ok
+test_passing_attestation_satisfies_release_gate (test_acer_ops.AttestTests.test_passing_attestation_satisfies_release_gate) ... ok
+test_slow_earlier_requests_do_not_skew_clock_check (test_acer_ops.AttestTests.test_slow_earlier_requests_do_not_skew_clock_check) ... ok
+test_daily_alive_summary_once_per_pacific_day (test_acer_ops.DecideTests.test_daily_alive_summary_once_per_pacific_day) ... ok
+test_failed_delivery_is_retried (test_acer_ops.DecideTests.test_failed_delivery_is_retried) ... ok
+test_first_ok_before_daily_hour_is_silent (test_acer_ops.DecideTests.test_first_ok_before_daily_hour_is_silent) ... ok
+test_problem_alerts_once_then_repeats_after_six_hours (test_acer_ops.DecideTests.test_problem_alerts_once_then_repeats_after_six_hours) ... ok
+test_recovery_is_announced (test_acer_ops.DecideTests.test_recovery_is_announced) ... ok
+test_activated_but_service_down_is_crit (test_acer_ops.StatusTests.test_activated_but_service_down_is_crit) ... ok
+test_attestation_age_levels (test_acer_ops.StatusTests.test_attestation_age_levels) ... ok
+test_halted_marker_is_crit (test_acer_ops.StatusTests.test_halted_marker_is_crit) ... ok
+test_low_free_space_warns (test_acer_ops.StatusTests.test_low_free_space_warns) ... ok
+test_not_activated_is_ok_with_info (test_acer_ops.StatusTests.test_not_activated_is_ok_with_info) ... ok
+test_reads_generation_timing_and_stale_is_crit (test_acer_ops.StatusTests.test_reads_generation_timing_and_stale_is_crit) ... ok
+test_status_never_queries_outcome_tables_and_is_read_only (test_acer_ops.StatusTests.test_status_never_queries_outcome_tables_and_is_read_only) ... ok
+test_posts_message (test_acer_ops.TelegramTests.test_posts_message) ... ok
+test_refuses_readable_config (test_acer_ops.TelegramTests.test_refuses_readable_config) ... ok
+test_account_fraction_sizes_below_ceiling (test_binary_risk.RiskTests.test_account_fraction_sizes_below_ceiling) ... ok
+test_adversarial_numbers_fail_closed (test_binary_risk.RiskTests.test_adversarial_numbers_fail_closed) ... ok
+test_bad_account_value_fails_closed (test_binary_risk.RiskTests.test_bad_account_value_fails_closed) ... ok
+test_boundary_grid_quantities_never_exceed_limits (test_binary_risk.RiskTests.test_boundary_grid_quantities_never_exceed_limits) ... ok
+test_configuration_cannot_authorize_advice (test_binary_risk.RiskTests.test_configuration_cannot_authorize_advice) ... ok
+test_daily_loss_breach_detected (test_binary_risk.RiskTests.test_daily_loss_breach_detected) ... ok
+test_daily_losses_reduce_quantity (test_binary_risk.RiskTests.test_daily_losses_reduce_quantity) ... ok
+test_depth_and_request_are_upper_bounds (test_binary_risk.RiskTests.test_depth_and_request_are_upper_bounds) ... ok
+test_duplicate_or_malformed_ledger_fails (test_binary_risk.RiskTests.test_duplicate_or_malformed_ledger_fails) ... ok
+test_exact_daily_limit_abstains (test_binary_risk.RiskTests.test_exact_daily_limit_abstains) ... ok
+test_exact_twenty_five_dollar_boundary (test_binary_risk.RiskTests.test_exact_twenty_five_dollar_boundary) ... ok
+test_existing_pending_breach_is_not_offset_by_wins (test_binary_risk.RiskTests.test_existing_pending_breach_is_not_offset_by_wins) ... ok
+test_existing_per_trade_loss_breach_detected (test_binary_risk.RiskTests.test_existing_per_trade_loss_breach_detected) ... ok
+test_fee_bound_must_cover_fragmentation_and_fractional_rounding (test_binary_risk.RiskTests.test_fee_bound_must_cover_fragmentation_and_fractional_rounding) ... ok
+test_fragmentation_bound_not_dropped (test_binary_risk.RiskTests.test_fragmentation_bound_not_dropped) ... ok
+test_invalid_price_quantity_and_tick (test_binary_risk.RiskTests.test_invalid_price_quantity_and_tick) ... ok
+test_large_account_value_cannot_exceed_ceiling (test_binary_risk.RiskTests.test_large_account_value_cannot_exceed_ceiling) ... ok
+test_ledger_captured_on_previous_pacific_day_rejected (test_binary_risk.RiskTests.test_ledger_captured_on_previous_pacific_day_rejected) ... ok
+test_limits_cannot_be_silently_relaxed (test_binary_risk.RiskTests.test_limits_cannot_be_silently_relaxed) ... ok
+test_missing_each_required_limit_fails_closed (test_binary_risk.RiskTests.test_missing_each_required_limit_fails_closed) ... ok
+test_missing_ledger_never_infers_zero (test_binary_risk.RiskTests.test_missing_ledger_never_infers_zero) ... ok
+test_naive_non_utc_and_malformed_time_rejected (test_binary_risk.RiskTests.test_naive_non_utc_and_malformed_time_rejected) ... ok
+test_no_double_count_daily_commit (test_binary_risk.RiskTests.test_no_double_count_daily_commit) ... ok
+test_no_mutation_of_inputs (test_binary_risk.RiskTests.test_no_mutation_of_inputs) ... ok
+test_one_full_loss_leaves_only_five_dollars_that_day (test_binary_risk.RiskTests.test_one_full_loss_leaves_only_five_dollars_that_day) ... ok
+test_open_position_occupies_slot (test_binary_risk.RiskTests.test_open_position_occupies_slot) ... ok
+test_opposite_side_does_not_evade_position_limit (test_binary_risk.RiskTests.test_opposite_side_does_not_evade_position_limit) ... ok
+test_pacific_day_across_dst_end (test_binary_risk.RiskTests.test_pacific_day_across_dst_end) ... ok
+test_pacific_day_boundary (test_binary_risk.RiskTests.test_pacific_day_boundary) ... ok
+test_payout_notional_reported_not_limited (test_binary_risk.RiskTests.test_payout_notional_reported_not_limited) ... ok
+test_pending_and_open_same_ticker_loss_aggregates (test_binary_risk.RiskTests.test_pending_and_open_same_ticker_loss_aggregates) ... ok
+test_pending_counts_exposure_and_committed_risk (test_binary_risk.RiskTests.test_pending_counts_exposure_and_committed_risk) ... ok
+test_repeatability (test_binary_risk.RiskTests.test_repeatability) ... ok
+test_same_market_open_or_pending_prevents_add (test_binary_risk.RiskTests.test_same_market_open_or_pending_prevents_add) ... ok
+test_stale_future_or_expired_timestamps_fail (test_binary_risk.RiskTests.test_stale_future_or_expired_timestamps_fail) ... ok
+test_trade_cap_and_exact_breakdown (test_binary_risk.RiskTests.test_trade_cap_and_exact_breakdown) ... ok
+test_unsupported_risk_structures_fail_closed (test_binary_risk.RiskTests.test_unsupported_risk_structures_fail_closed) ... ok
+test_unverified_evidence_fails (test_binary_risk.RiskTests.test_unverified_evidence_fails) ... ok
+test_wins_do_not_replenish_gross_loss_budget (test_binary_risk.RiskTests.test_wins_do_not_replenish_gross_loss_budget) ... ok
+test_abrupt_process_exit_at_each_transaction_boundary (test_coherent_runtime.CoherentRuntime.test_abrupt_process_exit_at_each_transaction_boundary) ... ok
+test_clock_discontinuity_is_persistent_halt (test_coherent_runtime.CoherentRuntime.test_clock_discontinuity_is_persistent_halt) ... ok
+test_commit_before_process_memory_failure_recovers_exactly_once (test_coherent_runtime.CoherentRuntime.test_commit_before_process_memory_failure_recovers_exactly_once) ... ok
+test_corrupted_publication_detected_on_read_and_restart (test_coherent_runtime.CoherentRuntime.test_corrupted_publication_detected_on_read_and_restart) ... /opt/homebrew/Cellar/python@3.14/3.14.4_1/Frameworks/Python.framework/Versions/3.14/lib/python3.14/copy.py:110: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x10a83b6a0>
+  def deepcopy(x, memo=None, _nil=[]):
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+/opt/homebrew/Cellar/python@3.14/3.14.4_1/Frameworks/Python.framework/Versions/3.14/lib/python3.14/copy.py:110: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x10a83b970>
+  def deepcopy(x, memo=None, _nil=[]):
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+/opt/homebrew/Cellar/python@3.14/3.14.4_1/Frameworks/Python.framework/Versions/3.14/lib/python3.14/copy.py:110: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x10a83b790>
+  def deepcopy(x, memo=None, _nil=[]):
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+ok
+test_current_generation_survives_conflicting_concurrent_writer (test_coherent_runtime.CoherentRuntime.test_current_generation_survives_conflicting_concurrent_writer) ... ok
+test_duplicate_identical_inputs_idempotent (test_coherent_runtime.CoherentRuntime.test_duplicate_identical_inputs_idempotent) ... ok
+test_duplicate_writer_process_cannot_open (test_coherent_runtime.CoherentRuntime.test_duplicate_writer_process_cannot_open) ... ok
+test_every_precommit_failure_rolls_back_real_audit_and_study (test_coherent_runtime.CoherentRuntime.test_every_precommit_failure_rolls_back_real_audit_and_study) ... ok
+test_expiry_at_commit_rolls_everything_back (test_coherent_runtime.CoherentRuntime.test_expiry_at_commit_rolls_everything_back) ... ok
+test_failed_collection_invalidates_confirmation_then_recovers (test_coherent_runtime.CoherentRuntime.test_failed_collection_invalidates_confirmation_then_recovers) ... ok
+test_failed_halt_marker_write_still_blocks_restart (test_coherent_runtime.CoherentRuntime.test_failed_halt_marker_write_still_blocks_restart) ... ok
+test_network_failure_and_wrong_ticker_never_fabricate_result (test_coherent_runtime.CoherentRuntime.test_network_failure_and_wrong_ticker_never_fabricate_result) ... ok
+test_no_legacy_retention_delete_in_coherent_store (test_coherent_runtime.CoherentRuntime.test_no_legacy_retention_delete_in_coherent_store) ... ok
+test_one_generation_uses_real_audit_study_and_same_commit (test_coherent_runtime.CoherentRuntime.test_one_generation_uses_real_audit_study_and_same_commit) ... ok
+test_private_or_directional_output_rejected (test_coherent_runtime.CoherentRuntime.test_private_or_directional_output_rejected) ... ok
+test_quota_limit_keeps_existing_evidence_and_halts (test_coherent_runtime.CoherentRuntime.test_quota_limit_keeps_existing_evidence_and_halts) ... ok
+test_reader_never_presents_expired_data (test_coherent_runtime.CoherentRuntime.test_reader_never_presents_expired_data) ... ok
+test_reboot_cannot_silently_reset_monotonic_history (test_coherent_runtime.CoherentRuntime.test_reboot_cannot_silently_reset_monotonic_history) ... ok
+test_same_boot_restart_preserves_evidence (test_coherent_runtime.CoherentRuntime.test_same_boot_restart_preserves_evidence) ... ok
+test_same_epoch_changed_raw_rejected_and_publication_degraded (test_coherent_runtime.CoherentRuntime.test_same_epoch_changed_raw_rejected_and_publication_degraded) ... ok
+test_settlement_amendment_quarantined_original_preserved (test_coherent_runtime.CoherentRuntime.test_settlement_amendment_quarantined_original_preserved) ... ok
+test_settlement_crash_after_get_never_postpones_retry (test_coherent_runtime.CoherentRuntime.test_settlement_crash_after_get_never_postpones_retry) ... ok
+test_settlement_transaction_interruption_rolls_back_attempt_and_outcome (test_coherent_runtime.CoherentRuntime.test_settlement_transaction_interruption_rolls_back_attempt_and_outcome) ... ok
+test_sqlite_page_limit_enforced_without_deleting_rows (test_coherent_runtime.CoherentRuntime.test_sqlite_page_limit_enforced_without_deleting_rows) ... ok
+test_stale_analysis_state_rejected (test_coherent_runtime.CoherentRuntime.test_stale_analysis_state_rejected) ... ok
+test_stale_future_nan_and_malformed_publication_fail_closed (test_coherent_runtime.CoherentRuntime.test_stale_future_nan_and_malformed_publication_fail_closed) ... ok
+test_symlink_and_hardlink_rejected (test_coherent_runtime.CoherentRuntime.test_symlink_and_hardlink_rejected) ... ok
+test_actual_engine_collector_and_store_share_one_generation (test_evidence_runner.EvidenceRunnerTests.test_actual_engine_collector_and_store_share_one_generation) ... ok
+test_cli_collect_rejects_before_runtime_or_network (test_evidence_runner.EvidenceRunnerTests.test_cli_collect_rejects_before_runtime_or_network) ... ok
+test_client_gate_runs_before_authentication_or_transport (test_evidence_runner.EvidenceRunnerTests.test_client_gate_runs_before_authentication_or_transport) ... ok
+test_coinbase_gate_before_any_transport (test_evidence_runner.EvidenceRunnerTests.test_coinbase_gate_before_any_transport) ... ok
+test_executable_lifecycle_uses_explicit_limits_and_closes_cleanly (test_evidence_runner.EvidenceRunnerTests.test_executable_lifecycle_uses_explicit_limits_and_closes_cleanly) ... ok
+test_factory_denied_before_every_side_effect (test_evidence_runner.EvidenceRunnerTests.test_factory_denied_before_every_side_effect) ... ok
+test_factory_refuses_unbound_destination_or_relaxed_storage_before_client (test_evidence_runner.EvidenceRunnerTests.test_factory_refuses_unbound_destination_or_relaxed_storage_before_client) ... ok
+test_fatal_gate_or_clock_failure_keeps_unclean_runtime (test_evidence_runner.EvidenceRunnerTests.test_fatal_gate_or_clock_failure_keeps_unclean_runtime) ... ok
+test_forced_authentication_flag_rejected (test_evidence_runner.EvidenceRunnerTests.test_forced_authentication_flag_rejected) ... ok
+test_gate_denies_even_with_approval_file (test_evidence_runner.EvidenceRunnerTests.test_gate_denies_even_with_approval_file) ... ok
+test_legacy_state_record_is_explicitly_forbidden (test_evidence_runner.EvidenceRunnerTests.test_legacy_state_record_is_explicitly_forbidden) ... ok
+test_narrow_client_blocks_private_account_order_and_setup_routes (test_evidence_runner.EvidenceRunnerTests.test_narrow_client_blocks_private_account_order_and_setup_routes) ... ok
+test_one_envelope_for_json_and_html_escapes_untrusted_text (test_evidence_runner.EvidenceRunnerTests.test_one_envelope_for_json_and_html_escapes_untrusted_text) ... ok
+test_reader_rejects_untrusted_host_origin_and_arbitrary_paths (test_evidence_runner.EvidenceRunnerTests.test_reader_rejects_untrusted_host_origin_and_arbitrary_paths) ... ok
+test_reader_unavailable_envelope_never_reuses_snapshot (test_evidence_runner.EvidenceRunnerTests.test_reader_unavailable_envelope_never_reuses_snapshot) ... ok
+test_revoked_gate_after_collection_never_publishes (test_evidence_runner.EvidenceRunnerTests.test_revoked_gate_after_collection_never_publishes) ... ok
+test_transient_read_error_records_degradation_and_next_poll_recovers (test_evidence_runner.EvidenceRunnerTests.test_transient_read_error_records_degradation_and_next_poll_recovers) ... ok
+test_bound_dominates_every_grouping_at_0001 (test_fee_bound_proposal.FeeBoundProposalTests.test_bound_dominates_every_grouping_at_0001) ... ok
+test_bound_is_not_the_cent_precision_bound (test_fee_bound_proposal.FeeBoundProposalTests.test_bound_is_not_the_cent_precision_bound) ... ok
+test_bound_values (test_fee_bound_proposal.FeeBoundProposalTests.test_bound_values) ... ok
+test_rejects_out_of_scope_inputs (test_fee_bound_proposal.FeeBoundProposalTests.test_rejects_out_of_scope_inputs) ... ok
+test_expired_publication_degrades_and_next_poll_recovers (test_operational_fixes.CollectorResilienceTests.test_expired_publication_degrades_and_next_poll_recovers) ... ok
+test_gate_revocation_after_failure_is_fatal (test_operational_fixes.CollectorResilienceTests.test_gate_revocation_after_failure_is_fatal) ... ok
+test_halted_store_is_fatal (test_operational_fixes.CollectorResilienceTests.test_halted_store_is_fatal) ... ok
+test_malformed_response_value_error_degrades (test_operational_fixes.CollectorResilienceTests.test_malformed_response_value_error_degrades) ... ok
+test_persistent_failures_stop_for_review (test_operational_fixes.CollectorResilienceTests.test_persistent_failures_stop_for_review) ... ok
+test_R1_request_wall_step_still_halts (test_operational_fixes.ReasonixOpsFindingTests.test_R1_request_wall_step_still_halts) ... ok
+test_R1_sleep_during_request_degrades_not_halts (test_operational_fixes.ReasonixOpsFindingTests.test_R1_sleep_during_request_degrades_not_halts) ... ok
+test_R2_long_sleep_during_settlement_read_degrades (test_operational_fixes.ReasonixOpsFindingTests.test_R2_long_sleep_during_settlement_read_degrades) ... ok
+test_R2_settlement_wall_step_still_halts (test_operational_fixes.ReasonixOpsFindingTests.test_R2_settlement_wall_step_still_halts) ... ok
+test_R2_sleep_during_settlement_read_does_not_halt (test_operational_fixes.ReasonixOpsFindingTests.test_R2_sleep_during_settlement_read_does_not_halt) ... ok
+test_R3_transient_settlement_failure_degrades (test_operational_fixes.ReasonixOpsFindingTests.test_R3_transient_settlement_failure_degrades) ... ok
+test_R4_wall_step_between_polls_is_unclean_stop (test_operational_fixes.ReasonixOpsFindingTests.test_R4_wall_step_between_polls_is_unclean_stop) ... ok
+test_R5_integrity_mismatch_halts_immediately (test_operational_fixes.ReasonixOpsFindingTests.test_R5_integrity_mismatch_halts_immediately) ... ok
+test_R6_external_halt_file_is_fatal_at_once (test_operational_fixes.ReasonixOpsFindingTests.test_R6_external_halt_file_is_fatal_at_once) ... ok
+test_continuity_clock_counts_system_sleep (test_operational_fixes.SleepContinuityTests.test_continuity_clock_counts_system_sleep) ... ok
+test_observation_and_request_timing_use_continuity_clock (test_operational_fixes.SleepContinuityTests.test_observation_and_request_timing_use_continuity_clock) ... ok
+test_sleep_gap_with_sleep_inclusive_clock_does_not_halt (test_operational_fixes.SleepContinuityTests.test_sleep_gap_with_sleep_inclusive_clock_does_not_halt) ... ok
+test_uptime_clock_during_sleep_would_halt (test_operational_fixes.SleepContinuityTests.test_uptime_clock_during_sleep_would_halt) ... ok
+test_wall_step_without_elapsed_time_still_halts (test_operational_fixes.SleepContinuityTests.test_wall_step_without_elapsed_time_still_halts) ... ok
+test_approval_deadline_not_start_or_late_or_implicit (test_readiness_protocol.ProtocolTests.test_approval_deadline_not_start_or_late_or_implicit) ... ok
+test_boolean_numeric_threshold_equivalence_not_accepted (test_readiness_protocol.ProtocolTests.test_boolean_numeric_threshold_equivalence_not_accepted) ... ok
+test_changed_candidate_release_rejected (test_readiness_protocol.ProtocolTests.test_changed_candidate_release_rejected) ... ok
+test_changed_each_boundary_rejected (test_readiness_protocol.ProtocolTests.test_changed_each_boundary_rejected) ... ok
+test_changed_or_legacy_identity_rejected (test_readiness_protocol.ProtocolTests.test_changed_or_legacy_identity_rejected) ... ok
+test_cost_precision_fee_multiplier_and_bounds_immutable (test_readiness_protocol.ProtocolTests.test_cost_precision_fee_multiplier_and_bounds_immutable) ... ok
+test_every_acceptance_field_is_immutable (test_readiness_protocol.ProtocolTests.test_every_acceptance_field_is_immutable) ... ok
+test_exact_preservation_from_legacy_source_reference (test_readiness_protocol.ProtocolTests.test_exact_preservation_from_legacy_source_reference) ... ok
+test_failure_does_not_mutate_supplied_protocol (test_readiness_protocol.ProtocolTests.test_failure_does_not_mutate_supplied_protocol) ... ok
+test_fixed_calendar_and_5376_holdout_slots (test_readiness_protocol.ProtocolTests.test_fixed_calendar_and_5376_holdout_slots) ... ok
+test_implied_activation_or_profitability_unblock_rejected (test_readiness_protocol.ProtocolTests.test_implied_activation_or_profitability_unblock_rejected) ... ok
+test_legacy_validator_rejects_new_identity_directly (test_readiness_protocol.ProtocolTests.test_legacy_validator_rejects_new_identity_directly) ... ok
+test_non_midnight_and_non_utc_rejected (test_readiness_protocol.ProtocolTests.test_non_midnight_and_non_utc_rejected) ... ok
+test_pacing_clock_uncertainty_and_outcomes_immutable (test_readiness_protocol.ProtocolTests.test_pacing_clock_uncertainty_and_outcomes_immutable) ... ok
+test_policy_prose_and_custody_cannot_be_weakened (test_readiness_protocol.ProtocolTests.test_policy_prose_and_custody_cannot_be_weakened) ... ok
+test_primary_checkpoint_exit_and_comparison_immutable (test_readiness_protocol.ProtocolTests.test_primary_checkpoint_exit_and_comparison_immutable) ... ok
+test_shifted_calendar_still_rejected (test_readiness_protocol.ProtocolTests.test_shifted_calendar_still_rejected) ... ok
+test_shortened_development_validation_holdout_rejected (test_readiness_protocol.ProtocolTests.test_shortened_development_validation_holdout_rejected) ... ok
+test_unknown_missing_fields_and_non_json_rejected (test_readiness_protocol.ProtocolTests.test_unknown_missing_fields_and_non_json_rejected) ... ok
+test_valid_proposal_is_unapproved_independent_copy (test_readiness_protocol.ProtocolTests.test_valid_proposal_is_unapproved_independent_copy) ... ok
+test_attestation_expiry_enforced_each_cycle_and_renewal_picked_up (test_release_gate.ReleaseGateTests.test_attestation_expiry_enforced_each_cycle_and_renewal_picked_up) ... ok
+test_bad_attestations_refused (test_release_gate.ReleaseGateTests.test_bad_attestations_refused) ... ok
+test_binding_mismatches_refused (test_release_gate.ReleaseGateTests.test_binding_mismatches_refused) ... ok
+test_bound_release_with_fresh_attestation_opens (test_release_gate.ReleaseGateTests.test_bound_release_with_fresh_attestation_opens) ... ok
+test_current_readiness_policy_refuses_activation (test_release_gate.ReleaseGateTests.test_current_readiness_policy_refuses_activation) ... ok
+test_group_readable_or_linked_files_refused (test_release_gate.ReleaseGateTests.test_group_readable_or_linked_files_refused) ... ok
+test_missing_approval_or_attestation_refused (test_release_gate.ReleaseGateTests.test_missing_approval_or_attestation_refused) ... ok
+test_outside_window_refused (test_release_gate.ReleaseGateTests.test_outside_window_refused) ... ok
+test_qa_candidate_always_refused (test_release_gate.ReleaseGateTests.test_qa_candidate_always_refused) ... ok
+test_both_transports_use_bounded_reads (test_response_bounds.ResponseBounds.test_both_transports_use_bounded_reads) ... ok
+test_invalid_utf8_fails_closed (test_response_bounds.ResponseBounds.test_invalid_utf8_fails_closed) ... ok
+test_response_limit_exact_and_overflow (test_response_bounds.ResponseBounds.test_response_limit_exact_and_overflow) ... ok
+
+----------------------------------------------------------------------
+Ran 158 tests in 1.967s
+
+OK

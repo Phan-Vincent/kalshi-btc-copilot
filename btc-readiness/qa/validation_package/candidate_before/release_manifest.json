@@ -1,0 +1,20 @@
+{
+  "study_id": "btc-prospective-002",
+  "status": "OFFLINE_QA_ONLY_NOT_APPROVED",
+  "files": {
+    "btc_copilot.py": "95a680f7651cc42a77013fd2173ff1924fe6205f9960ff327250e58296498516",
+    "btc_copilot_evidence.py": "ecd62771b40d07a0baf77e36c2019f553565699f840c8024f9a5345b07169505",
+    "btc_copilot_research.py": "85bc7dc690d0738b9f3caa34aeb426b10403bb6c0df01709f7baad003e89bf11",
+    "kalshi_readonly.py": "36d12ebbe20abe0698045877db24e1904dc131ea964946efcc48fc29d8e761f7",
+    "study_policy.py": "6e2d9d092980bf8144aeaa987f0e5c85f30c1315dddd596625a86a7018c98909",
+    "btc_copilot_protocol.json": "1f67bba90077429de6ccdbd62970338da7da4cdda685feb1ee36038abb80ecd4",
+    "btc_copilot_settings.json": "47dedad12c34481024d90cc5fafa45293bafa990bc555bf5eaa6f4a8ab0c4eab",
+    "btc_copilot.html": "051953269afbf9f260bd04a9bad218a862244b2ba3aafe2ee6e5e0bc6d61ee3c",
+    "request_pacing.py": "29b3e4d546d1ea8c5fbf634213b73174f70833e2f04510b2d702624ff9d6e3b7",
+    "fee_reconciliation.py": "bc52011f63466bdd949ebf8296d7f1793c736ad9202b4c994626c02a807d003b"
+  },
+  "release": "5.1.0-offline-acceptance-candidate",
+  "candidate_only": true,
+  "not_a_new_study_approval": true,
+  "upstream_sealed_release": "4.2.0-study002-fee-review"
+}

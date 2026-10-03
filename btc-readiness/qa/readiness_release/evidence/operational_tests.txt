@@ -1,0 +1,61 @@
+test_clock_discontinuity_is_persistent_halt (__main__.CoherentRuntime.test_clock_discontinuity_is_persistent_halt) ... ok
+test_commit_before_process_memory_failure_recovers_exactly_once (__main__.CoherentRuntime.test_commit_before_process_memory_failure_recovers_exactly_once) ... ok
+test_corrupted_publication_detected_on_read_and_restart (__main__.CoherentRuntime.test_corrupted_publication_detected_on_read_and_restart) ... ok
+test_duplicate_identical_inputs_idempotent (__main__.CoherentRuntime.test_duplicate_identical_inputs_idempotent) ... ok
+test_duplicate_writer_process_cannot_open (__main__.CoherentRuntime.test_duplicate_writer_process_cannot_open) ... ok
+test_every_precommit_failure_rolls_back_real_audit_and_study (__main__.CoherentRuntime.test_every_precommit_failure_rolls_back_real_audit_and_study) ... /Users/you/.codex/.chatgpt-projects/g-p-PROJECT/qa_btc_2026-09-27/readiness_release/candidate/btc_copilot.py:123: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x106ebd8a0>
+  if price <= 0 or not price.is_finite():
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+/Users/you/.codex/.chatgpt-projects/g-p-PROJECT/qa_btc_2026-09-27/readiness_release/candidate/btc_copilot.py:123: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x106ebdc60>
+  if price <= 0 or not price.is_finite():
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+/Users/you/.codex/.chatgpt-projects/g-p-PROJECT/qa_btc_2026-09-27/readiness_release/candidate/btc_copilot.py:123: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x106ebe890>
+  if price <= 0 or not price.is_finite():
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+/Users/you/.codex/.chatgpt-projects/g-p-PROJECT/qa_btc_2026-09-27/readiness_release/candidate/btc_copilot.py:123: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x106ebe3e0>
+  if price <= 0 or not price.is_finite():
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+ok
+test_expiry_at_commit_rolls_everything_back (__main__.CoherentRuntime.test_expiry_at_commit_rolls_everything_back) ... ok
+test_failed_collection_invalidates_confirmation_then_recovers (__main__.CoherentRuntime.test_failed_collection_invalidates_confirmation_then_recovers) ... /Users/you/.codex/.chatgpt-projects/g-p-PROJECT/qa_btc_2026-09-27/readiness_release/candidate/btc_copilot.py:123: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x106ebe2f0>
+  if price <= 0 or not price.is_finite():
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+/Users/you/.codex/.chatgpt-projects/g-p-PROJECT/qa_btc_2026-09-27/readiness_release/candidate/btc_copilot.py:123: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x106ebe5c0>
+  if price <= 0 or not price.is_finite():
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+/Users/you/.codex/.chatgpt-projects/g-p-PROJECT/qa_btc_2026-09-27/readiness_release/candidate/btc_copilot.py:123: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x106ebf4c0>
+  if price <= 0 or not price.is_finite():
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+/Users/you/.codex/.chatgpt-projects/g-p-PROJECT/qa_btc_2026-09-27/readiness_release/candidate/btc_copilot.py:123: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x106ebe7a0>
+  if price <= 0 or not price.is_finite():
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+ok
+test_no_legacy_retention_delete_in_coherent_store (__main__.CoherentRuntime.test_no_legacy_retention_delete_in_coherent_store) ... ok
+test_one_generation_uses_real_audit_study_and_same_commit (__main__.CoherentRuntime.test_one_generation_uses_real_audit_study_and_same_commit) ... ok
+test_private_or_directional_output_rejected (__main__.CoherentRuntime.test_private_or_directional_output_rejected) ... ok
+test_quota_limit_keeps_existing_evidence_and_halts (__main__.CoherentRuntime.test_quota_limit_keeps_existing_evidence_and_halts) ... ok
+test_reader_never_presents_expired_data (__main__.CoherentRuntime.test_reader_never_presents_expired_data) ... ok
+test_reboot_cannot_silently_reset_monotonic_history (__main__.CoherentRuntime.test_reboot_cannot_silently_reset_monotonic_history) ... /Users/you/.codex/.chatgpt-projects/g-p-PROJECT/qa_btc_2026-09-27/readiness_release/candidate/btc_copilot.py:127: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x106ebf2e0>
+  result = sorted(rows.items())
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+ok
+test_same_boot_restart_preserves_evidence (__main__.CoherentRuntime.test_same_boot_restart_preserves_evidence) ... ok
+test_same_epoch_changed_raw_rejected_and_publication_degraded (__main__.CoherentRuntime.test_same_epoch_changed_raw_rejected_and_publication_degraded) ... ok
+test_sqlite_page_limit_enforced_without_deleting_rows (__main__.CoherentRuntime.test_sqlite_page_limit_enforced_without_deleting_rows) ... /opt/homebrew/Cellar/python@3.14/3.14.4_1/Frameworks/Python.framework/Versions/3.14/lib/python3.14/copy.py:110: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x106ebf2e0>
+  def deepcopy(x, memo=None, _nil=[]):
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+ok
+test_stale_analysis_state_rejected (__main__.CoherentRuntime.test_stale_analysis_state_rejected) ... ok
+test_stale_future_nan_and_malformed_publication_fail_closed (__main__.CoherentRuntime.test_stale_future_nan_and_malformed_publication_fail_closed) ... ok
+test_symlink_and_hardlink_rejected (__main__.CoherentRuntime.test_symlink_and_hardlink_rejected) ... /opt/homebrew/Cellar/python@3.14/3.14.4_1/Frameworks/Python.framework/Versions/3.14/lib/python3.14/copy.py:110: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x106ebf3d0>
+  def deepcopy(x, memo=None, _nil=[]):
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+/opt/homebrew/Cellar/python@3.14/3.14.4_1/Frameworks/Python.framework/Versions/3.14/lib/python3.14/copy.py:110: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x106ebec50>
+  def deepcopy(x, memo=None, _nil=[]):
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+ok
+
+----------------------------------------------------------------------
+Ran 20 tests in 0.694s
+
+OK

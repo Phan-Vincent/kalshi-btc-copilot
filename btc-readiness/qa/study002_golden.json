@@ -1,0 +1,375 @@
+[
+  {
+    "scenario": "obvious_LONG",
+    "expected_before_run": {
+      "public_decision": "NO TRADE",
+      "bias": "UP",
+      "all_shadow_ineligible": false
+    },
+    "actual": {
+      "public_decision": "NO TRADE",
+      "bias": "UP",
+      "setup_side": "UP",
+      "shadow_decision": "NO TRADE",
+      "current_full_eligible": false,
+      "any_shadow_eligible": false,
+      "data_faults": [],
+      "second_observation": {
+        "public_decision": "NO TRADE",
+        "shadow_decision": "UP",
+        "setup_side": "UP",
+        "full_eligible": true,
+        "bias": "UP",
+        "full_reasons": []
+      }
+    },
+    "passes_expectation": true,
+    "llm_used": false
+  },
+  {
+    "scenario": "obvious_SHORT",
+    "expected_before_run": {
+      "public_decision": "NO TRADE",
+      "bias": "DOWN",
+      "all_shadow_ineligible": false
+    },
+    "actual": {
+      "public_decision": "NO TRADE",
+      "bias": "DOWN",
+      "setup_side": "DOWN",
+      "shadow_decision": "NO TRADE",
+      "current_full_eligible": false,
+      "any_shadow_eligible": true,
+      "data_faults": [],
+      "second_observation": {
+        "public_decision": "NO TRADE",
+        "shadow_decision": "DOWN",
+        "setup_side": "DOWN",
+        "full_eligible": true,
+        "bias": "DOWN",
+        "full_reasons": []
+      }
+    },
+    "passes_expectation": true,
+    "llm_used": false
+  },
+  {
+    "scenario": "clean_breakout",
+    "expected_before_run": {
+      "public_decision": "NO TRADE",
+      "bias": "UP",
+      "all_shadow_ineligible": false
+    },
+    "actual": {
+      "public_decision": "NO TRADE",
+      "bias": "UP",
+      "setup_side": null,
+      "shadow_decision": "NO TRADE",
+      "current_full_eligible": false,
+      "any_shadow_eligible": true,
+      "data_faults": [],
+      "second_observation": {
+        "public_decision": "NO TRADE",
+        "shadow_decision": "NO TRADE",
+        "setup_side": null,
+        "full_eligible": false,
+        "bias": "UP",
+        "full_reasons": [
+          "structure",
+          "confirmation"
+        ]
+      }
+    },
+    "passes_expectation": true,
+    "llm_used": false
+  },
+  {
+    "scenario": "failed_breakout",
+    "expected_before_run": {
+      "public_decision": "NO TRADE",
+      "bias": "NEUTRAL",
+      "all_shadow_ineligible": false
+    },
+    "actual": {
+      "public_decision": "NO TRADE",
+      "bias": "NEUTRAL",
+      "setup_side": null,
+      "shadow_decision": "NO TRADE",
+      "current_full_eligible": false,
+      "any_shadow_eligible": true,
+      "data_faults": [],
+      "second_observation": {
+        "public_decision": "NO TRADE",
+        "shadow_decision": "NO TRADE",
+        "setup_side": null,
+        "full_eligible": false,
+        "bias": "NEUTRAL",
+        "full_reasons": [
+          "structure",
+          "confirmation",
+          "strike_chop"
+        ]
+      }
+    },
+    "passes_expectation": true,
+    "llm_used": false
+  },
+  {
+    "scenario": "successful_retest",
+    "expected_before_run": {
+      "public_decision": "NO TRADE",
+      "bias": "UP",
+      "all_shadow_ineligible": false
+    },
+    "actual": {
+      "public_decision": "NO TRADE",
+      "bias": "UP",
+      "setup_side": "UP",
+      "shadow_decision": "NO TRADE",
+      "current_full_eligible": false,
+      "any_shadow_eligible": false,
+      "data_faults": [],
+      "second_observation": {
+        "public_decision": "NO TRADE",
+        "shadow_decision": "UP",
+        "setup_side": "UP",
+        "full_eligible": true,
+        "bias": "UP",
+        "full_reasons": []
+      }
+    },
+    "passes_expectation": true,
+    "llm_used": false
+  },
+  {
+    "scenario": "failed_reclaim",
+    "expected_before_run": {
+      "public_decision": "NO TRADE",
+      "bias": "DOWN",
+      "all_shadow_ineligible": false
+    },
+    "actual": {
+      "public_decision": "NO TRADE",
+      "bias": "DOWN",
+      "setup_side": "DOWN",
+      "shadow_decision": "NO TRADE",
+      "current_full_eligible": false,
+      "any_shadow_eligible": true,
+      "data_faults": [],
+      "second_observation": {
+        "public_decision": "NO TRADE",
+        "shadow_decision": "DOWN",
+        "setup_side": "DOWN",
+        "full_eligible": true,
+        "bias": "DOWN",
+        "full_reasons": []
+      }
+    },
+    "passes_expectation": true,
+    "llm_used": false
+  },
+  {
+    "scenario": "strong_downtrend",
+    "expected_before_run": {
+      "public_decision": "NO TRADE",
+      "bias": "DOWN",
+      "all_shadow_ineligible": false
+    },
+    "actual": {
+      "public_decision": "NO TRADE",
+      "bias": "DOWN",
+      "setup_side": null,
+      "shadow_decision": "NO TRADE",
+      "current_full_eligible": false,
+      "any_shadow_eligible": true,
+      "data_faults": [],
+      "second_observation": {
+        "public_decision": "NO TRADE",
+        "shadow_decision": "NO TRADE",
+        "setup_side": null,
+        "full_eligible": false,
+        "bias": "DOWN",
+        "full_reasons": [
+          "structure",
+          "confirmation"
+        ]
+      }
+    },
+    "passes_expectation": true,
+    "llm_used": false
+  },
+  {
+    "scenario": "strong_uptrend",
+    "expected_before_run": {
+      "public_decision": "NO TRADE",
+      "bias": "UP",
+      "all_shadow_ineligible": false
+    },
+    "actual": {
+      "public_decision": "NO TRADE",
+      "bias": "UP",
+      "setup_side": "UP",
+      "shadow_decision": "NO TRADE",
+      "current_full_eligible": false,
+      "any_shadow_eligible": true,
+      "data_faults": [],
+      "second_observation": {
+        "public_decision": "NO TRADE",
+        "shadow_decision": "UP",
+        "setup_side": "UP",
+        "full_eligible": true,
+        "bias": "UP",
+        "full_reasons": []
+      }
+    },
+    "passes_expectation": true,
+    "llm_used": false
+  },
+  {
+    "scenario": "sideways_chop",
+    "expected_before_run": {
+      "public_decision": "NO TRADE",
+      "bias": "NEUTRAL",
+      "all_shadow_ineligible": true
+    },
+    "actual": {
+      "public_decision": "NO TRADE",
+      "bias": "NEUTRAL",
+      "setup_side": null,
+      "shadow_decision": "NO TRADE",
+      "current_full_eligible": false,
+      "any_shadow_eligible": true,
+      "data_faults": [],
+      "second_observation": {
+        "public_decision": "NO TRADE",
+        "shadow_decision": "NO TRADE",
+        "setup_side": null,
+        "full_eligible": false,
+        "bias": "NEUTRAL",
+        "full_reasons": [
+          "structure",
+          "confirmation"
+        ]
+      }
+    },
+    "passes_expectation": false,
+    "llm_used": false
+  },
+  {
+    "scenario": "conflicting_timeframes",
+    "expected_before_run": {
+      "public_decision": "NO TRADE",
+      "bias": "DOWN",
+      "all_shadow_ineligible": false
+    },
+    "actual": {
+      "public_decision": "NO TRADE",
+      "bias": "DOWN",
+      "setup_side": null,
+      "shadow_decision": "NO TRADE",
+      "current_full_eligible": false,
+      "any_shadow_eligible": false,
+      "data_faults": [],
+      "second_observation": {
+        "public_decision": "NO TRADE",
+        "shadow_decision": "NO TRADE",
+        "setup_side": null,
+        "full_eligible": false,
+        "bias": "DOWN",
+        "full_reasons": [
+          "structure",
+          "confirmation"
+        ]
+      }
+    },
+    "passes_expectation": true,
+    "llm_used": false
+  },
+  {
+    "scenario": "stale_data",
+    "expected_before_run": {
+      "public_decision": "NO TRADE",
+      "bias": null,
+      "all_shadow_ineligible": true
+    },
+    "actual": {
+      "rejected": "ReadError"
+    },
+    "passes_expectation": true,
+    "llm_used": false
+  },
+  {
+    "scenario": "missing_data",
+    "expected_before_run": {
+      "public_decision": "NO TRADE",
+      "bias": null,
+      "all_shadow_ineligible": true
+    },
+    "actual": {
+      "rejected": "ReadError"
+    },
+    "passes_expectation": true,
+    "llm_used": false
+  },
+  {
+    "scenario": "extreme_volatility",
+    "expected_before_run": {
+      "public_decision": "NO TRADE",
+      "bias": null,
+      "all_shadow_ineligible": false
+    },
+    "actual": {
+      "public_decision": "NO TRADE",
+      "bias": "NEUTRAL",
+      "setup_side": null,
+      "shadow_decision": "NO TRADE",
+      "current_full_eligible": false,
+      "any_shadow_eligible": true,
+      "data_faults": [],
+      "second_observation": {
+        "public_decision": "NO TRADE",
+        "shadow_decision": "NO TRADE",
+        "setup_side": null,
+        "full_eligible": false,
+        "bias": "NEUTRAL",
+        "full_reasons": [
+          "structure",
+          "confirmation",
+          "strike_chop"
+        ]
+      }
+    },
+    "passes_expectation": true,
+    "llm_used": false
+  },
+  {
+    "scenario": "almost_qualifies",
+    "expected_before_run": {
+      "public_decision": "NO TRADE",
+      "bias": null,
+      "all_shadow_ineligible": true
+    },
+    "actual": {
+      "public_decision": "NO TRADE",
+      "bias": "NEUTRAL",
+      "setup_side": null,
+      "shadow_decision": "NO TRADE",
+      "current_full_eligible": false,
+      "any_shadow_eligible": true,
+      "data_faults": [],
+      "second_observation": {
+        "public_decision": "NO TRADE",
+        "shadow_decision": "NO TRADE",
+        "setup_side": null,
+        "full_eligible": false,
+        "bias": "NEUTRAL",
+        "full_reasons": [
+          "structure",
+          "confirmation"
+        ]
+      }
+    },
+    "passes_expectation": false,
+    "llm_used": false
+  }
+]

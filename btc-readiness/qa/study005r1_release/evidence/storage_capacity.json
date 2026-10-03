@@ -1,0 +1,102 @@
+{
+  "scope": "SYNTHETIC_TEMPORARY_CAPACITY_MEASUREMENT_NOT_STRATEGY_VALIDATION",
+  "candidate_source_sha256": {
+    "coherent_runtime.py": "b76d2262869441763c228f5a2c6edccceec8034317ca9988d54093aeaeac7f7c",
+    "btc_copilot.py": "b7b3434dbac54473d481c8cad257bf1fe5855623ea7f1a2d1ce8186a67192328",
+    "btc_copilot_research.py": "56bdd617b1c4d5877e1bb2ae40fac68d1f5a89773d63e1605ff4c8b22e1cdbe3",
+    "btc_copilot_evidence.py": "dde843484ee5a7ddf7b1b65ffc2a7770b8bff236e9d753605d06a8621aff2823",
+    "study_policy.py": "6e2d9d092980bf8144aeaa987f0e5c85f30c1315dddd596625a86a7018c98909"
+  },
+  "measurement": {
+    "samples": 256,
+    "warmup_generations": 64,
+    "cadence_seconds": 15,
+    "network_blocked": true,
+    "temporary_database_removed": true,
+    "public_fixture_bytes": 1334876,
+    "runtime_seconds": 4.904,
+    "database_size_samples": [
+      {
+        "generations": 0,
+        "database_bytes": 151552
+      },
+      {
+        "generations": 64,
+        "database_bytes": 2760704
+      },
+      {
+        "generations": 128,
+        "database_bytes": 5206016
+      },
+      {
+        "generations": 192,
+        "database_bytes": 7651328
+      },
+      {
+        "generations": 256,
+        "database_bytes": 10100736
+      }
+    ],
+    "post_warmup_window_bytes_per_generation": [
+      38208.0,
+      38208.0,
+      38272.0
+    ],
+    "conservative_observed_bytes_per_generation": 38272.0,
+    "observation_payload_compressed_bytes": {
+      "min": 36508,
+      "mean": 36795.625,
+      "max": 36803
+    },
+    "retained_source_bytes": 92406,
+    "latest_publication_bytes": 51728,
+    "latest_state_bytes": 2782,
+    "table_counts": {
+      "generations": 256,
+      "observations": 256,
+      "markets": 5,
+      "checkpoints": 4,
+      "signals": 0,
+      "outcome_events": 0,
+      "implementations": 1
+    },
+    "sqlite_page_size": 4096,
+    "sqlite_version": "3.53.0",
+    "python_version": "3.14.4"
+  },
+  "projection": {
+    "collection_days": 70,
+    "release_wait_days": 2,
+    "generations_70_days": 403200,
+    "markets_70_days": 6720,
+    "extrapolated_generation_database_bytes": 15431421952,
+    "additional_all_markets_one_checkpoint_plus_two_blobs_per_eight_arms_bytes": 4204374720,
+    "additional_outcome_rows_one_per_poll_72_days_at_4096_bytes": 1698693120,
+    "additional_source_budget_bytes": 1048576,
+    "subtotal_main_database_bytes": 21335538368,
+    "uncertainty_multiplier": 2,
+    "planning_main_database_bytes": 42671076736,
+    "recommended_explicit_total_quota_gib": 128,
+    "recommended_minimum_free_space_reserve_gib": 16,
+    "default_total_quota_gib": 8,
+    "default_effective_main_database_bytes": 2862960640,
+    "default_main_budget_estimated_days_at_fixture_rate": 12.987,
+    "default_quota_sufficient_for_projection": false,
+    "quota_factor_explanation": "Runtime max_page_count reserves roughly 2/3 total quota for rollback journal and metadata; only about1/3 is available for main database."
+  },
+  "filesystem_metadata": {
+    "available_bytes_at_measurement": 311296000000,
+    "sufficient_for_recommended_quota_plus_16gib_reserve": true
+  },
+  "limits": [
+    "Repeated public fixture is compressible; this is not a worst-case bound or throughput benchmark.",
+    "Retimed synthetic snapshots exercise storage only, not genuine time-consistent market replay.",
+    "All generations retained. No VACUUM, deletion, downsampling, compressed archival or production changes were performed.",
+    "Additional checkpoint/signal budget intentionally double-counts any already observed instances.",
+    "Outcome budget assumes at most one settle_one event per15-secondpoll; different scheduling must be measured again.",
+    "Two-times planning headroom is a proposal, not proof that varying API payloads fit.",
+    "Free disk is momentary filesystem metadata, not reserved capacity or deployment approval.",
+    "Actual source changes require remeasurement and source/config/package review before activation."
+  ],
+  "activation_allowed": false
+}

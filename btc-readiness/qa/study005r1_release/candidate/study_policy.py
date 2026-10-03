@@ -1,0 +1,158 @@
+"""Pure study-002 rules. No network, credentials, production data, or account actions."""
+from decimal import Decimal as D, ROUND_CEILING, ROUND_FLOOR
+from datetime import datetime, timezone
+from pathlib import Path
+import hashlib,json,math,random
+
+def epoch(value):
+    dt=datetime.fromisoformat(value.replace('Z','+00:00'))
+    if dt.utcoffset() is None or dt.utcoffset().total_seconds()!=0:raise ValueError('UTC required')
+    return dt.timestamp()
+
+def validate_protocol(p):
+    if p['schema_version']!=2 or p['study_id']!='btc-prospective-002':raise ValueError('Unsupported study identity')
+    times=[epoch(p[k]) for k in ('start_utc','validation_start_utc','holdout_start_utc','end_utc','release_utc')]
+    if times!=sorted(set(times)) or any(t%86400 for t in times):raise ValueError('Strict UTC midnight boundaries required')
+    if (times[3]-times[2])/86400!=56:raise ValueError('56-day holdout required')
+    if p['reaction_delay_seconds']!=15 or p['delay_window_seconds']!=20:raise ValueError('Unsupported execution policy')
+    if p['primary_strategy']!='drift_free':raise ValueError('Primary reselection forbidden')
+    a=p['primary_acceptance']
+    required={'matched_forecasts':5376,'filled_contracts':100,'distinct_days':40,'holdout_coverage':1.0,'stress_daily_lower_bound':0,'paired_zero_minus_market_brier_upper_bound':0,'calibration_ece':.05,'unresolved_enrolled':0,'missing_calendar_days':0,'amended_results':0,'missing_execution_observations':0}
+    if a!=required:raise ValueError('Unsupported acceptance policy; separately reviewed version required')
+    if p['uncertainty']['block_days']!=[1,2,7] or p['uncertainty']['replicates']!=2000 or p['uncertainty']['seed']!=719 or p['uncertainty']['minimum_days']!=56:raise ValueError('Unsupported uncertainty policy')
+    f=p['fee_policy']
+    if (f['coefficient'],f['type'],f['multiplier'],f['hypothetical_quantity'],f['minimum_fill_quantity'])!=('0.07','quadratic','1','1.00','0.01'):raise ValueError('Unsupported fee policy')
+    if p['fee_multiplier']!='1' or f['trade_fee_precision']!='0.000001' or f['balance_precisions']!=['0.0001','0.01']:raise ValueError('Unsupported fee precision')
+    if p['outcome_policy']['retry_batch']!=64 or p['outcome_policy']['recheck_seconds']!=21600 or p['outcome_policy']['release_recheck_window_seconds']!=21600:raise ValueError('Unsupported reconciliation policy')
+    if p['approval_policy']['deadline_utc']!=p['start_utc']:raise ValueError('Approval deadline mismatch')
+    if p['clock_policy']['wall_monotonic_tolerance_seconds']!=1 or p['clock_policy']['max_request_seconds']!=15 or p['clock_policy']['max_snapshot_age_seconds']!=20:raise ValueError('Unsupported clock policy')
+    if p['pacing_policy']!={'interval_seconds':15,'tokens_per_second':60,'bucket_capacity':60,'background_tokens_per_second':20,'background_bucket_capacity':10,'maximum_wait_seconds':5,'default_cost':10,'benchmark_cost':50,'initial_tokens':0,'cooldown_seconds':[2,4,8,16,30]}:raise ValueError('Unsupported pacing policy')
+    if p['profitability_validation_mode']!='BLOCKED_PENDING_FEE_AND_EXECUTION_EVIDENCE':raise ValueError('Fee and execution assumptions require separate review')
+    return p
+
+def check_clock(snapshot,last_epoch=None,last_monotonic=None):
+    now=snapshot['epoch'];expiry=snapshot['valid_until_epoch']
+    if any(type(v) not in (int,float) or not math.isfinite(v) for v in (now,expiry)):raise ValueError('Invalid clock')
+    mono=snapshot['observation_monotonic']
+    if type(mono) not in (int,float) or not math.isfinite(mono):raise ValueError('Invalid monotonic clock')
+    if last_monotonic is not None and (mono<=last_monotonic or abs((now-last_epoch)-(mono-last_monotonic))>1):raise ValueError('Between-observation clock discontinuity')
+    if not snapshot['retrieval_health']['requests'].get('book'):raise ValueError('Missing book clock')
+    if expiry<=now or expiry>now+20.001:raise ValueError('Invalid expiry')
+    if last_epoch is not None and now<=last_epoch:raise ValueError('Duplicate or reversed observation')
+    for t in snapshot['retrieval_health']['requests'].values():
+        start,finish,elapsed=(t[k] for k in ('started_at_epoch','finished_at_epoch','latency_seconds'))
+        if any(type(v) not in (int,float) or not math.isfinite(v) for v in (start,finish,elapsed)):raise ValueError('Invalid request clock')
+        if not start<=finish<=now or abs(finish-start-elapsed)>1:raise ValueError('Request clock discontinuity')
+        # A slow read (including one spanning system sleep) is stale data, not a clock fault.
+        if not 0<=elapsed<=15 or now-start>20:raise ValueError('Request stale beyond read budget')
+
+def fee_fills(fills,precision):
+    # Study entries remain buys; sell support is only for offline historical reconciliation.
+    from fee_reconciliation import fee_sequence
+    return fee_sequence([(p,q,'buy') for p,q in fills],precision)
+
+BOTH_PRECISIONS=('0.0001','0.01');LEDGER_0001=('0.0001',)
+
+def execution_cost(rows,settings,balance_precisions=BOTH_PRECISIONS):
+    # One contract, minimum .01 units; no partial fill counts as an entry.
+    # balance_precisions comes from the protocol's fee_policy. Both (default) is the
+    # unestablished-account bound. .0001 only (Study 005 r1, from the account's fee records) drops the
+    # .01 worst case and adds the reviewed closed-form bound q*(.07*p*(1-p)+.0101).
+    precisions=tuple(balance_precisions)
+    if precisions not in (BOTH_PRECISIONS,LEDGER_0001):raise ValueError('Unsupported balance precision policy')
+    levels=[];seen=set()
+    for p,q in rows:
+        p,q=D(str(p)),D(str(q))
+        if not p.is_finite() or not q.is_finite() or not 0<=p<=1 or q<0 or q%D('.01') or p in seen:raise ValueError('Unsupported or duplicate price/depth')
+        seen.add(p)
+        if q:levels.append((1-p,q))
+    remaining=D(1);fills=[]
+    for price,q in sorted(levels):
+        take=min(q,remaining)
+        if take:fills.append((price,take));remaining-=take
+        if not remaining:break
+    if remaining:return None
+    scenarios={x:fee_fills(fills,x) for x in ('.0001','.01')}
+    notional=sum((p*q for p,q in fills),D(0))
+    model=sum((D('.07')*q*p*(1-p) for p,q in fills),D(0))
+    # Ceiling is subadditive: splitting every .01 quantity quantum and ignoring
+    # rebates bounds any allowed grouping into fills at each consumed price.
+    bounds={}
+    for precision in (D(x) for x in precisions):
+        debit=D(0)
+        for price,q in fills:
+            unit_trade=(D('.07')*D('.01')*price*(1-price)).quantize(D('.000001'),rounding=ROUND_CEILING)
+            unit_debit=((D('.01')*price+unit_trade)/precision).to_integral_value(rounding=ROUND_CEILING)*precision
+            debit+=(q/D('.01'))*unit_debit
+        bounds[str(precision)]=debit-notional
+    bound=max(bounds.values())
+    legacy=sum((q.to_integral_value(rounding=ROUND_CEILING)*(D('.07')*p*(1-p)).quantize(D('.01'),rounding=ROUND_CEILING) for p,q in fills),D(0))
+    reserve_cents=D(str(settings['slippage_reserve_cents']))
+    if not reserve_cents.is_finite() or not D('.5')<=reserve_cents<=10:raise ValueError('Slippage reserve below safety floor or invalid')
+    fee=max(bound,legacy);extra={}
+    if precisions==LEDGER_0001:
+        closed=sum((q*(D('.07')*p*(1-p)+D('.0101')) for p,q in fills),D(0))
+        terms={'closed_form':closed,'unit_split_0001':bounds['0.0001'],'legacy_level':legacy}
+        fee=max(terms.values())
+        # Diagnostics only: which term set the acceptance fee (ties list every term) and how many
+        # displayed levels the one-unit entry consumed. They never change the cost.
+        extra={'closed_form_fee_bound':str(closed),'legacy_level_fee_bound':str(legacy),'balance_precisions':list(precisions),
+               'binding_fee_terms':sorted(k for k,v in terms.items() if v==fee),'consumed_levels':len(fills)}
+    reserve=reserve_cents/100
+    return {**extra,'scenario_fees':scenarios,'notional':str(notional),'acceptance_fee_bound':str(fee),'fragmentation_fee_bounds':{k:str(v) for k,v in bounds.items()},'cost':str(notional+fee+reserve),'stress_cost':str(notional+fee+reserve+D('.01')),'max_fills_assumed':100,'actual_fills':False}
+
+def intervals(values,policy):
+    days=sorted(values)
+    if len(days)<policy['minimum_days']:return {str(b):None for b in policy['block_days']}
+    if any(epoch(days[i]+'T00:00:00+00:00')-epoch(days[i-1]+'T00:00:00+00:00')!=86400 for i in range(1,len(days))):raise ValueError('Nonconsecutive daily sample')
+    data=[values[d] for d in days];out={};n=len(data)
+    for block in policy['block_days']:
+        rng=random.Random(policy['seed']);samples=[]
+        for _ in range(policy['replicates']):
+            sample=[]
+            while len(sample)<n:
+                start=rng.randrange(n-block+1);sample.extend(data[start:start+block])
+            samples.append(sum(sample[:n])/n)
+        samples.sort();out[str(block)]=[samples[int(len(samples)*.025)],samples[int(len(samples)*.975)]]
+    return out
+
+def digest(path):return hashlib.sha256(Path(path).read_bytes()).hexdigest()
+
+RELEASE_FILES={'btc_copilot.py','btc_copilot_evidence.py','btc_copilot_research.py','kalshi_readonly.py','study_policy.py','btc_copilot_protocol.json','btc_copilot_settings.json','btc_copilot.html','request_pacing.py','fee_reconciliation.py'}
+
+def verify_release(root):
+    root=Path(root).resolve();m=json.loads((root/'release_manifest.json').read_text())
+    if set(m['files'])!=RELEASE_FILES:raise ValueError('Incomplete release manifest')
+    if m['study_id']!='btc-prospective-002':raise ValueError('Manifest study mismatch')
+    for name,expected in m['files'].items():
+        path=root/name
+        if Path(name).name!=name or path.is_symlink() or digest(path)!=expected:raise ValueError('Release mismatch: '+name)
+    return m
+
+def launch_guard(root,now):
+    if type(now) not in (int,float) or not math.isfinite(now):raise ValueError('Invalid launch clock')
+    root=Path(root).resolve()
+    if (root/'QA_ONLY').exists():raise ValueError('NOT ACTIVATED: offline QA candidate; no collector launch authorized')
+    verify_release(root)
+    p=validate_protocol(json.loads((root/'btc_copilot_protocol.json').read_text()))
+    approval=root/'activation_approval.json'
+    if not approval.exists():raise ValueError('NOT ACTIVATED: explicit user approval record absent')
+    if approval.is_symlink():raise ValueError('Approval symlink forbidden')
+    a=json.loads(approval.read_text())
+    if a.get('bundle_path')!=str(root):raise ValueError('Approval path mismatch')
+    if a.get('approved') is not True or a.get('study_id')!=p['study_id'] or a.get('manifest_sha256')!=digest(root/'release_manifest.json'):raise ValueError('Approval not bound to this release')
+    approved=epoch(a['approved_at_utc'])
+    if not approved<=now or not approved<epoch(p['start_utc']):raise ValueError('Approval too late or future-dated')
+    if not epoch(p['start_utc'])<=now<epoch(p['release_utc']):raise ValueError('Outside authorized collection/reconciliation window')
+    attested=epoch(a['fee_verified_at_utc'])
+    if not 0<=now-attested<=86400 or a.get('fee_rules_verified') is not True:raise ValueError('Fee rules require fresh verification')
+    for field in ('read_refill_tokens_per_second','read_bucket_capacity','default_read_cost','benchmark_read_cost'):
+        if type(a.get(field)) not in (int,float) or not math.isfinite(a[field]):raise ValueError('Invalid budget attestation')
+    rate_time=epoch(a['rate_verified_at_utc'])
+    if not 0<=now-rate_time<=86400 or a.get('read_refill_tokens_per_second',0)<200 or a.get('read_bucket_capacity',0)<600 or a.get('default_read_cost')!=10 or a.get('benchmark_read_cost')!=50:raise ValueError('Read budget or costs require fresh verification')
+    for name in ('btc_copilot_latest.json','btc_copilot_latest.txt','btc_copilot_journal.jsonl','btc_copilot_evidence_report.json'):
+        if (root/name).is_symlink():raise ValueError('Published output symlink forbidden')
+    work=root/'runtime'
+    if work.is_symlink():raise ValueError('Runtime symlink forbidden')
+    if work.exists() and any(x.is_symlink() or (x.is_file() and x.stat().st_nlink!=1) for x in work.iterdir()):raise ValueError('Runtime contains linked file')
+    return p

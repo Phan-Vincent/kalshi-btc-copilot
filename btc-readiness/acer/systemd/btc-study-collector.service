@@ -1,0 +1,17 @@
+[Unit]
+Description=BTC 15m evidence-only collector (no trading, no advice)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/btc-study/current
+ExecStart=/usr/bin/python3 -B %h/btc-study/current/evidence_runner.py --collect
+# No automatic restart: an unclean exit or halt keeps its RUNNING/HALTED marker
+# for review, and the watch timer alerts on Telegram.
+Restart=no
+Nice=5
+UMask=0077
+
+[Install]
+WantedBy=default.target

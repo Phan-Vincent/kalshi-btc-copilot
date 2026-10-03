@@ -1,0 +1,15 @@
+test_early_request_not_filled_later_eligible_request_used (copilot_audit_regressions.CandidateRegressions.test_early_request_not_filled_later_eligible_request_used) ... ok
+test_fair_settlement_visits_fourth_market (copilot_audit_regressions.CandidateRegressions.test_fair_settlement_visits_fourth_market) ... ok
+test_frozen_early_fill_and_origin_overwrite_reproduced (copilot_audit_regressions.CandidateRegressions.test_frozen_early_fill_and_origin_overwrite_reproduced) ... ok
+test_incomplete_results_cannot_pass_and_attempts_retained (copilot_audit_regressions.CandidateRegressions.test_incomplete_results_cannot_pass_and_attempts_retained) ... ok
+test_staged_monitor_settlement_is_in_finally (copilot_audit_regressions.CandidateRegressions.test_staged_monitor_settlement_is_in_finally) ... ok
+test_health_malformed_inputs_fail_closed (copilot_audit_regressions.DisclosureAndHealth.test_health_malformed_inputs_fail_closed) ... ok
+test_health_rejects_stale_future_missing_lock_and_enabled_advice (copilot_audit_regressions.DisclosureAndHealth.test_health_rejects_stale_future_missing_lock_and_enabled_advice) ... ok
+test_holdout_not_parsed_before_release (copilot_audit_regressions.DisclosureAndHealth.test_holdout_not_parsed_before_release) ... ok
+test_frozen_can_pass_with_unresolved_fills_excluded (copilot_audit_regressions.FrozenReproductions.test_frozen_can_pass_with_unresolved_fills_excluded) ... ok
+test_frozen_starves_fourth_market (copilot_audit_regressions.FrozenReproductions.test_frozen_starves_fourth_market) ... ok
+
+----------------------------------------------------------------------
+Ran 10 tests in 2.621s
+
+OK

@@ -1,0 +1,103 @@
+EE.EEEE...
+======================================================================
+ERROR: test_expired_publication_degrades_and_next_poll_recovers (test_operational_fixes.CollectorResilienceTests.test_expired_publication_degrades_and_next_poll_recovers)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/you/Library/Application Support/Claude/scratch-workspaces/WORKSPACE/SESSION/scratch-2026-09-27-d7f3e5/btc-readiness/qa/readiness_release/tests/test_operational_fixes.py", line 75, in test_expired_publication_degrades_and_next_poll_recovers
+    result = run.run_authorized(f.ROOT, gate, max_cycles=2, **kwargs)
+  File "/Users/you/Library/Application Support/Claude/scratch-workspaces/WORKSPACE/SESSION/scratch-2026-09-27-d7f3e5/btc-readiness/qa/readiness_release/candidate/evidence_runner.py", line 170, in run_authorized
+    try:collector.once()
+        ~~~~~~~~~~~~~~^^
+  File "/Users/you/Library/Application Support/Claude/scratch-workspaces/WORKSPACE/SESSION/scratch-2026-09-27-d7f3e5/btc-readiness/qa/readiness_release/candidate/evidence_runner.py", line 102, in once
+    generation=self.store.publish(self.engine,snapshot)
+  File "/opt/homebrew/Cellar/python@3.14/3.14.4_1/Frameworks/Python.framework/Versions/3.14/lib/python3.14/unittest/mock.py", line 1176, in __call__
+    return self._mock_call(*args, **kwargs)
+           ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/Cellar/python@3.14/3.14.4_1/Frameworks/Python.framework/Versions/3.14/lib/python3.14/unittest/mock.py", line 1180, in _mock_call
+    return self._execute_mock_call(*args, **kwargs)
+           ~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/Cellar/python@3.14/3.14.4_1/Frameworks/Python.framework/Versions/3.14/lib/python3.14/unittest/mock.py", line 1245, in _execute_mock_call
+    raise result
+coherent_runtime.RuntimeBlocked: Expired or future publication
+
+======================================================================
+ERROR: test_gate_revocation_after_failure_is_fatal (test_operational_fixes.CollectorResilienceTests.test_gate_revocation_after_failure_is_fatal)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/you/Library/Application Support/Claude/scratch-workspaces/WORKSPACE/SESSION/scratch-2026-09-27-d7f3e5/btc-readiness/qa/readiness_release/tests/test_operational_fixes.py", line 106, in test_gate_revocation_after_failure_is_fatal
+    run.run_authorized(f.ROOT, gate, max_cycles=5, **kwargs)
+    ~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/you/Library/Application Support/Claude/scratch-workspaces/WORKSPACE/SESSION/scratch-2026-09-27-d7f3e5/btc-readiness/qa/readiness_release/candidate/evidence_runner.py", line 170, in run_authorized
+    try:collector.once()
+        ~~~~~~~~~~~~~~^^
+  File "/Users/you/Library/Application Support/Claude/scratch-workspaces/WORKSPACE/SESSION/scratch-2026-09-27-d7f3e5/btc-readiness/qa/readiness_release/candidate/evidence_runner.py", line 100, in once
+    snapshot=self.engine.collect(persist=False)
+  File "/opt/homebrew/Cellar/python@3.14/3.14.4_1/Frameworks/Python.framework/Versions/3.14/lib/python3.14/unittest/mock.py", line 1176, in __call__
+    return self._mock_call(*args, **kwargs)
+           ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/Cellar/python@3.14/3.14.4_1/Frameworks/Python.framework/Versions/3.14/lib/python3.14/unittest/mock.py", line 1180, in _mock_call
+    return self._execute_mock_call(*args, **kwargs)
+           ~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/Cellar/python@3.14/3.14.4_1/Frameworks/Python.framework/Versions/3.14/lib/python3.14/unittest/mock.py", line 1241, in _execute_mock_call
+    raise effect
+ValueError: synthetic
+
+======================================================================
+ERROR: test_malformed_response_value_error_degrades (test_operational_fixes.CollectorResilienceTests.test_malformed_response_value_error_degrades)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/you/Library/Application Support/Claude/scratch-workspaces/WORKSPACE/SESSION/scratch-2026-09-27-d7f3e5/btc-readiness/qa/readiness_release/tests/test_operational_fixes.py", line 82, in test_malformed_response_value_error_degrades
+    result = run.run_authorized(f.ROOT, gate, max_cycles=2, **kwargs)
+  File "/Users/you/Library/Application Support/Claude/scratch-workspaces/WORKSPACE/SESSION/scratch-2026-09-27-d7f3e5/btc-readiness/qa/readiness_release/candidate/evidence_runner.py", line 170, in run_authorized
+    try:collector.once()
+        ~~~~~~~~~~~~~~^^
+  File "/Users/you/Library/Application Support/Claude/scratch-workspaces/WORKSPACE/SESSION/scratch-2026-09-27-d7f3e5/btc-readiness/qa/readiness_release/candidate/evidence_runner.py", line 100, in once
+    snapshot=self.engine.collect(persist=False)
+  File "/opt/homebrew/Cellar/python@3.14/3.14.4_1/Frameworks/Python.framework/Versions/3.14/lib/python3.14/unittest/mock.py", line 1176, in __call__
+    return self._mock_call(*args, **kwargs)
+           ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/Cellar/python@3.14/3.14.4_1/Frameworks/Python.framework/Versions/3.14/lib/python3.14/unittest/mock.py", line 1180, in _mock_call
+    return self._execute_mock_call(*args, **kwargs)
+           ~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/Cellar/python@3.14/3.14.4_1/Frameworks/Python.framework/Versions/3.14/lib/python3.14/unittest/mock.py", line 1245, in _execute_mock_call
+    raise result
+ValueError: synthetic malformed payload
+
+======================================================================
+ERROR: test_persistent_failures_stop_for_review (test_operational_fixes.CollectorResilienceTests.test_persistent_failures_stop_for_review)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/you/Library/Application Support/Claude/scratch-workspaces/WORKSPACE/SESSION/scratch-2026-09-27-d7f3e5/btc-readiness/qa/readiness_release/tests/test_operational_fixes.py", line 113, in test_persistent_failures_stop_for_review
+    run.run_authorized(f.ROOT, gate, max_cycles=run.MAX_CONSECUTIVE_FAILURES + 5, **kwargs)
+                                                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: module 'evidence_runner' has no attribute 'MAX_CONSECUTIVE_FAILURES'
+
+======================================================================
+ERROR: test_continuity_clock_counts_system_sleep (test_operational_fixes.SleepContinuityTests.test_continuity_clock_counts_system_sleep)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/you/Library/Application Support/Claude/scratch-workspaces/WORKSPACE/SESSION/scratch-2026-09-27-d7f3e5/btc-readiness/qa/readiness_release/tests/test_operational_fixes.py", line 22, in test_continuity_clock_counts_system_sleep
+    self.assertLess(abs(f.b.continuity_clock() - boot_seconds()), 2)
+                        ^^^^^^^^^^^^^^^^^^^^
+AttributeError: module 'btc_copilot' has no attribute 'continuity_clock'
+
+======================================================================
+ERROR: test_observation_and_request_timing_use_continuity_clock (test_operational_fixes.SleepContinuityTests.test_observation_and_request_timing_use_continuity_clock)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/you/Library/Application Support/Claude/scratch-workspaces/WORKSPACE/SESSION/scratch-2026-09-27-d7f3e5/btc-readiness/qa/readiness_release/tests/test_operational_fixes.py", line 30, in test_observation_and_request_timing_use_continuity_clock
+    patch.object(f.b, 'continuity_clock', side_effect=lambda: float(next(ticks))), \
+    ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/Cellar/python@3.14/3.14.4_1/Frameworks/Python.framework/Versions/3.14/lib/python3.14/unittest/mock.py", line 1510, in __enter__
+    original, local = self.get_original()
+                      ~~~~~~~~~~~~~~~~~^^
+  File "/opt/homebrew/Cellar/python@3.14/3.14.4_1/Frameworks/Python.framework/Versions/3.14/lib/python3.14/unittest/mock.py", line 1480, in get_original
+    raise AttributeError(
+        "%s does not have the attribute %r" % (target, name)
+    )
+AttributeError: <module 'btc_copilot' from '/Users/you/Library/Application Support/Claude/scratch-workspaces/WORKSPACE/SESSION/scratch-2026-09-27-d7f3e5/btc-readiness/qa/readiness_release/candidate/btc_copilot.py'> does not have the attribute 'continuity_clock'
+
+----------------------------------------------------------------------
+Ran 10 tests in 0.155s
+
+FAILED (errors=6)

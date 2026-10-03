@@ -1,0 +1,21 @@
+[Unit]
+Description=BTC TA copilot dashboard (read-only public data, no account access)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/btc-ta
+# Loopback only; published to the tailnet by Tailscale Serve on :11443.
+ExecStart=/usr/bin/python3 -B %h/btc-ta/ta_copilot.py --host 127.0.0.1 --port 8770
+# A display-only service, so unlike the study collector it restarts itself.
+Restart=on-failure
+RestartSec=10
+Nice=10
+UMask=0077
+NoNewPrivileges=yes
+PrivateTmp=yes
+MemoryMax=256M
+
+[Install]
+WantedBy=default.target

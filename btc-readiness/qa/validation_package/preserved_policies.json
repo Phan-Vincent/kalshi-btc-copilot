@@ -1,0 +1,22 @@
+{
+  "btc_copilot_settings.json": {
+    "sha256": "47dedad12c34481024d90cc5fafa45293bafa990bc555bf5eaa6f4a8ab0c4eab",
+    "unchanged": true
+  },
+  "btc_copilot_protocol.json": {
+    "sha256": "1f67bba90077429de6ccdbd62970338da7da4cdda685feb1ee36038abb80ecd4",
+    "unchanged": true
+  },
+  "study_policy.py": {
+    "sha256": "6e2d9d092980bf8144aeaa987f0e5c85f30c1315dddd596625a86a7018c98909",
+    "unchanged": true
+  },
+  "fee_reconciliation.py": {
+    "sha256": "bc52011f63466bdd949ebf8296d7f1793c736ad9202b4c994626c02a807d003b",
+    "unchanged": true
+  },
+  "request_pacing.py": {
+    "sha256": "29b3e4d546d1ea8c5fbf634213b73174f70833e2f04510b2d702624ff9d6e3b7",
+    "unchanged": true
+  }
+}

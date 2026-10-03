@@ -1,0 +1,22 @@
+test_atomic_pre_replace_fsync_failure_preserves_file (__main__.Acceptance.test_atomic_pre_replace_fsync_failure_preserves_file) ... ok
+test_corrupt_state_never_reinitialized (__main__.Acceptance.test_corrupt_state_never_reinitialized) ... ok
+test_different_payload_same_observation_rejected (__main__.Acceptance.test_different_payload_same_observation_rejected) ... ok
+test_disk_full_state_write_does_not_mutate_memory (__main__.Acceptance.test_disk_full_state_write_does_not_mutate_memory) ... ok
+test_duplicate_observation_does_not_increment_count (__main__.Acceptance.test_duplicate_observation_does_not_increment_count) ... ok
+test_fee_targets_across_prices_and_multipliers (__main__.Acceptance.test_fee_targets_across_prices_and_multipliers) ... ok
+test_log_failure_cannot_leave_healthy_confirmation (__main__.Acceptance.test_log_failure_cannot_leave_healthy_confirmation) ... ok
+test_log_failure_retry_repair_without_count_increment (__main__.Acceptance.test_log_failure_retry_repair_without_count_increment) ... ok
+test_log_hardlink_cannot_modify_other_file (__main__.Acceptance.test_log_hardlink_cannot_modify_other_file) ... ok
+test_log_symlink_cannot_modify_other_file (__main__.Acceptance.test_log_symlink_cannot_modify_other_file) ... ok
+test_pending_survives_every_downstream_failure_and_restart (__main__.Acceptance.test_pending_survives_every_downstream_failure_and_restart) ... ok
+test_repeated_restart_cannot_use_pending_snapshot_for_confirmation (__main__.Acceptance.test_repeated_restart_cannot_use_pending_snapshot_for_confirmation) ... ok
+test_reversed_observation_rejected_before_state_write (__main__.Acceptance.test_reversed_observation_rejected_before_state_write) ... ok
+test_simultaneous_duplicate_study_records_only_one_succeeds (__main__.Acceptance.test_simultaneous_duplicate_study_records_only_one_succeeds) ... ok
+test_study_mid_transaction_crash_preserves_clock_and_slot (__main__.Acceptance.test_study_mid_transaction_crash_preserves_clock_and_slot) ... ok
+test_successful_pipeline_commits_once_and_rejects_old_commit (__main__.Acceptance.test_successful_pipeline_commits_once_and_rejects_old_commit) ... ok
+test_two_state_writers_do_not_lose_or_duplicate_updates (__main__.Acceptance.test_two_state_writers_do_not_lose_or_duplicate_updates) ... ok
+
+----------------------------------------------------------------------
+Ran 17 tests in 0.469s
+
+OK

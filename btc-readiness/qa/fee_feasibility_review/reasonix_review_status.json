@@ -1,0 +1,45 @@
+{
+  "as_of": "2026-09-27",
+  "reviews": [
+    {
+      "mode": "read",
+      "tier": "flash",
+      "exit_code": 1,
+      "ok": false,
+      "status": "PARTIAL_NOT_SIGNOFF",
+      "cost_usd": 0.012921144,
+      "external_docs_independently_read_by_worker": false,
+      "tests_executed_by_worker": false,
+      "local_adjudication": [
+        "Tiny-fill cent cap computation locally confirmed",
+        "Two-contract notional/payout comparison rejected: two winning contracts pay2, not1; erroneous branch fee also rejected",
+        "Proposed direct single-fill/per-level substitution rejected as fragmentation proof: .055 price counterexample differs across groupings",
+        "Worker network reads denied; supplied document excerpts independently retrieved by Codex"
+      ]
+    },
+    {
+      "mode": "read",
+      "tier": "flash",
+      "exit_code": 0,
+      "ok": true,
+      "status": "BOUNDED_ACCEPT_CONDITIONAL_MODEL_NOT_VENUE_ATTESTATION",
+      "cost_usd": 0.01248174,
+      "external_docs_independently_read_by_worker": false,
+      "tests_executed_by_worker": false,
+      "accepted": [
+        "Integer oracle matches Decimal equations by inspection",
+        "Cent tiny-fill path attains preserved conservative bound under literal cap",
+        "No current cost narrowing justified",
+        "Actual account/fill/end-carry/future-fee behavior remains unknown"
+      ],
+      "local_adjudication": [
+        "Reviewer cent-index shorthand confused cents with 1e-4 price units; code computations and hand example pi5000 qi1 confirmed separately",
+        "Unverified account-local-carry and fee-attribution comments not adopted as defects or policy changes",
+        "No activation/fee-rule/precision attestation inferred from reviewer acceptance"
+      ]
+    }
+  ],
+  "total_reported_cost_usd": 0.025402884,
+  "raw_worker_transcript_published": false,
+  "provider_config_published": false
+}

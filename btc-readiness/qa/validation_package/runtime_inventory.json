@@ -1,0 +1,13 @@
+{
+  "python": "3.14.4 (main, Apr  7 2026, 13:13:20) [Clang 21.0.0 (clang-2100.0.123.102)]",
+  "python_executable": "/opt/homebrew/opt/python@3.14/bin/python3.14",
+  "sqlite": "3.53.0",
+  "node": "v25.9.0",
+  "platform": "macOS-27.0-arm64-arm-64bit-Mach-O",
+  "optional_authenticated_read_dependency": {
+    "cryptography": "49.0.0"
+  },
+  "authenticated_reads_tested": false,
+  "installation_or_upgrade_performed": false,
+  "future_deployment_dependency_lock_complete": false
+}

@@ -1,0 +1,29 @@
+{
+  "status": "MEASURED_SAMPLE_NOT_ENFORCED_CAPACITY_LIMIT",
+  "sample": {
+    "synthetic_records": 100,
+    "observations_in_sample": 100,
+    "database_file_bytes_including_schema_and_source": 3760128,
+    "compressed_observation_payload_mean_bytes": 36494.5,
+    "diagnostic_jsonl_mean_bytes": 19445.0,
+    "study_checkpoint_payload_example_bytes": 86049
+  },
+  "proposed_70_day_observations": 403200,
+  "proposed_7_day_retained_observations": 40320,
+  "estimated_rolling_payload_bytes": 1471458240,
+  "estimated_unrotated_diagnostic_bytes": 7840224000,
+  "proposed_70_day_slots": 6720,
+  "limitations": [
+    "Repeated synthetic fixture; not a market worst-case or throughput soak test",
+    "No full study/signals/outcome archive or WAL growth measured",
+    "SQLite deletes do not guarantee file shrinkage",
+    "HTTP bodies, evidence reports, journal and diagnostic rows have no established global byte bound",
+    "Current runtime has no enforced disk quota/capacity monitor/retention schedule; proposal cannot rely on these as safeguards"
+  ],
+  "proposed_not_enforced_limits": {
+    "dedicated_evidence_volume_bytes": 10737418240,
+    "minimum_free_bytes_before_poll": 2147483648,
+    "retained_evidence_warning_bytes": 5368709120,
+    "action_on_limit": "halt, retain evidence; no automatic deletion; independent sizing/soak and stop implementation required"
+  }
+}

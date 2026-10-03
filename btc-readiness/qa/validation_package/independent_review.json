@@ -1,0 +1,53 @@
+{
+  "status": "BOUNDED_INDEPENDENT_ACCEPTANCE_NOT_ACTIVATION_SIGNOFF",
+  "reviews": [
+    {
+      "tier": "flash",
+      "mode": "read",
+      "ok": true,
+      "exit_code": 0,
+      "cost_usd": 0.009135408,
+      "scope": "Five proposal/recovery files before final lock guard",
+      "tests_executed_by_reviewer": false,
+      "accepted": [
+        "abrupt process exit boundaries",
+        "clock behavioral assertions",
+        "cost bound arithmetic, with market-profitability caveat",
+        "blocked package status"
+      ],
+      "additional_defect": "Expiry could cross during confirmation-lock acquisition; locally reproduced and fixed.",
+      "not_certified": [
+        "activation",
+        "profitability",
+        "absence of capacity monitor",
+        "threshold preservation in this first review",
+        "coherent publication",
+        "hardware power loss"
+      ]
+    },
+    {
+      "tier": "flash",
+      "mode": "read",
+      "ok": true,
+      "exit_code": 0,
+      "cost_usd": 0.004919418,
+      "scope": "Final lock guard, supplied test evidence and preserved-policy inventory",
+      "tests_executed_by_reviewer": false,
+      "accepted": [
+        "lock-acquisition expiry gap closed within supplied tested scope",
+        "unchanged policy/config bytes and strict proposal thresholds",
+        "package remains blocked and disabled"
+      ],
+      "limits": [
+        "Residual time between clock check and disk commit is not temporally atomic",
+        "Simulated clock crossing after real lock acquisition is not a genuinely blocked-lock scheduling test",
+        "Physical multi-file publication and machine power loss are not certified",
+        "Capacity and profitability remain blocked"
+      ],
+      "local_adjudication": "Added last_observation.committed=false assertion to both expiry-after-study and lock-wait tests, then reran focused and full suites; candidate source unchanged after this review."
+    }
+  ],
+  "total_reported_review_cost_usd": 0.014054826,
+  "artifacts_sanitized": true,
+  "raw_transcripts_or_credentials_published": false
+}

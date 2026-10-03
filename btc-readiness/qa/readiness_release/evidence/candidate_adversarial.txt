@@ -1,0 +1,9 @@
+{
+  "target": "candidate",
+  "run": 40,
+  "passed": 39,
+  "failed_test_methods": 0,
+  "skipped": 1,
+  "failures": [],
+  "errors": []
+}

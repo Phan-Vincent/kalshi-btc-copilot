@@ -1,0 +1,11 @@
+[Unit]
+Description=Start the BTC study collector at the approved protocol start
+
+[Timer]
+# release_tool.py seal fills this in from the sealed protocol's start_utc.
+OnCalendar=2026-10-12 00:00:00 UTC
+Persistent=false
+Unit=btc-study-collector.service
+
+[Install]
+WantedBy=timers.target

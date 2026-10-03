@@ -1,0 +1,45 @@
+test_atomic_temporary_symlink_does_not_truncate_other_file (__main__.SafetyTests.test_atomic_temporary_symlink_does_not_truncate_other_file) ... ok
+test_bad_previous_snapshot_cannot_confirm (__main__.SafetyTests.test_bad_previous_snapshot_cannot_confirm) ... ok
+test_collect_network_faults_no_record (__main__.SafetyTests.test_collect_network_faults_no_record) ... ok
+test_corrupt_state_constructor_explicit_failure (__main__.SafetyTests.test_corrupt_state_constructor_explicit_failure) ... ok
+test_duplicate_book_levels_rejected_or_deduplicated (__main__.SafetyTests.test_duplicate_book_levels_rejected_or_deduplicated) ... ok
+test_duplicate_ticks_rejected (__main__.SafetyTests.test_duplicate_ticks_rejected) ... ok
+test_duplicate_trade_not_double_counted (__main__.SafetyTests.test_duplicate_trade_not_double_counted) ... ok
+test_empty_book_public_abstains (__main__.SafetyTests.test_empty_book_public_abstains) ... ok
+test_execution_routes_denied_before_transport (__main__.SafetyTests.test_execution_routes_denied_before_transport) ... ok
+test_fee_multiplier_negative_rejected (__main__.SafetyTests.test_fee_multiplier_negative_rejected) ... ok
+test_first_observation_abstains_full_strategy (__main__.SafetyTests.test_first_observation_abstains_full_strategy) ... ok
+test_forming_minute_not_closed (__main__.SafetyTests.test_forming_minute_not_closed) ... ok
+test_future_candle_rejected_or_quarantined (__main__.SafetyTests.test_future_candle_rejected_or_quarantined) ... ok
+test_future_tick_1_second_rejected (__main__.SafetyTests.test_future_tick_1_second_rejected) ... ok
+test_future_trade_rejected (__main__.SafetyTests.test_future_trade_rejected) ... ok
+test_grid_invalid_infinity_bounded (__main__.SafetyTests.test_grid_invalid_infinity_bounded) ... ok
+test_hour_coverage_must_be_proven (__main__.SafetyTests.test_hour_coverage_must_be_proven) ... ok
+test_identical_input_deterministic_5_runs (__main__.SafetyTests.test_identical_input_deterministic_5_runs) ... ok
+test_invalid_book_rejected (__main__.SafetyTests.test_invalid_book_rejected) ... ok
+test_journal_crash_retry_idempotent (__main__.SafetyTests.test_journal_crash_retry_idempotent) ... skipped 'Study002 removes original settlement journal writes'
+test_missing_credentials_sanitized (__main__.SafetyTests.test_missing_credentials_sanitized) ... ok
+test_missing_data_rejected (__main__.SafetyTests.test_missing_data_rejected) ... ok
+test_negative_trade_quantity_rejected (__main__.SafetyTests.test_negative_trade_quantity_rejected) ... ok
+test_notional_and_fee_independent (__main__.SafetyTests.test_notional_and_fee_independent) ... ok
+test_price_conflict_abstains (__main__.SafetyTests.test_price_conflict_abstains) ... ok
+test_prior_position_does_not_change_market_model (__main__.SafetyTests.test_prior_position_does_not_change_market_model) ... ok
+test_profit_target_recomputes_exit_fee_at_exit_price (__main__.SafetyTests.test_profit_target_recomputes_exit_fee_at_exit_price) ... ok
+test_public_shadow_gate_long_and_short (__main__.SafetyTests.test_public_shadow_gate_long_and_short) ... ok
+test_replay_detects_tampered_shadow_decision (__main__.SafetyTests.test_replay_detects_tampered_shadow_decision) ... ok
+test_scale_in_inventory_math_both_directions (__main__.SafetyTests.test_scale_in_inventory_math_both_directions) ... ok
+test_server_allowlist_no_files_served_to_bad_host_or_private_path (__main__.SafetyTests.test_server_allowlist_no_files_served_to_bad_host_or_private_path) ... ok
+test_settings_safety_floors (__main__.SafetyTests.test_settings_safety_floors) ... ok
+test_stale_data_every_shadow_arm_abstains (__main__.SafetyTests.test_stale_data_every_shadow_arm_abstains) ... ok
+test_state_files_owner_only_atomic_replacement (__main__.SafetyTests.test_state_files_owner_only_atomic_replacement) ... ok
+test_subsecond_sampling_must_be_rejected_or_normalized (__main__.SafetyTests.test_subsecond_sampling_must_be_rejected_or_normalized) ... ok
+test_timezone_dst_conversion (__main__.SafetyTests.test_timezone_dst_conversion) ... ok
+test_transport_network_timeout_no_fabricated_response (__main__.SafetyTests.test_transport_network_timeout_no_fabricated_response) ... ok
+test_unordered_ticks_normalized (__main__.SafetyTests.test_unordered_ticks_normalized) ... ok
+test_upstream_error_with_payload_must_be_rejected (__main__.SafetyTests.test_upstream_error_with_payload_must_be_rejected) ... ok
+test_walk_zero_negative_null_quantities_fail_closed (__main__.SafetyTests.test_walk_zero_negative_null_quantities_fail_closed) ... ok
+
+----------------------------------------------------------------------
+Ran 40 tests in 0.391s
+
+OK (skipped=1)

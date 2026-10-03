@@ -1,0 +1,164 @@
+warning: skill "kalshi-incident-response" at /Users/you/.agents/skills/kalshi-incident-response/SKILL.md has no description: — it will load but won't appear in the skills index
+[2m  ▎ thinking[0m
+  · 6447 tok · in 6231 (4352 cached / 1879 new) · out 216 (69 reasoning) · $0.0035 · peak
+  -> todo_write {"todos": [{"content": "Read candidate files (coherent_runtime, evidence_runner, btc_copilot, study_policy)", "status": ...
+[2m  ▎ thinking[0m
+  · 6672 tok · in 6571 (6400 cached / 171 new) · out 101 (6 reasoning) · $0.0009 · peak
+  -> read_file {"path": "readiness_release/candidate/coherent_runtime.py"}
+  -> read_file {"path": "readiness_release/candidate/evidence_runner.py"}
+[2m  ▎ thinking[0m
+  · 8053 tok · in 7751 (6656 cached / 1095 new) · out 302 (143 reasoning) · $0.0029 · peak
+  -> read_file {"path": "readiness_release/candidate/coherent_runtime.py", "offset": 0, "limit": 400}
+  -> read_file {"path": "readiness_release/candidate/evidence_runner.py", "offset": 0, "limit": 300}
+[2m  ▎ thinking[0m
+  · 9616 tok · in 9132 (7936 cached / 1196 new) · out 484 (259 reasoning) · $0.0038 · peak
+  -> bash {"command": "cd \"/Users/you/Library/Application Support/Claude/scratch-workspaces/WORKSPACE...
+  · 9895 tok · in 9731 (9600 cached / 131 new) · out 164 · $0.0012 · peak
+  -> bash {"command": "cd \"/Users/you/Library/Application Support/Claude/scratch-workspaces/WORKSPACE...
+[2m  ▎ thinking[0m
+  · 10861 tok · in 10408 (9856 cached / 552 new) · out 453 (181 reasoning) · $0.0030 · peak
+  -> bash {"command": "cd \"/Users/you/Library/Application Support/Claude/scratch-workspaces/WORKSPACE...
+[2m  ▎ thinking[0m
+  · 11205 tok · in 11116 (10752 cached / 364 new) · out 89 (41 reasoning) · $0.0013 · peak
+  -> read_file {"path": "scratch/cr.py"}
+[2m  ▎ thinking[0m
+  · 12125 tok · in 11804 (11136 cached / 668 new) · out 321 (123 reasoning) · $0.0026 · peak
+  -> bash {"command": "cd \"/Users/you/Library/Application Support/Claude/scratch-workspaces/WORKSPACE...
+[2m  ▎ thinking[0m
+  · 14358 tok · in 14121 (12032 cached / 2089 new) · out 237 (37 reasoning) · $0.0042 · peak
+  -> bash {"command": "cd \"/Users/you/Library/Application Support/Claude/scratch-workspaces/WORKSPACE...
+[2m  ▎ thinking[0m
+  · 15217 tok · in 14894 (14336 cached / 558 new) · out 323 (123 reasoning) · $0.0026 · peak
+  -> bash {"command": "cd \"/Users/you/Library/Application Support/Claude/scratch-workspaces/WORKSPACE...
+  · 16147 tok · in 15947 (15104 cached / 843 new) · out 200 · $0.0026 · peak
+  -> bash {"command": "cd \"/Users/you/Library/Application Support/Claude/scratch-workspaces/WORKSPACE...
+  · 17025 tok · in 16825 (16128 cached / 697 new) · out 200 · $0.0024 · peak
+  -> bash {"command": "cd \"/Users/you/Library/Application Support/Claude/scratch-workspaces/WORKSPACE...
+  · 18043 tok · in 17843 (17024 cached / 819 new) · out 200 · $0.0026 · peak
+  -> bash {"command": "cd \"/Users/you/Library/Application Support/Claude/scratch-workspaces/WORKSPACE...
+[2m  ▎ thinking[0m
+  · 19827 tok · in 19063 (17920 cached / 1143 new) · out 764 (568 reasoning) · $0.0053 · peak
+  -> bash {"command": "cd \"/Users/you/Library/Application Support/Claude/scratch-workspaces/WORKSPACE...
+[2m  ▎ thinking[0m
+  · 20493 tok · in 20291 (19712 cached / 579 new) · out 202 (4 reasoning) · $0.0024 · peak
+  -> bash {"command": "cd \"/Users/you/Library/Application Support/Claude/scratch-workspaces/WORKSPACE...
+  · 22420 tok · in 22220 (20480 cached / 1740 new) · out 200 · $0.0040 · peak
+  -> bash {"command": "cd \"/Users/you/Library/Application Support/Claude/scratch-workspaces/WORKSPACE...
+[2m  ▎ thinking[0m
+  · 24490 tok · in 24233 (22400 cached / 1833 new) · out 257 (39 reasoning) · $0.0044 · peak
+  -> bash {"command": "cd \"/Users/you/Library/Application Support/Claude/scratch-workspaces/WORKSPACE...
+  · 24869 tok · in 24669 (24448 cached / 221 new) · out 200 · $0.0022 · peak
+  -> bash {"command": "cd \"/Users/you/Library/Application Support/Claude/scratch-workspaces/WORKSPACE...
+  · 26655 tok · in 26455 (24832 cached / 1623 new) · out 200 · $0.0040 · peak
+  -> bash {"command": "cd \"/Users/you/Library/Application Support/Claude/scratch-workspaces/WORKSPACE...
+[2m  ▎ thinking[0m
+  · 27826 tok · in 27475 (26624 cached / 851 new) · out 351 (156 reasoning) · $0.0037 · peak
+  -> bash {"command": "cd \"/Users/you/Library/Application Support/Claude/scratch-workspaces/WORKSPACE...
+[2m  ▎ thinking[0m
+  · 42552 tok · in 31238 (27776 cached / 3462 new) · out 11314 (11118 reasoning) · $0.0506 · peak
+  -> bash {"command": "cd \"/Users/you/Library/Application Support/Claude/scratch-workspaces/WORKSPACE...
+[2m  ▎ thinking[0m
+  · 45784 tok · in 45488 (42496 cached / 2992 new) · out 296 (100 reasoning) · $0.0070 · peak
+  -> bash {"command": "cd \"/Users/you/Library/Application Support/Claude/scratch-workspaces/WORKSPACE...
+[2m  ▎ thinking[0m
+  · 48039 tok · in 47721 (45696 cached / 2025 new) · out 318 (122 reasoning) · $0.0059 · peak
+  -> bash {"command": "cd \"/Users/you/Library/Application Support/Claude/scratch-workspaces/WORKSPACE...
+[2m  ▎ thinking[0m
+  · 52291 tok · in 52081 (48000 cached / 4081 new) · out 210 (9 reasoning) · $0.0083 · peak
+  -> bash {"command": "cd \"/Users/you/Library/Application Support/Claude/scratch-workspaces/WORKSPACE...
+[2m  ▎ thinking[0m
+  · 52630 tok · in 52338 (52224 cached / 114 new) · out 292 (130 reasoning) · $0.0036 · peak
+  -> bash {"command": "cd \"/Users/you/Library/Application Support/Claude/scratch-workspaces/WORKSPACE...
+[2m  ▎ thinking[0m
+  · 53101 tok · in 52884 (52608 cached / 276 new) · out 217 (14 reasoning) · $0.0035 · peak
+  -> bash {"command": "cd \"/Users/you/Library/Application Support/Claude/scratch-workspaces/WORKSPACE...
+[2m  ▎ thinking[0m
+  · 54913 tok · in 54009 (52992 cached / 1017 new) · out 904 (704 reasoning) · $0.0073 · peak
+  -> bash {"command": "cd \"/Users/you/Library/Application Support/Claude/scratch-workspaces/WORKSPACE...
+[2m  ▎ thinking[0m
+  · 59819 tok · in 56743 (54912 cached / 1831 new) · out 3076 (2827 reasoning) · $0.0170 · peak
+  -> bash {"command": "cd \"/Users/you/Library/Application Support/Claude/scratch-workspaces/WORKSPACE...
+[2m  ▎ thinking[0m
+  · 66613 tok · in 60576 (59776 cached / 800 new) · out 6037 (5559 reasoning) · $0.0276 · peak
+  -> write_file {"path": "scratch/probe1_sleep_during_request.py", "content": "import sys, tempfile\nfrom pathlib import Path\nsys.path....
+  · 66899 tok · in 66743 (66560 cached / 183 new) · out 156 · $0.0038 · peak
+  -> bash {"command": "cd \"/Users/you/Library/Application Support/Claude/scratch-workspaces/WORKSPACE...
+[2m  ▎ thinking[0m
+  · 67545 tok · in 66949 (66816 cached / 133 new) · out 596 (51 reasoning) · $0.0055 · peak
+  -> write_file {"content": "import sys, tempfile\nfrom pathlib import Path\nfrom types import SimpleNamespace\nfrom unittest.mock impor...
+  · 67831 tok · in 67675 (67456 cached / 219 new) · out 156 · $0.0039 · peak
+  -> bash {"command": "cd \"/Users/you/Library/Application Support/Claude/scratch-workspaces/WORKSPACE...
+[2m  ▎ thinking[0m
+  · 68290 tok · in 67868 (67712 cached / 156 new) · out 422 (80 reasoning) · $0.0049 · peak
+  -> write_file {"content": "import sys\nfrom pathlib import Path\nfrom unittest.mock import Mock\nsys.path.insert(0, str(Path('readines...
+  · 68576 tok · in 68420 (68224 cached / 196 new) · out 156 · $0.0039 · peak
+  -> bash {"command": "cd \"/Users/you/Library/Application Support/Claude/scratch-workspaces/WORKSPACE...
+[2m  ▎ thinking[0m
+  · 69299 tok · in 68626 (68480 cached / 146 new) · out 673 (295 reasoning) · $0.0059 · peak
+  -> bash {"command": "cd \"/Users/you/Library/Application Support/Claude/scratch-workspaces/WORKSPACE...
+[2m  ▎ thinking[0m
+  · 74635 tok · in 69344 (69248 cached / 96 new) · out 5291 (4833 reasoning) · $0.0241 · peak
+  -> bash {"command": "cd \"/Users/you/Library/Application Support/Claude/scratch-workspaces/WORKSPACE...
+[2m  ▎ thinking[0m
+  · 76602 tok · in 74686 (74624 cached / 62 new) · out 1916 (1517 reasoning) · $0.0110 · peak
+  -> bash {"command": "cd \"/Users/you/Library/Application Support/Claude/scratch-workspaces/WORKSPACE...
+[2m  ▎ thinking[0m
+  · 77547 tok · in 76631 (76544 cached / 87 new) · out 916 (475 reasoning) · $0.0071 · peak
+  -> bash {"command": "cd \"/Users/you/Library/Application Support/Claude/scratch-workspaces/WORKSPACE...
+[2m  ▎ thinking[0m
+All 54 in-scope tests pass (`cd readiness_release/tests && python3 -B -m unittest test_coherent_runtime test_evidence_runner test_operational_fixes` → OK). I then reproduced the defects below with scratch scripts under `./scratch/`.
+
+## CONFIRMED (executed)
+
+**1. P1 — Sleep overlapping an in-flight request (≈15–20 s) still halts the store as `CLOCK_DISCONTINUITY`.**
+`btc_copilot.measured()` now uses `continuity_clock()` for latency, so a sleep that spans a request inflates `latency_seconds`. `study_policy.check_clock` line 45 then raises `ValueError('Request clock discontinuity or staleness')`, and `publish()` line 243 string-matches `'clock'` and calls `_halt('CLOCK_DISCONTINUITY')`.
+Repro (`scratch/probe1_sleep_during_request.py`): take `f.fixture()` snapshot, set one request to `started_at_epoch=epoch-16.2`, `finished_at_epoch=epoch-0.2`, `latency_seconds=16.0` (wall and sleep-inclusive mono both advanced 16 s — pure sleep, no step):
+```
+check_clock raised ValueError: Request clock discontinuity or staleness
+publish raised: ValueError Request clock discontinuity or staleness
+store.halted = True | HALTED file = True
+```
+Expected: sleep ≠ wall step, so this poll should degrade/be dropped, not halt. Actual: permanent halt. The `0<=elapsed<=15` / `now-start>20` bounds don't distinguish sleep from a step; only `abs(finish-start-elapsed)>1` does.
+Fix: use the wall/mono mismatch check to halt on steps, but treat sleep-inflated (`elapsed>15`, `now-start>20`) as staleness → `ReadError`/degradation, or measure the 15 s request budget with a sleep-exclusive clock.
+
+**2. P1 — `settle_one` still uses `time.monotonic()`, so sleep during a settlement GET halts.**
+`coherent_runtime.py:262/266` (`started=time.monotonic()`, `elapsed=time.monotonic()-started`) was not migrated to `continuity_clock`. On macOS `time.monotonic()` excludes sleep, so any sleep during `client.market()` makes `abs(ended-now-elapsed)>1` and halts `SETTLEMENT_CLOCK_DISCONTINUITY`.
+Repro (`scratch/probe2_settle_sleep.py`): patch `coherent_runtime.time.monotonic` to advance 0.1 s while `wall()` advances 16 s across the GET:
+```
+settle_one raised: RuntimeBlocked Settlement clock discontinuity
+store.halted = True | HALTED file = True
+```
+A ~2 s sleep already trips it. This directly violates “system sleep must NOT halt collection.”
+Fix: `started/elapsed` via `continuity_clock()` and, as above, halt only when wall and mono disagree (real step); treat a wall-consistent long GET as degradation.
+
+**3. P2 — One non-`ReadError` settlement failure kills the whole run uncleanly, bypassing the new resilience policy.**
+`settle_one` records `SETTLEMENT_FAILED` (degradation, non-halting) then re-raises, but `run_authorized` only catches `ReadError` around `reconcile_one`. A single malformed-but-transient upstream payload (`RuntimeBlocked('Settlement ticker mismatch')` or `TimeoutError`) escapes, and `finally: store.close(clean=False)` leaves `RUNNING` behind, blocking resume for operator review.
+Repro (`scratch/probe3_settle_transient.py`): `store.settle_one.side_effect=[RuntimeBlocked('Settlement ticker mismatch'),False]` with the test lifecycle fixture:
+```
+run_authorized raised: RuntimeBlocked Settlement ticker mismatch
+store.close calls: [call(clean=False)]
+store.settle_one calls: 1
+```
+Expected: degradation + continue (like collection polls), stop after `MAX_CONSECUTIVE_FAILURES`. Actual: run dies on the first occurrence with no `HALTED` marker but a persistent `RUNNING` block.
+Fix: in the loop, catch the same non-halting settlement exceptions (or have `settle_one` convert them to `ReadError` after recording), and only re-raise when `store.halted` or the gate is revoked.
+
+**4. P3 — A wall step forward across `release_utc` stops cleanly instead of halting.**
+The loop only compares `wall()` to `release_utc`; a large forward step there hits `break` → `clean=True` → `RUNNING` removed, no `HALTED`, so the skipped tail of the study leaves no review marker and a restart can resume with a silent gap.
+Repro (factory fixture, `wall` = `iter([release-3600, release+3600])`): returned `{'status':'STOPPED','cycles':1,...}`, `store.close(clean=True)`.
+Fix: track wall vs `continuity_clock()` across loop iterations (or a last-wall reference in the DB) and halt when the two diverge by >1 s even if that crosses `release_utc`.
+
+**5. P3 — Mid-run publication integrity mismatch is treated as transient degradation for ~10 minutes.**
+If `publication`/`generations` digests stop matching, `store.state()` (called outside `Collector.once`’s `try`) raises `RuntimeBlocked('Publication digest mismatch')` with `store.halted == False` (repro: corrupt `publication.state` → `state()` raises, `store.halted = False`). The loop counts it like a failed poll for 40 cycles before stopping with an unclean `RUNNING`; no immediate `HALTED`.
+Fix: in the loop’s `except`, treat `RuntimeBlocked` raised by `store.state()`/`_verify` (not `_owned`) as fatal, or have `_verify` call `_halt` on mismatch.
+
+## SUSPECTED (code-read, not executed)
+
+**6. P3 — Externally created `HALTED` file isn’t fatal immediately.** `_owned()` honors the file, but the loop checks only the in-memory `store.halted` flag, so a `HALTED` file dropped in mid-run is retried up to 40 times before stopping. Check `store.root/HALTED` (or make `_owned` set `self.halted`) in the loop’s fatal check.
+
+## Not a defect (verified)
+
+- The consecutive-failure counter itself resets correctly: it zeroes only after a successful `collector.once()` and increments on every failed poll; halted stores and revoked gates still re-raise immediately.
+- Sleep *between* `fresh()` checks degrades, not halts: `interrupt('before_commit')` advancing `wall()` by 21 s raises `RuntimeBlocked('Expired or future publication')` with `store.halted=False`, `degraded=(1,'PUBLICATION_FAILED')`, no `HALTED`.
+  · 81302 tok · in 77623 (77440 cached / 183 new) · out 3679 (2079 reasoning) · $0.0182 · peak
+
+exit=0

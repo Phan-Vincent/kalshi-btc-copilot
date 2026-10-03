@@ -1,0 +1,470 @@
+--- sealed-study002/btc_copilot.html
++++ offline-candidate/btc_copilot.html
+@@ -19,7 +19,23 @@
+ <section class="card wide"><details><summary>Exact rules, source times and model assumptions</summary><pre id="rules"></pre></details><p class="note">Analysis only. No orders, cancellations or account changes. Polling every 15 seconds while the local monitor is running; freshness checks independently suppress expired decisions. Fees use conservative estimates; quantity previews account for consumed depth.</p></section>
+ </div>
+ <script>
+-let latest=null,range=15,chartRows=[];
++let latest=null,range=15,chartRows=[],receivedAt=null,receivedWall=null;
++function sourceFresh(s){
++ const now=Date.now()/1000;
++ if(!s||typeof s!=="object"||s.error||!Number.isFinite(s.epoch)||!Number.isFinite(s.valid_until_epoch)||
++    s.valid_until_epoch<=s.epoch||s.valid_until_epoch-s.epoch>20.001||now<s.epoch||now>=s.valid_until_epoch)return false;
++ if(typeof s.close_time!=='string'||!Number.isFinite(Date.parse(s.close_time))||s.valid_until_epoch>Date.parse(s.close_time)/1000)return false;
++ return s.decision==='NO TRADE'&&s.validation?.status==='UNVALIDATED_SHADOW_ONLY'&&s.position?.guidance_valid===false;
++}
++function observationFresh(s){
++ if(!sourceFresh(s))return false;
++ if(receivedAt!==null){
++  if(typeof performance==='undefined')return false;
++  const elapsed=performance.now()/1000-receivedAt,wallElapsed=Date.now()/1000-receivedWall;
++  if(!Number.isFinite(elapsed)||elapsed<0||elapsed>=20||Math.abs(wallElapsed-elapsed)>1)return false;
++ }
++ return true;
++}
+ const $=id=>document.getElementById(id), number=x=>Number(x), money=x=>'$'+number(x).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}), cents=x=>x==null?'—':(number(x)*100).toFixed(2)+'¢';
+ function list(id,items){$(id).replaceChildren(...items.map(v=>{const li=document.createElement('li');li.textContent=v;return li}))}
+ for(const m of [1,3,5,15,60]){const b=document.createElement('button');b.textContent=m+'m';b.onclick=()=>{range=m;draw()};b.dataset.range=m;$('ranges').append(b)}
+@@ -38,7 +54,7 @@
+ const alerted=new Set();
+ $('soundToggle').onclick=async()=>{soundEnabled=!soundEnabled;if(soundEnabled){soundContext??=new AudioContext();await soundContext.resume()}$('soundToggle').textContent=soundEnabled?'Disable signal sound':'Enable signal sound'};
+ function signalAlert(s){
+- const valid=!disconnected&&!s.error&&Date.now()/1000<=s.valid_until_epoch&&Date.now()/1000>=s.epoch-2;
++ const valid=!disconnected&&observationFresh(s);
+  if(!valid||!['UP','DOWN'].includes(s.decision)){$('signalAlert').textContent='';return}
+  $('signalAlert').textContent='Fresh '+s.decision+' setup · expires '+new Date(s.valid_until_epoch*1000).toLocaleTimeString()+' · uncalibrated estimate';
+  const key=s.ticker+':'+s.decision;let seen=alerted.has(key);try{seen||=sessionStorage.getItem('btc-alert:'+key)==='1'}catch(e){}
+@@ -56,8 +72,8 @@
+  const cohorts=s.scorecard?.cohorts||[];$('scorecard').textContent=cohorts.length?cohorts.map(c=>c.contracts+' contracts · '+c.settled+' settled across '+c.settled_days+' days · Brier '+(c.brier_score===null?'pending':c.brier_score.toFixed(4))+' · '+c.actionable_after_delay+'/'+c.delay_checked+' signals still eligible after delay · hypothetical net '+money(c.hypothetical_net_sum)+' on '+c.settled_hypothetical_entries+' settled entries · '+c.version).join('\n'):'Collecting prospective observations; no evaluated contracts yet.';
+  signalAlert(s);
+ }
+-function freshness(){if(!latest)return;const now=Date.now()/1000,stale=disconnected||latest.error||now>latest.valid_until_epoch||now<latest.epoch-2||!Number.isFinite(latest.valid_until_epoch); $('stale').style.display=stale?'block':'none';$('decision').textContent=stale?'NO TRADE':latest.decision;$('decision').className='decision '+(!stale&&latest.decision==='UP'?'up':!stale&&latest.decision==='DOWN'?'down':'');if(latest.close_time){const remaining=Math.max(0,(Date.parse(latest.close_time)-Date.now())/1000);$('target').textContent=money(latest.strike)+' / '+Math.floor(remaining/60)+'m '+Math.floor(remaining%60)+'s'}if(stale){$('signalAlert').textContent='';$('previewCard').hidden=true;$('eligibility').textContent='Entry and position guidance unavailable until fresh data returns';$('blockers').replaceChildren();$('entry').textContent='No valid entry recommendation — awaiting fresh data';$('management').textContent='Position recommendation expired; refresh before acting';$('position').textContent='Holdings/position guidance requires a fresh observation'}}
+-function render(s){latest=s;disconnected=false;$('previewCard').hidden=!!s.error;$('stale').textContent='Data is stale. NO TRADE until fresh observations return.';$('clock').textContent=s.timestamp.utc+' UTC\n'+s.timestamp.pacific+' Pacific';if(s.error){list('risks',s.risk_flags);freshness();return}
++function freshness(){if(!latest)return;const now=Date.now()/1000,stale=disconnected||!observationFresh(latest); $('stale').style.display=stale?'block':'none';$('decision').textContent=stale?'NO TRADE':latest.decision;$('decision').className='decision '+(!stale&&latest.decision==='UP'?'up':!stale&&latest.decision==='DOWN'?'down':'');if(latest.close_time){const remaining=Math.max(0,(Date.parse(latest.close_time)-Date.now())/1000);$('target').textContent=money(latest.strike)+' / '+Math.floor(remaining/60)+'m '+Math.floor(remaining%60)+'s'}if(stale){$('signalAlert').textContent='';$('previewCard').hidden=true;$('eligibility').textContent='Entry and position guidance unavailable until fresh data returns';$('blockers').replaceChildren();$('entry').textContent='No valid entry recommendation — awaiting fresh data';$('management').textContent='Position recommendation expired; refresh before acting';$('position').textContent='Holdings/position guidance requires a fresh observation'}}
++function render(s){if(!s||typeof s!=='object'||(!s.error&&!sourceFresh(s)))throw Error('Invalid or expired shadow snapshot');latest=s;disconnected=false;receivedAt=typeof performance!=='undefined'?performance.now()/1000:null;receivedWall=Date.now()/1000;$('previewCard').hidden=!!s.error;$('stale').textContent='Data is stale. NO TRADE until fresh observations return.';$('clock').textContent=s.timestamp.utc+' UTC\n'+s.timestamp.pacific+' Pacific';if(s.error){list('risks',s.risk_flags);freshness();return}
+  $('ticker').textContent=s.ticker;$('btc').textContent=money(s.btc);$('distance').textContent=money(s.distance_dollars)+' / '+number(s.distance_bps).toFixed(2)+' bps';$('bias').textContent=s.initial_bias+' · '+s.structure.structure;
+  $('entry').textContent=s.entry?'Maximum entry '+cents(s.entry.maximum_acceptable_price)+' · conservative net edge '+s.entry.conservative_net_edge_pp.toFixed(1)+'pp':'No entry: '+(s.entry_blockers?.[0]?.reason||'waiting for verification');
+  $('book').replaceChildren(...['yes','no'].map((side,i)=>{const tr=document.createElement('tr');for(const v of [i?'DOWN':'UP',cents(s.book[side+'_bid_dollars']),cents(s.book[side+'_ask_dollars']),s.book[side+'_ask_size_fp']??'—']){const td=document.createElement('td');td.textContent=v;tr.append(td)}return tr}));
+--- sealed-study002/btc_copilot.py
++++ offline-candidate/btc_copilot.py
+@@ -18,6 +18,7 @@
+ from pathlib import Path
+ import signal
+ import statistics
++import tempfile
+ import threading
+ import time
+ from urllib.request import Request, build_opener
+@@ -35,7 +36,10 @@
+ 
+ 
+ def dt(value):
+-    return datetime.fromisoformat(value.replace("Z", "+00:00"))
++    result = datetime.fromisoformat(value.replace("Z", "+00:00"))
++    if result.utcoffset() is None:
++        raise ReadError('Timestamp timezone unavailable')
++    return result
+ 
+ 
+ def stamp(epoch=None):
+@@ -45,11 +49,22 @@
+ 
+ def atomic(path, value):
+     path = Path(path)
+-    temporary = path.with_suffix(path.suffix + ".tmp")
+-    fd = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+-    with os.fdopen(fd, "w") as f:
+-        f.write(value if isinstance(value, str) else dump(value) + "\n")
+-    temporary.replace(path)
++    if path.is_symlink() or (path.exists() and path.stat().st_nlink != 1):
++        raise ReadError('Linked output destination rejected')
++    fd, name = tempfile.mkstemp(prefix='.'+path.name+'.', suffix='.tmp', dir=path.parent)
++    temporary = Path(name)
++    try:
++        with os.fdopen(fd, "w") as f:
++            os.fchmod(f.fileno(), 0o600)
++            f.write(value if isinstance(value, str) else dump(value) + "\n")
++            f.flush();os.fsync(f.fileno())
++        # replace never follows a destination link installed after the check.
++        os.replace(temporary, path)
++        directory = os.open(path.parent, os.O_RDONLY | os.O_DIRECTORY)
++        try:os.fsync(directory)
++        finally:os.close(directory)
++    finally:
++        temporary.unlink(missing_ok=True)
+ 
+ 
+ def append(path, value):
+@@ -68,7 +83,10 @@
+ 
+ 
+ def ticks_from_response(envelope):
+-    payload = envelope["data"]["data"]["payload"]
++    upstream = envelope["data"]["data"]
++    if upstream.get('error'):
++        raise ReadError('BRTI upstream reports unavailable data')
++    payload = upstream["payload"]
+     if not isinstance(payload, list):
+         raise ReadError("Unexpected BRTI payload")
+     rows = {}
+@@ -76,14 +94,17 @@
+         # Invalid/amended source data must not silently become a trade signal.
+         if item.get("amendTime") or item.get("repeatOfPreviousValue"):
+             raise ReadError("BRTI amendment or repeated-value flag")
+-        epoch = int(item["time"]) / 1000
++        milliseconds = item['time']
++        if type(milliseconds) is not int or milliseconds <= 0 or milliseconds % 1000:
++            raise ReadError('Expected positive per-second BRTI timestamps')
++        epoch = milliseconds / 1000
+         price = D(item["value"])
+         if price <= 0 or not price.is_finite():
+             raise ReadError("Invalid BRTI value")
+         if epoch in rows:raise ReadError('Duplicate BRTI observation timestamp')
+         rows[epoch] = price
+     result = sorted(rows.items())
+-    if len(result) < 3000:
++    if len(result) < 3000 or result[-1][0]-result[0][0] < 3599:
+         raise ReadError("Insufficient one-hour BRTI coverage")
+     return result
+ 
+@@ -100,6 +121,8 @@
+ def nearest_price(ticks, seconds):
+     target = ticks[-1][0] - seconds
+     ts, value = min(ticks, key=lambda x: abs(x[0]-target))
++    if abs(ts-target) > 1:
++        raise ReadError('Requested lookback unavailable')
+     return value, ticks[-1][0]-ts
+ 
+ 
+@@ -207,22 +230,81 @@
+ def taker_fee(price, multiplier):
+     # Conservative whole-cent ceiling for one contract covers both direct-member
+     # centicent settlement and non-direct rounding. Not an account-specific quote.
+-    return (D("0.07")*D(str(multiplier))*price*(1-price)).quantize(D("0.01"),rounding=ROUND_CEILING)
++    price,multiplier=D(str(price)),D(str(multiplier))
++    if not price.is_finite() or not 0<=price<=1 or not multiplier.is_finite() or multiplier<0:
++        raise ReadError('Invalid fee price or multiplier')
++    return (D("0.07")*multiplier*price*(1-price)).quantize(D("0.01"),rounding=ROUND_CEILING)
+ 
+ 
+ def grid_prices(market):
+     found = set()
++    iterations = 0
+     for band in market.get("price_ranges",[]):
+         start,end,step = map(D,(band["start"],band["end"],band["step"]))
+-        if step<=0:
++        if not all(p.is_finite() for p in (start,end,step)) or not 0<=start<=end<=1 or not 0<step<=1:
+             raise ReadError("Invalid price grid")
++        if (end-start)/step > 20000:
++            raise ReadError('Price grid exceeds bounded resolution')
+         p=start
+-        while p<=end and len(found)<20000:
++        while p<=end:
++            iterations+=1
++            if iterations>20000:raise ReadError('Price grid iteration limit exceeded')
+             if 0<p<1:found.add(p)
+             p+=step
+     if not found:
+         raise ReadError("Missing price grid")
+     return sorted(found)
++
++
++def profit_target(market, entry, multiplier, reserve=D('.03')):
++    entry,reserve=D(str(entry)),D(str(reserve))
++    if not reserve.is_finite() or reserve<0:raise ReadError('Invalid profit reserve')
++    entry_fee=taker_fee(entry,multiplier)
++    return next((g for g in grid_prices(market) if g-entry-entry_fee-taker_fee(g,multiplier)>=reserve),None)
++
++
++def validated_trades(rows, ticker, now):
++    if not isinstance(rows,list):raise ReadError('Invalid trades schema')
++    seen=set();result=[]
++    for row in rows:
++        identity=row.get('trade_id')
++        quantity=D(str(row.get('count_fp')))
++        epoch=dt(row['created_time']).timestamp()
++        if not isinstance(identity,str) or not identity or identity in seen or row.get('ticker')!=ticker:
++            raise ReadError('Trade identity missing, duplicated or mismatched')
++        if not quantity.is_finite() or quantity<=0 or not now-180<=epoch<=now:
++            raise ReadError('Invalid trade quantity or timestamp')
++        for field in ('yes_price_dollars','no_price_dollars'):
++            price=D(str(row[field]))
++            if not price.is_finite() or not 0<=price<=1:raise ReadError('Invalid trade price')
++        if D(str(row['yes_price_dollars']))+D(str(row['no_price_dollars']))!=1:
++            raise ReadError('Trade binary prices inconsistent')
++        seen.add(identity);result.append(row)
++    return sorted(result,key=lambda x:dt(x['created_time']).timestamp())
++
++
++def validated_candles(rows, now):
++    if not isinstance(rows,list):raise ReadError('Invalid candle schema')
++    result=[];seen=set();last_end=None
++    for row in rows:
++        end=row['end_period_ts']
++        if type(end) is not int or end%60 or end in seen or not now-960<=end<=(int(now)//60+1)*60:
++            raise ReadError('Candle ordering, timeframe, closure or timestamp invalid')
++        if last_end is not None and end<=last_end:raise ReadError('Candle timestamps unordered')
++        last_end=end
++        for field in ('volume_fp','open_interest_fp'):
++            number=D(str(row[field]))
++            if not number.is_finite() or number<0:raise ReadError('Invalid candle volume or interest')
++        for field in ('price','yes_bid','yes_ask'):
++            values=[row[field][key+'_dollars'] for key in ('open','high','low','close')]
++            if all(v is None for v in values):continue # Explicit no-trade candle, not invented prices.
++            if any(v is None for v in values):raise ReadError('Incomplete candle OHLC')
++            o,h,l,c=map(D,values)
++            if not all(v.is_finite() and 0<=v<=1 for v in (o,h,l,c)) or not l<=min(o,c)<=max(o,c)<=h:
++                raise ReadError('Invalid candle OHLC')
++        seen.add(end)
++        if end<=now:result.append(row) # A current forming candle is never published as closed.
++    return result
+ 
+ 
+ def price_ceiling(market, probability_floor, multiplier, reserve, slippage=D("0.005")):
+@@ -291,7 +373,8 @@
+         slip=D(str(settings['slippage_reserve_cents']))/100
+         minimum_edge=D(str(settings['minimum_conservative_net_edge_pp']))
+         self.prior=copy.deepcopy(self.state.get('previous'))
+-        now=time.time()
++        now=replay_health.get('collection_epoch',time.time()) if replay_health is not None else time.time()
++        collection_epoch=now
+         discovery=self.client.pages('/markets',{'series_ticker':SERIES,'status':'open','limit':100},max_pages=3)
+         if not discovery['complete']:
+             raise ReadError('Active contract discovery was truncated')
+@@ -327,7 +410,12 @@
+         essential=('market','event','series','book','benchmark','trades','candles','spot','exchange')
+         if any(k not in raw for k in essential):
+             raise ReadError('Required data unavailable: '+', '.join(k for k in essential if k not in raw))
+-        now=time.time();m=raw['market']['data']['market']
++        for key in essential:
++            envelope=raw[key];body=envelope.get('data')
++            if envelope.get('error') or (isinstance(body,dict) and (body.get('error') or (isinstance(body.get('data'),dict) and body['data'].get('error')))):
++                raise ReadError(key+' returned an upstream error')
++        now=replay_health.get('analysis_epoch',time.time()) if replay_health is not None else time.time()
++        m=raw['market']['data']['market']
+         if m.get('ticker')!=t or m.get('event_ticker')!=e:raise ReadError('Market identity changed during collection')
+         if raw['event']['data']['event'].get('event_ticker')!=e:raise ReadError('Event identity mismatch')
+         if not verified_market(m,now):
+@@ -351,6 +439,8 @@
+             if isinstance(v.get('request_started_at'),str) and now-dt(v['request_started_at']).timestamp()>15:
+                 veto.append(k+' request exceeded freshness budget')
+         spot=raw['spot']['data'];spot_age=now-dt(spot['time']).timestamp()
++        spot_price=D(str(spot['price']))
++        if not spot_price.is_finite() or spot_price<=0:raise ReadError('Invalid Coinbase spot price')
+         if spot_age>10 or spot_age < 0:veto.append('Coinbase source timestamp stale or in future')
+         basis=D(spot['price'])-ticks[-1][1]
+         if abs(basis/ticks[-1][1])*10000>5:veto.append('Coinbase/BRTI divergence exceeds 5 bps')
+@@ -391,11 +481,14 @@
+         midpoint=book['yes_midpoint_estimate_dollars']
+         up_depth=book['yes_bid_depth_within_5c_fp'];down_depth=book['no_bid_depth_within_5c_fp']
+         imbalance=float((up_depth-down_depth)/(up_depth+down_depth)) if up_depth is not None and down_depth is not None and up_depth+down_depth>0 else None
+-        trades=sorted(raw['trades']['data'].get('trades',[]),key=lambda x:x.get('created_time',''))
+-        if any(dt(t['created_time']).timestamp()>now for t in trades):raise ReadError('Future-dated trade input')
++        trades=validated_trades(raw['trades']['data']['trades'],t,now)
++        candles=validated_candles(raw['candles']['data']['candlesticks'],now)
+         trade_flow={'sample_count':len(trades),'truncated':bool(raw['trades']['data'].get('cursor')),
+                     'volume_fp':sum((D(str(t.get('count_fp','0'))) for t in trades),D(0)),
+                     'direction':'unknown; no unverified aggressor inference'}
++        if trade_flow['truncated']:
++            data_faults.append('Recent trade window incomplete; cursor remains')
++            veto.append(data_faults[-1])
+         known_sides=[t for t in trades if t.get('taker_outcome_side') in ('yes','no')]
+         if known_sides:
+             yes=sum((D(str(t.get('count_fp','0'))) for t in known_sides if t['taker_outcome_side']=='yes'),D(0))
+@@ -404,7 +497,9 @@
+         if trades:
+             trade_flow['first_observed_at']=stamp(dt(trades[0]['created_time']).timestamp())
+             trade_flow['last_observed_at']=stamp(dt(trades[-1]['created_time']).timestamp())
+-        prev=self.state.get('previous');same=prev and prev.get('ticker')==m['ticker'] and now-prev.get('epoch',0)<60
++        prev=self.state.get('previous');same=prev and prev.get('ticker')==m['ticker'] and 0<=now-prev.get('epoch',0)<60
++        confirmed=(same and prev.get('confirmation_valid') is True and not prev.get('data_quality_faults') and not prev.get('operational_vetoes') and
++                   prev.get('source_epoch',math.inf)<ticks[-1][0] and now-prev.get('epoch',now)>=5)
+         changes=['First observation for this contract; entry requires a later confirming snapshot']
+         if same:
+             changes=[f"BRTI moved ${float(ticks[-1][1])-prev['btc']:+.2f}; strike distance changed by the same amount",
+@@ -440,7 +535,7 @@
+             if book[prefix+'_ask_dollars'] is None or book[prefix+'_bid_dollars'] is None:veto.append('Missing executable bid/ask')
+             elif book[prefix+'_spread_dollars']<0 or book[prefix+'_spread_dollars']>D('0.04'):veto.append('Crossed book or spread over 4c')
+             if book[prefix+'_ask_size_fp'] is None or book[prefix+'_ask_size_fp']<1:veto.append('Less than one contract at executable ask')
+-            if not same or prev.get('setup_side')!=side or now-prev.get('epoch',now)<5:veto.append('Setup not confirmed across fresh snapshots')
++            if not confirmed or prev.get('setup_side')!=side:veto.append('Setup not confirmed across fresh healthy snapshots')
+             if p['conservative_net_edge_pp'] is None or p['conservative_net_edge_pp']<float(minimum_edge):veto.append('Insufficient edge after fees, slippage and model uncertainty')
+             if imbalance is not None and ((side=='UP' and imbalance<-.35) or (side=='DOWN' and imbalance>.35)):veto.append('Displayed depth materially conflicts with direction')
+             if trade_flow['direction'] in ('UP','DOWN') and trade_flow['direction']!=side:veto.append('Recent taker flow conflicts with direction')
+@@ -488,8 +583,7 @@
+         entry=prices[selected] if selected else None
+         profit=None
+         if selected and entry['ask'] is not None:
+-            exit_fee=taker_fee(entry['ask'],mult)
+-            profit=next((g for g in grid_prices(m) if g>=entry['ask']+entry['fee_per_contract']+exit_fee+D('0.03')),None)
++            profit=profit_target(m,entry['ask'],mult)
+         elif position.get('side') and position.get('average_entry_price') is not None:
+             paid=position['average_entry_price']
+             max_exit_fee=(D('0.07')*mult*D('0.25')).quantize(D('0.01'),rounding=ROUND_CEILING)
+@@ -500,7 +594,7 @@
+         if trade_flow['truncated']:flags.append('Recent trade sample truncated at 1000 records; flow is a partial window')
+         flags+=veto
+         snapshot={
+-            'timestamp':stamp(now),'epoch':now,'valid_until_epoch':min(now+20,close,ticks[-1][0]+20,dt(spot['time']).timestamp()+20,min(timing[k]['started_at_epoch'] for k in essential)+20),'ticker':m['ticker'],'event_ticker':m['event_ticker'],
++            'timestamp':stamp(now),'epoch':now,'collection_epoch':collection_epoch,'analysis_epoch':now,'valid_until_epoch':min(now+20,close,ticks[-1][0]+20,dt(spot['time']).timestamp()+20,min(timing[k]['started_at_epoch'] for k in essential)+20),'ticker':m['ticker'],'event_ticker':m['event_ticker'],
+             'question':m['title'],'strike':strike,'close_time':m['close_time'],'open_time':m['open_time'],'time_remaining_seconds':max(0,remaining),
+             'btc':ticks[-1][1],'btc_source':'CF Benchmarks BRTI via authenticated Kalshi REST passthrough',
+             'btc_observed_at':stamp(ticks[-1][0]),'btc_age_seconds':raw_age,'spot':D(spot['price']),
+@@ -518,7 +612,7 @@
+                    'Entry vetoes: '+('; '.join(veto) if veto else 'none')],
+             'changes':changes,'volume_fp':m.get('volume_fp'),'open_interest_fp':m.get('open_interest_fp'),
+             'last_trade_price_dollars':m.get('last_price_dollars'),'recent_trades':trade_flow,
+-            'kalshi_recent_candlesticks':raw['candles']['data'].get('candlesticks',[])[-5:],
++            'kalshi_recent_candlesticks':candles[-5:],
+             'observation_times':observed_at,'rules_primary':m['rules_primary'],'rules_secondary':m['rules_secondary'],
+             'target_boundary_matches':anchor_matches,'settlement_rule':'Final 60 BRTI observations averaged and rounded to 2 decimals; at least target resolves UP',
+             'fee_multiplier':mult,'fee_schedule_checked_on':fee_settings['fee_verified_at'],'book_imbalance_5c':imbalance,
+@@ -541,7 +635,7 @@
+         snapshot['risk_flags'].append('SHADOW ONLY: modeled value is not validated trading advice')
+         snapshot['why'].append(snapshot['validation']['reason'])
+         snapshot['quantity_previews']=previews(raw,snapshot,settings)
+-        available=time.time() if replay_health is None else snapshot['epoch']
++        available=time.time() if replay_health is None else replay_health.get('available_epoch',snapshot['epoch'])
+         if available<now or available>=snapshot['valid_until_epoch'] or close-available<float(settings['final_entry_cutoff_seconds']):
+             raise ReadError('Decision completion outside valid observation window')
+         snapshot['observation_monotonic']=time.monotonic()
+@@ -578,6 +672,9 @@
+                 r['min_observed_bid']=str(min(D(r['min_observed_bid']),bid));r['max_observed_bid']=str(max(D(r['max_observed_bid']),bid))
+         previous=self.state.get('previous')
+         self.state['previous']={'ticker':t,'epoch':s['epoch'],'btc':float(s['btc']),
++            'confirmation_valid':not s['operational_vetoes'] and not s['data_quality_faults'],
++            'data_quality_faults':list(s['data_quality_faults']),'operational_vetoes':list(s['operational_vetoes']),
++            'source_epoch':dt(s['btc_observed_at']['utc']).timestamp(),
+             'up_ask':float(s['book']['yes_ask_dollars']) if s['book']['yes_ask_dollars'] is not None else None,
+             'down_ask':float(s['book']['no_ask_dollars']) if s['book']['no_ask_dollars'] is not None else None,
+             'velocity':s['structure']['velocity_dollars_per_second'],
+@@ -671,6 +768,7 @@
+     p.add_argument('--port',type=int,default=8767);p.add_argument('--positions',action='store_true')
+     args=p.parse_args()
+     if not math.isfinite(args.interval) or args.interval!=15:raise SystemExit('Study002 requires exactly 15 seconds')
++    raise SystemExit('NOT ACTIVATED: offline remediation candidate; collector launch requires a separate reviewed release')
+     launch_guard(ROOT,time.time())
+     if args.port!=8767 or args.positions:raise SystemExit('Study002 uses port8767 and public research only')
+     WORK.mkdir(exist_ok=True)
+--- sealed-study002/btc_copilot_evidence.py
++++ offline-candidate/btc_copilot_evidence.py
+@@ -55,7 +55,9 @@
+         if strategy not in ('drift_free','market_implied','without_structure') and s['structure']['setup_side']:
+             chosen=s['structure']['setup_side']
+         reasons=list(scores[chosen][1]);st=s['structure']
+-        same=previous and previous.get('ticker')==s['ticker'] and 5<=s['epoch']-previous.get('epoch',0)<60
++        same=(previous and previous.get('ticker')==s['ticker'] and 5<=s['analysis_epoch']-previous.get('epoch',0)<60 and
++              previous.get('confirmation_valid') is True and not previous.get('data_quality_faults') and not previous.get('operational_vetoes') and
++              previous.get('source_epoch',math.inf)<timestamp(s['btc_observed_at']['utc']))
+         filters={
+             'structure':st['setup_side']==chosen,
+             'confirmation':bool(same and previous.get('setup_side')==chosen),
+--- sealed-study002/btc_copilot_research.py
++++ offline-candidate/btc_copilot_research.py
+@@ -9,7 +9,7 @@
+ import zlib
+ from decimal import Decimal as D, ROUND_CEILING
+ 
+-VERSION = '4.2.0-study002-fee-review'
++VERSION = '5.0.0-offline-QA-candidate'
+ SOURCE_TEXT={name:(Path(__file__).parent/name).read_text() for name in ('btc_copilot.py','btc_copilot_research.py','btc_copilot_evidence.py','kalshi_readonly.py','study_policy.py','request_pacing.py','fee_reconciliation.py')}
+ 
+ def load_settings(path):
+@@ -33,18 +33,23 @@
+     return VERSION+'-'+digest.hexdigest()[:16]
+ 
+ def walk(rows,quantity,complement=False,multiplier=1):
+-    levels=[]
++    quantity,multiplier=D(str(quantity)),D(str(multiplier))
++    if not quantity.is_finite() or not 0<quantity<=1000 or not multiplier.is_finite() or multiplier<0:
++        raise ValueError('Invalid preview quantity or fee multiplier')
++    if not isinstance(rows,list):raise ValueError('Invalid book ladder')
++    levels=[];seen=set()
+     for p,q in rows:
+         p,q=D(str(p)),D(str(q))
+-        if not p.is_finite() or not q.is_finite() or not 0<=p<=1 or q<0:raise ValueError('Invalid book level')
++        if not p.is_finite() or not q.is_finite() or not 0<=p<=1 or q<0 or p in seen:raise ValueError('Invalid or duplicate book level')
++        seen.add(p)
+         if q:levels.append((1-p if complement else p,q))
+     levels.sort(reverse=not complement)
+-    remaining=D(str(quantity));cost=D(0);fee=D(0)
++    remaining=quantity;cost=D(0);fee=D(0)
+     for price,available in levels:
+         take=min(remaining,available)
+         cost+=take*price
+         # Round each contract conservatively, including fractional-contract ceilings.
+-        fee+=take.to_integral_value(rounding=ROUND_CEILING)*(D('.07')*D(str(multiplier))*price*(1-price)).quantize(D('.01'),rounding=ROUND_CEILING)
++        fee+=take.to_integral_value(rounding=ROUND_CEILING)*(D('.07')*multiplier*price*(1-price)).quantize(D('.01'),rounding=ROUND_CEILING)
+         remaining-=take
+         if remaining<=0:break
+     filled=D(str(quantity))-remaining
+@@ -177,10 +182,19 @@
+             return raw[{'/cfbenchmarks/values':'benchmark','/markets/trades':'trades','/exchange/status':'exchange'}[path]]
+     copilot=object.__new__(b.Copilot);copilot.client=Client();copilot.positions=False
+     copilot.state={'previous':saved['previous'],'contracts':{}};copilot.record=lambda s:None
+-    with patch.object(b,'load_settings',return_value=settings),patch.object(b.time,'time',return_value=expected['epoch']),patch.object(b,'spot_get',return_value=raw['spot']):
+-        actual=copilot.collect(replay_health=expected['retrieval_health'])
+-    matches=actual['decision']==expected['decision'] and abs(actual['model']['p_up']-expected['model']['p_up'])<1e-12 and actual['entry_blockers']==expected['entry_blockers']
+-    return {'observation_id':row[0],'matches':matches,'expected_decision':expected['decision'],'replayed_decision':actual['decision'],'scope':'Entry decision, probability and blockers only; account guidance excluded; no network'}
++    health=dict(expected['retrieval_health'],collection_epoch=expected['collection_epoch'],analysis_epoch=expected['analysis_epoch'],available_epoch=expected['epoch'])
++    with patch.object(b,'load_settings',return_value=settings),patch.object(b.time,'time',return_value=expected['analysis_epoch']),patch.object(b,'spot_get',return_value=raw['spot']):
++        actual=copilot.collect(replay_health=health)
++    fields=('decision','entry','shadow_decision','shadow_entry','shadow_strategies','model','drift_free_model',
++            'structure','book','btc','btc_observed_at','btc_age_seconds','spot','spot_observed_at','basis_dollars',
++            'initial_bias','side_evaluations','quantity_previews','entry_blockers','data_quality_faults','operational_vetoes',
++            'recent_trades','kalshi_recent_candlesticks','target_boundary_matches','model_version','validation',
++            'collection_epoch','analysis_epoch','epoch','valid_until_epoch','time_remaining_seconds')
++    def canonical(value):return json.dumps(value,sort_keys=True,separators=(',',':'),default=str,allow_nan=False)
++    mismatches=[key for key in fields if key not in expected or canonical(actual[key])!=canonical(expected[key])]
++    return {'observation_id':row[0],'matches':not mismatches,'mismatched_fields':mismatches,'compared_fields':list(fields),
++            'expected_decision':expected['decision'],'replayed_decision':actual['decision'],
++            'scope':'Deterministic market, feature, cost, full shadow-candidate and public-decision fields; account guidance and wall/monotonic runtime metadata excluded; no network'}
+ 
+ if __name__=='__main__':
+     import argparse
+--- sealed-study002/kalshi_readonly.py
++++ offline-candidate/kalshi_readonly.py
+@@ -220,7 +220,15 @@
+     levels = {}
+     for side in ("yes", "no"):
+         rows = book.get(side + "_dollars") or []
+-        levels[side] = sorted([(Decimal(p), Decimal(q)) for p, q in rows if Decimal(q) > 0], reverse=True)
++        if not isinstance(rows,list):raise ReadError('Invalid book ladder')
++        normalized=[];seen=set()
++        for p,q in rows:
++            p,q=Decimal(p),Decimal(q)
++            if not p.is_finite() or not q.is_finite() or not 0<=p<=1 or q<0 or p in seen:
++                raise ReadError('Invalid or duplicate aggregated book level')
++            seen.add(p)
++            if q>0:normalized.append((p,q))
++        levels[side] = sorted(normalized, reverse=True)
+         best = levels[side][0][0] if levels[side] else None
+         result[side + "_bid_dollars"] = best
+         result[side + "_bid_size_fp"] = sum((q for p, q in levels[side] if p == best), Decimal(0)) if best is not None else None
+--- sealed-study002/study_policy.py
++++ offline-candidate/study_policy.py
+@@ -51,10 +51,11 @@
+ 
+ def execution_cost(rows,settings):
+     # One contract, minimum .01 units; no partial fill counts as an entry.
+-    levels=[]
++    levels=[];seen=set()
+     for p,q in rows:
+         p,q=D(str(p)),D(str(q))
+-        if not p.is_finite() or not q.is_finite() or not 0<=p<=1 or q<0 or q%D('.01'):raise ValueError('Unsupported price/depth')
++        if not p.is_finite() or not q.is_finite() or not 0<=p<=1 or q<0 or q%D('.01') or p in seen:raise ValueError('Unsupported or duplicate price/depth')
++        seen.add(p)
+         if q:levels.append((1-p,q))
+     remaining=D(1);fills=[]
+     for price,q in sorted(levels):
+@@ -112,7 +113,9 @@
+ 
+ def launch_guard(root,now):
+     if type(now) not in (int,float) or not math.isfinite(now):raise ValueError('Invalid launch clock')
+-    root=Path(root).resolve();verify_release(root)
++    root=Path(root).resolve()
++    if (root/'QA_ONLY').exists():raise ValueError('NOT ACTIVATED: offline QA candidate; no collector launch authorized')
++    verify_release(root)
+     p=validate_protocol(json.loads((root/'btc_copilot_protocol.json').read_text()))
+     approval=root/'activation_approval.json'
+     if not approval.exists():raise ValueError('NOT ACTIVATED: explicit user approval record absent')

@@ -1,0 +1,24 @@
+test_atomic_destination_links_and_old_temp_sentinel (__main__.Regression.test_atomic_destination_links_and_old_temp_sentinel) ... ok
+test_atomic_failed_replace_preserves_old_and_cleans_unique_temp (__main__.Regression.test_atomic_failed_replace_preserves_old_and_cleans_unique_temp) ... ok
+test_atomic_file_and_directory_fsync (__main__.Regression.test_atomic_file_and_directory_fsync) ... ok
+test_aux_candle_ordering_duplicates_and_ohlc (__main__.Regression.test_aux_candle_ordering_duplicates_and_ohlc) ... ok
+test_each_required_upstream_error_rejected (__main__.Regression.test_each_required_upstream_error_rejected) ... ok
+test_empty_no_trade_candle_is_not_fabricated (__main__.Regression.test_empty_no_trade_candle_is_not_fabricated) ... ok
+test_forming_aux_candle_omitted (__main__.Regression.test_forming_aux_candle_omitted) ... ok
+test_grid_finite_capacity_and_bounds (__main__.Regression.test_grid_finite_capacity_and_bounds) ... ok
+test_honest_replay_and_every_compared_field_tamper (__main__.Regression.test_honest_replay_and_every_compared_field_tamper) ... ok
+test_missing_trade_and_candle_keys_rejected (__main__.Regression.test_missing_trade_and_candle_keys_rejected) ... ok
+test_offline_cli_and_transport_gate (__main__.Regression.test_offline_cli_and_transport_gate) ... ok
+test_partial_trade_window_every_arm_abstains (__main__.Regression.test_partial_trade_window_every_arm_abstains) ... ok
+test_record_preserves_health_and_provenance (__main__.Regression.test_record_preserves_health_and_provenance) ... ok
+test_replay_delayed_completion_clocks (__main__.Regression.test_replay_delayed_completion_clocks) ... ok
+test_settlement_crash_rolls_back_then_retry_is_idempotent (__main__.Regression.test_settlement_crash_rolls_back_then_retry_is_idempotent) ... ok
+test_timezone_naive_rejected (__main__.Regression.test_timezone_naive_rejected) ... ok
+test_trade_full_schema_boundaries (__main__.Regression.test_trade_full_schema_boundaries) ... ok
+test_unknown_prior_health_and_same_source_never_confirm (__main__.Regression.test_unknown_prior_health_and_same_source_never_confirm) ... ok
+test_walk_and_execution_duplicate_depth_rejected (__main__.Regression.test_walk_and_execution_duplicate_depth_rejected) ... ok
+
+----------------------------------------------------------------------
+Ran 19 tests in 1.749s
+
+OK

@@ -1,0 +1,209 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%233056d3'/%3E%3Ctext x='32' y='45' text-anchor='middle' font-size='38' fill='white'%3E₿%3C/text%3E%3C/svg%3E">
+<title>BTC TA Copilot</title>
+<script src="https://unpkg.com/lightweight-charts@4.2.3/dist/lightweight-charts.standalone.production.js" integrity="sha384-stKllnUqA9AD0gsKCuUtf5XlqAW7PwIgDagoNsTWkjkBmJ/GZ/uHTgEBxdLV2VSK" crossorigin="anonymous"></script>
+<style>
+:root {
+  --bg: #f6f7f9; --panel: #ffffff; --line: #e3e6eb; --text: #14171c; --muted: #667085;
+  --bull: #12805c; --bear: #c2362b; --neutral: #8a8f98; --accent: #3056d3;
+  --e9: #e39b1a; --e21: #3056d3; --e50: #8a4fd1; --bb: #9aa3b2; --vwap: #0f9fb0; --strike: #c2362b;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0e1116; --panel: #161a21; --line: #262c36; --text: #e7eaf0; --muted: #8b93a1;
+    --bull: #2fbf8a; --bear: #f0645a; --neutral: #7d8490; --accent: #6d8cff;
+    --e9: #f2b441; --e21: #6d8cff; --e50: #b58af0; --bb: #5b6474; --vwap: #33c6d6; --strike: #f0645a;
+  }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text);
+  font: 14px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, sans-serif; }
+.wrap { max-width: 1320px; margin: 0 auto; padding: 16px; }
+header { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; margin-bottom: 14px; }
+h1 { font-size: 18px; margin: 0; letter-spacing: -.01em; }
+.pill { font-size: 12px; padding: 3px 9px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); }
+.live { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; font-size: 12px; }
+.dot { width: 8px; height: 8px; border-radius: 50%; background: var(--neutral); }
+.live.ok .dot { background: var(--bull); box-shadow: 0 0 0 3px color-mix(in srgb, var(--bull) 25%, transparent); }
+.live.bad { color: var(--bear); } .live.bad .dot { background: var(--bear); }
+.live.warn { color: var(--e9); } .live.warn .dot { background: var(--e9); }
+.clock { margin-left: auto; color: var(--muted); font-variant-numeric: tabular-nums; font-size: 12px; }
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 12px; margin-bottom: 12px; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; min-width: 0; }
+.label { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .04em; }
+.big { font-size: 26px; font-weight: 650; font-variant-numeric: tabular-nums; letter-spacing: -.01em; }
+.row { display: flex; justify-content: space-between; gap: 8px; font-variant-numeric: tabular-nums; }
+.row + .row { margin-top: 2px; }
+.sigma-row, .quote-row { flex-wrap: wrap; }
+.sigma-row .muted, .quote-row .muted { white-space: nowrap; }
+.quote-source { font-size: 12px; margin: 0 0 2px; }
+.muted { color: var(--muted); }
+.bull { color: var(--bull); } .bear { color: var(--bear); } .neutral { color: var(--neutral); }
+.tabs { display: flex; gap: 6px; margin: 0 0 10px; }
+.tabs button { font: inherit; font-weight: 600; padding: 5px 14px; border-radius: 7px; cursor: pointer;
+  border: 1px solid var(--line); background: var(--panel); color: var(--text); }
+.tabs button.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+.grid { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 12px; }
+@media (max-width: 980px) { .grid { grid-template-columns: minmax(0, 1fr); } }
+.chart { height: 400px; } .sub { height: 120px; margin-top: 6px; }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12px; color: var(--muted); margin-bottom: 6px; }
+.legend i { display: inline-block; width: 12px; height: 3px; border-radius: 2px; vertical-align: middle; margin-right: 5px; }
+table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+td, th { padding: 5px 4px; border-bottom: 1px solid var(--line); text-align: left; font-size: 13px; }
+th { color: var(--muted); font-weight: 500; font-size: 12px; }
+td:last-child, th:last-child { text-align: right; }
+tr:last-child td { border-bottom: 0; }
+.badge { display: inline-block; font-size: 11px; font-weight: 700; padding: 1px 7px; border-radius: 5px; text-transform: uppercase; }
+.badge.bull { background: color-mix(in srgb, var(--bull) 14%, transparent); }
+.badge.bear { background: color-mix(in srgb, var(--bear) 14%, transparent); }
+.badge.neutral, .badge.mixed { background: color-mix(in srgb, var(--neutral) 16%, transparent); color: var(--neutral); }
+.bar { display: flex; height: 8px; border-radius: 4px; overflow: hidden; background: var(--line); margin: 8px 0 4px; }
+.bar span { display: block; }
+details { margin-top: 7px; font-size: 12px; color: var(--muted); }
+summary { cursor: pointer; }
+h2 { font-size: 13px; margin: 0 0 8px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); font-weight: 600; }
+.side > .card + .card { margin-top: 12px; }
+.window-strip { margin-bottom: 12px; display: grid; grid-template-columns: minmax(0, 4fr) repeat(4, minmax(90px, 1fr)); gap: 12px; align-items: center; }
+.window-strip .big { font-size: 18px; }
+.spark { height: 84px; width: 100%; display: block; }
+.small-chart { height: 90px; }
+@media (max-width: 980px) { .window-strip { grid-template-columns: repeat(2, 1fr); } .window-strip .path { grid-column: 1 / -1; } }
+.mtf td, .mtf th { text-align: center; padding: 3px 2px; }
+.mtf td:first-child, .mtf th:first-child { text-align: left; color: var(--muted); }
+.mtf tr.total td { border-top: 1px solid var(--line); font-weight: 600; }
+.dist-block { margin-top: 10px; padding: 8px 10px; border-radius: 8px; background: color-mix(in srgb, var(--neutral) 10%, transparent); }
+.dist-block.bull { background: color-mix(in srgb, var(--bull) 14%, transparent); }
+.dist-block.bear { background: color-mix(in srgb, var(--bear) 14%, transparent); }
+.dist-big { font-size: 26px; font-weight: 650; font-variant-numeric: tabular-nums; letter-spacing: -.01em; line-height: 1.2; }
+.scalp-panel { margin-top: 8px; border: 1px solid var(--line); border-radius: 8px; padding: 8px; min-width: 0; overflow-wrap: anywhere; }
+.scalp-badge { display: inline-block; border: 1px solid var(--accent); color: var(--accent); border-radius: 5px; padding: 1px 5px; font-size: 10px; font-weight: 700; letter-spacing: .02em; }
+.scalp-state { margin-top: 5px; font-weight: 650; font-variant-numeric: tabular-nums; }
+.scalp-detail, .scalp-stats { color: var(--muted); font-size: 11px; margin-top: 4px; font-variant-numeric: tabular-nums; }
+footer { margin-top: 14px; font-size: 12px; color: var(--muted); }
+#errors { color: var(--bear); font-size: 12px; margin-top: 6px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>BTC TA Copilot</h1>
+    <span class="pill">Public data · one experimental paper trigger</span>
+    <span id="live" class="live"><span class="dot"></span><span id="liveText">Connecting…</span></span>
+    <span class="clock" id="clock"></span>
+  </header>
+
+  <div class="cards">
+    <div class="card">
+      <div class="label">BTC-USD spot (Coinbase)</div>
+      <div class="big" id="price">—</div>
+      <div class="row"><span class="muted">Bid / Ask</span><span id="bidask">—</span></div>
+      <div class="row"><span class="muted">Change 15m / 1h</span><span id="chg">—</span></div>
+      <div class="scalp-panel" aria-live="polite">
+        <span class="scalp-badge">EXPERIMENTAL · paper · unvalidated</span>
+        <div class="scalp-state" id="scalpState">FLAT · watching</div>
+        <div class="scalp-detail" id="scalpConditions">Waiting for data</div>
+        <div class="scalp-stats" id="scalpStats">0 trades · win — [CI —] · avg —¢/contract after fees [CI —] · too few trades to judge</div>
+      </div>
+      <details><summary>Venue prices and ages</summary><table><tbody id="venues"></tbody></table>
+        <span>Kraken uses trade time on WebSocket and fetch time on REST; Gemini uses fetch time. Coinbase and Bitstamp use exchange timestamps.</span>
+      </details>
+      <div class="muted" style="font-size:12px;margin-top:6px">Composite and average are proxies, not BRTI. They can differ from settlement.</div>
+    </div>
+    <div class="card">
+      <div class="label">Kalshi window <span id="ticker" class="muted" style="text-transform:none"></span></div>
+      <div class="big" id="countdown">—</div>
+      <div id="kalshiAge" class="muted" style="font-size:12px"></div>
+      <div class="row"><span class="muted">Composite spot proxy</span><span id="composite">—</span></div>
+      <div class="row"><span class="muted">Rolling 60s proxy average</span><span id="average60">—</span></div>
+      <div class="row"><span class="muted">Target (floor strike)</span><span id="strike">—</span></div>
+      <div class="row sigma-row"><span class="muted">Distance in σ (settle-avg model)</span><span id="sig">—</span></div>
+      <div class="row quote-row"><span class="muted" id="yesLabel">YES bid / ask</span><span id="yes">—</span></div>
+      <div id="yesSource" class="muted quote-source"></div>
+      <div class="row quote-row"><span class="muted" id="noLabel">NO bid / ask</span><span id="no">—</span></div>
+      <div id="noSource" class="muted quote-source"></div>
+      <div id="distBlock" class="dist-block">
+        <div class="label" id="distanceLabel">Composite vs target</div>
+        <div class="dist-big" id="dist">—</div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="label">Indicator tally · <span id="tallyTf">1m</span></div>
+      <div class="big" id="lean">—</div>
+      <div class="bar"><span id="bBull" style="background:var(--bull)"></span><span id="bNeu" style="background:var(--neutral)"></span><span id="bBear" style="background:var(--bear)"></span></div>
+      <div class="row"><span class="bull" id="nBull">—</span><span class="neutral" id="nNeu"></span><span class="bear" id="nBear"></span></div>
+      <div class="label" style="margin-top:10px">All indicators by timeframe</div>
+      <table class="mtf"><thead id="mtfHead"></thead><tbody id="mtf"></tbody></table>
+    </div>
+  </div>
+
+  <div class="card window-strip">
+    <div class="path"><div class="label">Window in context · <span id="ctxLabel">1m · last 1 h</span></div><svg id="windowPath" class="spark" role="img" aria-label="Recent price, current window and target"></svg><span id="pathNote" class="muted"></span></div>
+    <div><div class="label">Time left</div><div class="big" id="stripTime">—</div></div>
+    <div><div class="label">Composite vs 60s avg</div><div class="big" id="stripAvg">—</div></div>
+    <div><div class="label">High since open</div><div class="big" id="stripHigh">—</div></div>
+    <div><div class="label">Low since open</div><div class="big" id="stripLow">—</div></div>
+  </div>
+
+  <div class="tabs" id="tabs">
+    <button data-tf="1m" class="on">1m</button><button data-tf="5m">5m</button><button data-tf="10m">10m</button><button data-tf="15m">15m</button><button data-tf="1h">1h</button>
+  </div>
+
+  <div class="grid">
+    <div class="card">
+      <div class="legend">
+        <span><i style="background:var(--e9)"></i>EMA 9</span><span><i style="background:var(--e21)"></i>EMA 21</span>
+        <span><i style="background:var(--e50)"></i>EMA 50</span><span><i style="background:var(--bb)"></i>Bollinger 20,2</span>
+        <span><i style="background:var(--vwap)"></i>VWAP <span id="vwapNote"></span></span><span><i style="background:var(--strike)"></i>Kalshi target</span>
+      </div>
+      <div id="chart" class="chart"></div>
+      <div class="legend" style="margin-top:8px">RSI 14 <span id="rsiNow"></span></div>
+      <div id="rsi" class="sub"></div>
+      <div class="legend" style="margin-top:8px">MACD 12,26,9 <span id="macdNow"></span></div>
+      <div id="macd" class="sub"></div>
+      <div class="legend" style="margin-top:8px">Cumulative volume delta · Coinbase + Kraken BTC · <span id="cvdNow"></span></div>
+      <div id="cvd" class="sub"></div>
+    </div>
+    <div class="side">
+      <div class="card">
+        <h2>Order flow · current window</h2>
+        <div class="row"><span class="muted">CVD since open</span><span id="flowCvd">—</span></div>
+        <div class="row"><span class="muted">1m taker buy / sell</span><span id="flowOne">—</span></div>
+        <div class="row"><span class="muted">1m imbalance</span><span id="flowImbalance">—</span></div>
+        <div class="row"><span class="muted">Large trade threshold</span><span id="flowThreshold">—</span></div>
+        <div class="muted" id="flowCoverage" style="font-size:12px;margin-top:5px"></div>
+      </div>
+      <div class="card">
+        <h2>Kalshi market context <span id="bookAge" class="muted"></span></h2>
+        <div class="row"><span class="muted">YES bid depth / ask depth</span><span id="yesDepth">—</span></div>
+        <div class="row"><span class="muted">NO bid depth / ask depth</span><span id="noDepth">—</span></div>
+        <div class="label" style="margin-top:8px">YES mid · this window</div>
+        <svg id="yesMid" class="spark small-chart" role="img" aria-label="YES mid over current window"></svg>
+        <div class="muted" style="font-size:12px">Mid uses the best YES bid and implied YES ask; it is not an executable quote.</div>
+        <div class="label" style="margin-top:8px">Recent trades in this window</div>
+        <table><thead><tr><th>Time UTC</th><th>YES price</th><th>Contracts</th></tr></thead><tbody id="kalshiTrades"></tbody></table>
+      </div>
+      <div class="card">
+        <h2>Readings · <span id="readTf">1m</span></h2>
+        <table><tbody id="readings"></tbody></table>
+      </div>
+      <div class="card">
+        <h2>Levels · <span id="lvlTf">1m</span></h2>
+        <table><tbody id="levels"></tbody></table>
+      </div>
+    </div>
+  </div>
+
+  <footer>
+    Spot proxy: median of fresh Coinbase, Kraken, Bitstamp and Gemini BTC-USD last trades after exclusions. Candles: Coinbase Advanced Trade public market data. Kalshi: public market endpoint. Kalshi settles KXBTC15M on the 60-second CF Benchmarks BRTI average. This composite and its rolling average are not BRTI and can differ from settlement.
+    The tally counts indicator states and has not been validated as a trade signal. The separate momentum scalp trigger is experimental, paper-only, and unvalidated; its track record describes past paper fills, not future odds. The Study 005 advice gate stays disabled. No account access, no orders.
+    <div id="errors"></div>
+  </footer>
+</div>
+
+<script src="/app.js"></script>
+</body>
+</html>

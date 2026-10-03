@@ -1,0 +1,1503 @@
+{
+  "prompt_tokens": 2161305,
+  "completion_tokens": 50223,
+  "cache_hit_tokens": 1900928,
+  "cache_miss_tokens": 260377,
+  "steps": 32,
+  "cost": 0.626221552,
+  "currency": "USD",
+  "cost_complete": true,
+  "display_complete": true,
+  "display_status": "matched",
+  "aggregate_mode": "single_currency",
+  "original_totals": [
+    {
+      "amount": "0.626221552",
+      "currency": "USD"
+    }
+  ],
+  "original_costs": {
+    "USD": 0.626221552
+  },
+  "cost_quotes": [
+    {
+      "original": {
+        "amount": "0.003768688",
+        "currency": "USD"
+      },
+      "valuations": {
+        "CNY": {
+          "money": {
+            "amount": "0.0256956",
+            "currency": "CNY"
+          },
+          "basis": "official_table",
+          "source": "https://api-docs.deepseek.com/quick_start/pricing",
+          "asOf": "2026-09-28"
+        },
+        "USD": {
+          "money": {
+            "amount": "0.003768688",
+            "currency": "USD"
+          },
+          "basis": "identity",
+          "source": "https://api-docs.deepseek.com/quick_start/pricing",
+          "asOf": "2026-09-28"
+        }
+      },
+      "selected": {
+        "amount": "0.003768688",
+        "currency": "USD"
+      },
+      "billingMode": "payg",
+      "estimated": true,
+      "costComplete": true,
+      "displayComplete": true,
+      "complete": true,
+      "displayStatus": "matched",
+      "aggregateMode": "single_currency",
+      "modelRef": "deepseek/deepseek-v4-pro",
+      "usageSource": "executor",
+      "pricingFingerprint": "77497348cb9b2cbc",
+      "rateBand": "peak",
+      "ratedAt": "2026-09-28T06:39:44.852781Z",
+      "catalogSource": "https://api-docs.deepseek.com/quick_start/pricing"
+    },
+    {
+      "original": {
+        "amount": "0.00142076",
+        "currency": "USD"
+      },
+      "valuations": {
+        "CNY": {
+          "money": {
+            "amount": "0.009687",
+            "currency": "CNY"
+          },
+          "basis": "official_table",
+          "source": "https://api-docs.deepseek.com/quick_start/pricing",
+          "asOf": "2026-09-28"
+        },
+        "USD": {
+          "money": {
+            "amount": "0.00142076",
+            "currency": "USD"
+          },
+          "basis": "identity",
+          "source": "https://api-docs.deepseek.com/quick_start/pricing",
+          "asOf": "2026-09-28"
+        }
+      },
+      "selected": {
+        "amount": "0.00142076",
+        "currency": "USD"
+      },
+      "billingMode": "payg",
+      "estimated": true,
+      "costComplete": true,
+      "displayComplete": true,
+      "complete": true,
+      "displayStatus": "matched",
+      "aggregateMode": "single_currency",
+      "modelRef": "deepseek/deepseek-v4-pro",
+      "usageSource": "executor",
+      "pricingFingerprint": "77497348cb9b2cbc",
+      "rateBand": "peak",
+      "ratedAt": "2026-09-28T06:39:47.827216Z",
+      "catalogSource": "https://api-docs.deepseek.com/quick_start/pricing"
+    },
+    {
+      "original": {
+        "amount": "0.022657008",
+        "currency": "USD"
+      },
+      "valuations": {
+        "CNY": {
+          "money": {
+            "amount": "0.1544796",
+            "currency": "CNY"
+          },
+          "basis": "official_table",
+          "source": "https://api-docs.deepseek.com/quick_start/pricing",
+          "asOf": "2026-09-28"
+        },
+        "USD": {
+          "money": {
+            "amount": "0.022657008",
+            "currency": "USD"
+          },
+          "basis": "identity",
+          "source": "https://api-docs.deepseek.com/quick_start/pricing",
+          "asOf": "2026-09-28"
+        }
+      },
+      "selected": {
+        "amount": "0.022657008",
+        "currency": "USD"
+      },
+      "billingMode": "payg",
+      "estimated": true,
+      "costComplete": true,
+      "displayComplete": true,
+      "complete": true,
+      "displayStatus": "matched",
+      "aggregateMode": "single_currency",
+      "modelRef": "deepseek/deepseek-v4-pro",
+      "usageSource": "executor",
+      "pricingFingerprint": "77497348cb9b2cbc",
+      "rateBand": "peak",
+      "ratedAt": "2026-09-28T06:41:18.783634Z",
+      "catalogSource": "https://api-docs.deepseek.com/quick_start/pricing"
+    },
+    {
+      "original": {
+        "amount": "0.027277712",
+        "currency": "USD"
+      },
+      "valuations": {
+        "CNY": {
+          "money": {
+            "amount": "0.1859844",
+            "currency": "CNY"
+          },
+          "basis": "official_table",
+          "source": "https://api-docs.deepseek.com/quick_start/pricing",
+          "asOf": "2026-09-28"
+        },
+        "USD": {
+          "money": {
+            "amount": "0.027277712",
+            "currency": "USD"
+          },
+          "basis": "identity",
+          "source": "https://api-docs.deepseek.com/quick_start/pricing",
+          "asOf": "2026-09-28"
+        }
+      },
+      "selected": {
+        "amount": "0.027277712",
+        "currency": "USD"
+      },
+      "billingMode": "payg",
+      "estimated": true,
+      "costComplete": true,
+      "displayComplete": true,
+      "complete": true,
+      "displayStatus": "matched",
+      "aggregateMode": "single_currency",
+      "modelRef": "deepseek/deepseek-v4-pro",
+      "usageSource": "executor",
+      "pricingFingerprint": "77497348cb9b2cbc",
+      "rateBand": "peak",
+      "ratedAt": "2026-09-28T06:41:48.626551Z",
+      "catalogSource": "https://api-docs.deepseek.com/quick_start/pricing"
+    },
+    {
+      "original": {
+        "amount": "0.00218284",
+        "currency": "USD"
+      },
+      "valuations": {
+        "CNY": {
+          "money": {
+            "amount": "0.014883",
+            "currency": "CNY"
+          },
+          "basis": "official_table",
+          "source": "https://api-docs.deepseek.com/quick_start/pricing",
+          "asOf": "2026-09-28"
+        },
+        "USD": {
+          "money": {
+            "amount": "0.00218284",
+            "currency": "USD"
+          },
+          "basis": "identity",
+          "source": "https://api-docs.deepseek.com/quick_start/pricing",
+          "asOf": "2026-09-28"
+        }
+      },
+      "selected": {
+        "amount": "0.00218284",
+        "currency": "USD"
+      },
+      "billingMode": "payg",
+      "estimated": true,
+      "costComplete": true,
+      "displayComplete": true,
+      "complete": true,
+      "displayStatus": "matched",
+      "aggregateMode": "single_currency",
+      "modelRef": "deepseek/deepseek-v4-pro",
+      "usageSource": "executor",
+      "pricingFingerprint": "77497348cb9b2cbc",
+      "rateBand": "peak",
+      "ratedAt": "2026-09-28T06:41:51.717388Z",
+      "catalogSource": "https://api-docs.deepseek.com/quick_start/pricing"
+    },
+    {
+      "original": {
+        "amount": "0.006113184",
+        "currency": "USD"
+      },
+      "valuations": {
+        "CNY": {
+          "money": {
+            "amount": "0.0416808",
+            "currency": "CNY"
+          },
+          "basis": "official_table",
+          "source": "https://api-docs.deepseek.com/quick_start/pricing",
+          "asOf": "2026-09-28"
+        },
+        "USD": {
+          "money": {
+            "amount": "0.006113184",
+            "currency": "USD"
+          },
+          "basis": "identity",
+          "source": "https://api-docs.deepseek.com/quick_start/pricing",
+          "asOf": "2026-09-28"
+        }
+      },
+      "selected": {
+        "amount": "0.006113184",
+        "currency": "USD"
+      },
+      "billingMode": "payg",
+      "estimated": true,
+      "costComplete": true,
+      "displayComplete": true,
+      "complete": true,
+      "displayStatus": "matched",
+      "aggregateMode": "single_currency",
+      "modelRef": "deepseek/deepseek-v4-pro",
+      "usageSource": "executor",
+      "pricingFingerprint": "77497348cb9b2cbc",
+      "rateBand": "peak",
+      "ratedAt": "2026-09-28T06:41:55.080408Z",
+      "catalogSource": "https://api-docs.deepseek.com/quick_start/pricing"
+    },
+    {
+      "original": {
+        "amount": "0.010484936",
+        "currency": "USD"
+      },
+      "valuations": {
+        "CNY": {
+          "money": {
+            "amount": "0.0714882",
+            "currency": "CNY"
+          },
+          "basis": "official_table",
+          "source": "https://api-docs.deepseek.com/quick_start/pricing",
+          "asOf": "2026-09-28"
+        },
+        "USD": {
+          "money": {
+            "amount": "0.010484936",
+            "currency": "USD"
+          },
+          "basis": "identity",
+          "source": "https://api-docs.deepseek.com/quick_start/pricing",
+          "asOf": "2026-09-28"
+        }
+      },
+      "selected": {
+        "amount": "0.010484936",
+        "currency": "USD"
+      },
+      "billingMode": "payg",
+      "estimated": true,
+      "costComplete": true,
+      "displayComplete": true,
+      "complete": true,
+      "displayStatus": "matched",
+      "aggregateMode": "single_currency",
+      "modelRef": "deepseek/deepseek-v4-pro",
+      "usageSource": "executor",
+      "pricingFingerprint": "77497348cb9b2cbc",
+      "rateBand": "peak",
+      "ratedAt": "2026-09-28T06:42:30.652846Z",
+      "catalogSource": "https://api-docs.deepseek.com/quick_start/pricing"
+    },
+    {
+      "original": {
+        "amount": "0.005987872",
+        "currency": "USD"
+      },
+      "valuations": {
+        "CNY": {
+          "money": {
+            "amount": "0.0408264",
+            "currency": "CNY"
+          },
+          "basis": "official_table",
+          "source": "https://api-docs.deepseek.com/quick_start/pricing",
+          "asOf": "2026-09-28"
+        },
+        "USD": {
+          "money": {
+            "amount": "0.005987872",
+            "currency": "USD"
+          },
+          "basis": "identity",
+          "source": "https://api-docs.deepseek.com/quick_start/pricing",
+          "asOf": "2026-09-28"
+        }
+      },
+      "selected": {
+        "amount": "0.005987872",
+        "currency": "USD"
+      },
+      "billingMode": "payg",
+      "estimated": true,
+      "costComplete": true,
+      "displayComplete": true,
+      "complete": true,
+      "displayStatus": "matched",
+      "aggregateMode": "single_currency",
+      "modelRef": "deepseek/deepseek-v4-pro",
+      "usageSource": "executor",
+      "pricingFingerprint": "77497348cb9b2cbc",
+      "rateBand": "peak",
+      "ratedAt": "2026-09-28T06:42:33.507355Z",
+      "catalogSource": "https://api-docs.deepseek.com/quick_start/pricing"
+    },
+    {
+      "original": {
+        "amount": "0.02226268",
+        "currency": "USD"
+      },
+      "valuations": {
+        "CNY": {
+          "money": {
+            "amount": "0.151791",
+            "currency": "CNY"
+          },
+          "basis": "official_table",
+          "source": "https://api-docs.deepseek.com/quick_start/pricing",
+          "asOf": "2026-09-28"
+        },
+        "USD": {
+          "money": {
+            "amount": "0.02226268",
+            "currency": "USD"
+          },
+          "basis": "identity",
+          "source": "https://api-docs.deepseek.com/quick_start/pricing",
+          "asOf": "2026-09-28"
+        }
+      },
+      "selected": {
+        "amount": "0.02226268",
+        "currency": "USD"
+      },
+      "billingMode": "payg",
+      "estimated": true,
+      "costComplete": true,
+      "displayComplete": true,
+      "complete": true,
+      "displayStatus": "matched",
+      "aggregateMode": "single_currency",
+      "modelRef": "deepseek/deepseek-v4-pro",
+      "usageSource": "executor",
+      "pricingFingerprint": "77497348cb9b2cbc",
+      "rateBand": "peak",
+      "ratedAt": "2026-09-28T06:46:07.952209Z",
+      "catalogSource": "https://api-docs.deepseek.com/quick_start/pricing"
+    },
+    {
+      "original": {
+        "amount": "0.072461752",
+        "currency": "USD"
+      },
+      "valuations": {
+        "CNY": {
+          "money": {
+            "amount": "0.4940574",
+            "currency": "CNY"
+          },
+          "basis": "official_table",
+          "source": "https://api-docs.deepseek.com/quick_start/pricing",
+          "asOf": "2026-09-28"
+        },
+        "USD": {
+          "money": {
+            "amount": "0.072461752",
+            "currency": "USD"
+          },
+          "basis": "identity",
+          "source": "https://api-docs.deepseek.com/quick_start/pricing",
+          "asOf": "2026-09-28"
+        }
+      },
+      "selected": {
+        "amount": "0.072461752",
+        "currency": "USD"
+      },
+      "billingMode": "payg",
+      "estimated": true,
+      "costComplete": true,
+      "displayComplete": true,
+      "complete": true,
+      "displayStatus": "matched",
+      "aggregateMode": "single_currency",
+      "modelRef": "deepseek/deepseek-v4-pro",
+      "usageSource": "web-search",
+      "pricingFingerprint": "77497348cb9b2cbc",
+      "rateBand": "peak",
+      "ratedAt": "2026-09-28T06:46:44.774661Z",
+      "catalogSource": "https://api-docs.deepseek.com/quick_start/pricing"
+    },
+    {
+      "original": {
+        "amount": "0.005233272",
+        "currency": "USD"
+      },
+      "valuations": {
+        "CNY": {
+          "money": {
+            "amount": "0.0356814",
+            "currency": "CNY"
+          },
+          "basis": "official_table",
+          "source": "https://api-docs.deepseek.com/quick_start/pricing",
+          "asOf": "2026-09-28"
+        },
+        "USD": {
+          "money": {
+            "amount": "0.005233272",
+            "currency": "USD"
+          },
+          "basis": "identity",
+          "source": "https://api-docs.deepseek.com/quick_start/pricing",
+          "asOf": "2026-09-28"
+        }
+      },
+      "selected": {
+        "amount": "0.005233272",
+        "currency": "USD"
+      },
+      "billingMode": "payg",
+      "estimated": true,
+      "costComplete": true,
+      "displayComplete": true,
+      "complete": true,
+      "displayStatus": "matched",
+      "aggregateMode": "single_currency",
+      "modelRef": "deepseek/deepseek-v4-pro",
+      "usageSource": "executor",
+      "pricingFingerprint": "77497348cb9b2cbc",
+      "rateBand": "peak",
+      "ratedAt": "2026-09-28T06:46:50.00462Z",
+      "catalogSource": "https://api-docs.deepseek.com/quick_start/pricing"
+    },
+    {
+      "original": {
+        "amount": "0.01070036",
+        "currency": "USD"
+      },
+      "valuations": {
+        "CNY": {
+          "money": {
+            "amount": "0.072957",
+            "currency": "CNY"
+          },
+          "basis": "official_table",
+          "source": "https://api-docs.deepseek.com/quick_start/pricing",
+          "asOf": "2026-09-28"
+        },
+        "USD": {
+          "money": {
+            "amount": "0.01070036",
+            "currency": "USD"
+          },
+          "basis": "identity",
+          "source": "https://api-docs.deepseek.com/quick_start/pricing",
+          "asOf": "2026-09-28"
+        }
+      },
+      "selected": {
+        "amount": "0.01070036",
+        "currency": "USD"
+      },
+      "billingMode": "payg",
+      "estimated": true,
+      "costComplete": true,
+      "displayComplete": true,
+      "complete": true,
+      "displayStatus": "matched",
+      "aggregateMode": "single_currency",
+      "modelRef": "deepseek/deepseek-v4-pro",
+      "usageSource": "executor",
+      "pricingFingerprint": "77497348cb9b2cbc",
+      "rateBand": "peak",
+      "ratedAt": "2026-09-28T06:47:34.028079Z",
+      "catalogSource": "https://api-docs.deepseek.com/quick_start/pricing"
+    },
+    {
+      "original": {
+        "amount": "0.06107244",
+        "currency": "USD"
+      },
+      "valuations": {
+        "CNY": {
+          "money": {
+            "amount": "0.416403",
+            "currency": "CNY"
+          },
+          "basis": "official_table",
+          "source": "https://api-docs.deepseek.com/quick_start/pricing",
+          "asOf": "2026-09-28"
+        },
+        "USD": {
+          "money": {
+            "amount": "0.06107244",
+            "currency": "USD"
+          },
+          "basis": "identity",
+          "source": "https://api-docs.deepseek.com/quick_start/pricing",
+          "asOf": "2026-09-28"
+        }
+      },
+      "selected": {
+        "amount": "0.06107244",
+        "currency": "USD"
+      },
+      "billingMode": "payg",
+      "estimated": true,
+      "costComplete": true,
+      "displayComplete": true,
+      "complete": true,
+      "displayStatus": "matched",
+      "aggregateMode": "single_currency",
+      "modelRef": "deepseek/deepseek-v4-pro",
+      "usageSource": "web-search",
+      "pricingFingerprint": "77497348cb9b2cbc",
+      "rateBand": "peak",
+      "ratedAt": "2026-09-28T06:48:25.628141Z",
+      "catalogSource": "https://api-docs.deepseek.com/quick_start/pricing"
+    },
+    {
+      "original": {
+        "amount": "0.00477576",
+        "currency": "USD"
+      },
+      "valuations": {
+        "CNY": {
+          "money": {
+            "amount": "0.032562",
+            "currency": "CNY"
+          },
+          "basis": "official_table",
+          "source": "https://api-docs.deepseek.com/quick_start/pricing",
+          "asOf": "2026-09-28"
+        },
+        "USD": {
+          "money": {
+            "amount": "0.00477576",
+            "currency": "USD"
+          },
+          "basis": "identity",
+          "source": "https://api-docs.deepseek.com/quick_start/pricing",
+          "asOf": "2026-09-28"
+        }
+      },
+      "selected": {
+        "amount": "0.00477576",
+        "currency": "USD"
+      },
+      "billingMode": "payg",
+      "estimated": true,
+      "costComplete": true,
+      "displayComplete": true,
+      "complete": true,
+      "displayStatus": "matched",
+      "aggregateMode": "single_currency",
+      "modelRef": "deepseek/deepseek-v4-pro",
+      "usageSource": "executor",
+      "pricingFingerprint": "77497348cb9b2cbc",
+      "rateBand": "peak",
+      "ratedAt": "2026-09-28T06:48:28.285001Z",
+      "catalogSource": "https://api-docs.deepseek.com/quick_start/pricing"
+    },
+    {
+      "original": {
+        "amount": "0.011950224",
+        "currency": "USD"
+      },
+      "valuations": {
+        "CNY": {
+          "money": {
+            "amount": "0.0814788",
+            "currency": "CNY"
+          },
+          "basis": "official_table",
+          "source": "https://api-docs.deepseek.com/quick_start/pricing",
+          "asOf": "2026-09-28"
+        },
+        "USD": {
+          "money": {
+            "amount": "0.011950224",
+            "currency": "USD"
+          },
+          "basis": "identity",
+          "source": "https://api-docs.deepseek.com/quick_start/pricing",
+          "asOf": "2026-09-28"
+        }
+      },
+      "selected": {
+        "amount": "0.011950224",
+        "currency": "USD"
+      },
+      "billingMode": "payg",
+      "estimated": true,
+      "costComplete": true,
+      "displayComplete": true,
+      "complete": true,
+      "displayStatus": "matched",
+      "aggregateMode": "single_currency",
+      "modelRef": "deepseek/deepseek-v4-pro",
+      "usageSource": "executor",
+      "pricingFingerprint": "77497348cb9b2cbc",
+      "rateBand": "peak",
+      "ratedAt": "2026-09-28T06:49:00.157566Z",
+      "catalogSource": "https://api-docs.deepseek.com/quick_start/pricing"
+    },
+    {
+      "original": {
+        "amount": "0.096785568",
+        "currency": "USD"
+      },
+      "valuations": {
+        "CNY": {
+          "money": {
+            "amount": "0.6599016",
+            "currency": "CNY"
+          },
+          "basis": "official_table",
+          "source": "https://api-docs.deepseek.com/quick_start/pricing",
+          "asOf": "2026-09-28"
+        },
+        "USD": {
+          "money": {
+            "amount": "0.096785568",
+            "currency": "USD"
+          },
+          "basis": "identity",
+          "source": "https://api-docs.deepseek.com/quick_start/pricing",
+          "asOf": "2026-09-28"
+        }
+      },
+      "selected": {
+        "amount": "0.096785568",
+        "currency": "USD"
+      },
+      "billingMode": "payg",
+      "estimated": true,
+      "costComplete": true,
+      "displayComplete": true,
+      "complete": true,
+      "displayStatus": "matched",
+      "aggregateMode": "single_currency",
+      "modelRef": "deepseek/deepseek-v4-pro",
+      "usageSource": "web-search",
+      "pricingFingerprint": "77497348cb9b2cbc",
+      "rateBand": "peak",
+      "ratedAt": "2026-09-28T06:49:48.364701Z",
+      "catalogSource": "https://api-docs.deepseek.com/quick_start/pricing"
+    },
+    {
+      "original": {
+        "amount": "0.00829224",
+        "currency": "USD"
+      },
+      "valuations": {
+        "CNY": {
+          "money": {
+            "amount": "0.056538",
+            "currency": "CNY"
+          },
+          "basis": "official_table",
+          "source": "https://api-docs.deepseek.com/quick_start/pricing",
+          "asOf": "2026-09-28"
+        },
+        "USD": {
+          "money": {
+            "amount": "0.00829224",
+            "currency": "USD"
+          },
+          "basis": "identity",
+          "source": "https://api-docs.deepseek.com/quick_start/pricing",
+          "asOf": "2026-09-28"
+        }
+      },
+      "selected": {
+        "amount": "0.00829224",
+        "currency": "USD"
+      },
+      "billingMode": "payg",
+      "estimated": true,
+      "costComplete": true,
+      "displayComplete": true,
+      "complete": true,
+      "displayStatus": "matched",
+      "aggregateMode": "single_currency",
+      "modelRef": "deepseek/deepseek-v4-pro",
+      "usageSource": "executor",
+      "pricingFingerprint": "77497348cb9b2cbc",
+      "rateBand": "peak",
+      "ratedAt": "2026-09-28T06:50:07.378496Z",
+      "catalogSource": "https://api-docs.deepseek.com/quick_start/pricing"
+    },
+    {
+      "original": {
+        "amount": "0.003724512",
+        "currency": "USD"
+      },
+      "valuations": {
+        "CNY": {
+          "money": {
+            "amount": "0.0253944",
+            "currency": "CNY"
+          },
+          "basis": "official_table",
+          "source": "https://api-docs.deepseek.com/quick_start/pricing",
+          "asOf": "2026-09-28"
+        },
+        "USD": {
+          "money": {
+            "amount": "0.003724512",
+            "currency": "USD"
+          },
+          "basis": "identity",
+          "source": "https://api-docs.deepseek.com/quick_start/pricing",
+          "asOf": "2026-09-28"
+        }
+      },
+      "selected": {
+        "amount": "0.003724512",
+        "currency": "USD"
+      },
+      "billingMode": "payg",
+      "estimated": true,
+      "costComplete": true,
+      "displayComplete": true,
+      "complete": true,
+      "displayStatus": "matched",
+      "aggregateMode": "single_currency",
+      "modelRef": "deepseek/deepseek-v4-pro",
+      "usageSource": "executor",
+      "pricingFingerprint": "77497348cb9b2cbc",
+      "rateBand": "peak",
+      "ratedAt": "2026-09-28T06:50:11.093311Z",
+      "catalogSource": "https://api-docs.deepseek.com/quick_start/pricing"
+    },
+    {
+      "original": {
+        "amount": "0.0040018",
+        "currency": "USD"
+      },
+      "valuations": {
+        "CNY": {
+          "money": {
+            "amount": "0.027285",
+            "currency": "CNY"
+          },
+          "basis": "official_table",
+          "source": "https://api-docs.deepseek.com/quick_start/pricing",
+          "asOf": "2026-09-28"
+        },
+        "USD": {
+          "money": {
+            "amount": "0.0040018",
+            "currency": "USD"
+          },
+          "basis": "identity",
+          "source": "https://api-docs.deepseek.com/quick_start/pricing",
+          "asOf": "2026-09-28"
+        }
+      },
+      "selected": {
+        "amount": "0.0040018",
+        "currency": "USD"
+      },
+      "billingMode": "payg",
+      "estimated": true,
+      "costComplete": true,
+      "displayComplete": true,
+      "complete": true,
+      "displayStatus": "matched",
+      "aggregateMode": "single_currency",
+      "modelRef": "deepseek/deepseek-v4-pro",
+      "usageSource": "executor",
+      "pricingFingerprint": "77497348cb9b2cbc",
+      "rateBand": "peak",
+      "ratedAt": "2026-09-28T06:50:15.775875Z",
+      "catalogSource": "https://api-docs.deepseek.com/quick_start/pricing"
+    },
+    {
+      "original": {
+        "amount": "0.006900608",
+        "currency": "USD"
+      },
+      "valuations": {
+        "CNY": {
+          "money": {
+            "amount": "0.0470496",
+            "currency": "CNY"
+          },
+          "basis": "official_table",
+          "source": "https://api-docs.deepseek.com/quick_start/pricing",
+          "asOf": "2026-09-28"
+        },
+        "USD": {
+          "money": {
+            "amount": "0.006900608",
+            "currency": "USD"
+          },
+          "basis": "identity",
+          "source": "https://api-docs.deepseek.com/quick_start/pricing",
+          "asOf": "2026-09-28"
+        }
+      },
+      "selected": {
+        "amount": "0.006900608",
+        "currency": "USD"
+      },
+      "billingMode": "payg",
+      "estimated": true,
+      "costComplete": true,
+      "displayComplete": true,
+      "complete": true,
+      "displayStatus": "matched",
+      "aggregateMode": "single_currency",
+      "modelRef": "deepseek/deepseek-v4-pro",
+      "usageSource": "executor",
+      "pricingFingerprint": "77497348cb9b2cbc",
+      "rateBand": "peak",
+      "ratedAt": "2026-09-28T06:50:20.273058Z",
+      "catalogSource": "https://api-docs.deepseek.com/quick_start/pricing"
+    },
+    {
+      "original": {
+        "amount": "0.00434324",
+        "currency": "USD"
+      },
+      "valuations": {
+        "CNY": {
+          "money": {
+            "amount": "0.029613",
+            "currency": "CNY"
+          },
+          "basis": "official_table",
+          "source": "https://api-docs.deepseek.com/quick_start/pricing",
+          "asOf": "2026-09-28"
+        },
+        "USD": {
+          "money": {
+            "amount": "0.00434324",
+            "currency": "USD"
+          },
+          "basis": "identity",
+          "source": "https://api-docs.deepseek.com/quick_start/pricing",
+          "asOf": "2026-09-28"
+        }
+      },
+      "selected": {
+        "amount": "0.00434324",
+        "currency": "USD"
+      },
+      "billingMode": "payg",
+      "estimated": true,
+      "costComplete": true,
+      "displayComplete": true,
+      "complete": true,
+      "displayStatus": "matched",
+      "aggregateMode": "single_currency",
+      "modelRef": "deepseek/deepseek-v4-pro",
+      "usageSource": "executor",
+      "pricingFingerprint": "77497348cb9b2cbc",
+      "rateBand": "peak",
+      "ratedAt": "2026-09-28T06:50:24.932693Z",
+      "catalogSource": "https://api-docs.deepseek.com/quick_start/pricing"
+    },
+    {
+      "original": {
+        "amount": "0.005121512",
+        "currency": "USD"
+      },
+      "valuations": {
+        "CNY": {
+          "money": {
+            "amount": "0.0349194",
+            "currency": "CNY"
+          },
+          "basis": "official_table",
+          "source": "https://api-docs.deepseek.com/quick_start/pricing",
+          "asOf": "2026-09-28"
+        },
+        "USD": {
+          "money": {
+            "amount": "0.005121512",
+            "currency": "USD"
+          },
+          "basis": "identity",
+          "source": "https://api-docs.deepseek.com/quick_start/pricing",
+          "asOf": "2026-09-28"
+        }
+      },
+      "selected": {
+        "amount": "0.005121512",
+        "currency": "USD"
+      },
+      "billingMode": "payg",
+      "estimated": true,
+      "costComplete": true,
+      "displayComplete": true,
+      "complete": true,
+      "displayStatus": "matched",
+      "aggregateMode": "single_currency",
+      "modelRef": "deepseek/deepseek-v4-pro",
+      "usageSource": "executor",
+      "pricingFingerprint": "77497348cb9b2cbc",
+      "rateBand": "peak",
+      "ratedAt": "2026-09-28T06:50:30.62555Z",
+      "catalogSource": "https://api-docs.deepseek.com/quick_start/pricing"
+    },
+    {
+      "original": {
+        "amount": "0.00770792",
+        "currency": "USD"
+      },
+      "valuations": {
+        "CNY": {
+          "money": {
+            "amount": "0.052554",
+            "currency": "CNY"
+          },
+          "basis": "official_table",
+          "source": "https://api-docs.deepseek.com/quick_start/pricing",
+          "asOf": "2026-09-28"
+        },
+        "USD": {
+          "money": {
+            "amount": "0.00770792",
+            "currency": "USD"
+          },
+          "basis": "identity",
+          "source": "https://api-docs.deepseek.com/quick_start/pricing",
+          "asOf": "2026-09-28"
+        }
+      },
+      "selected": {
+        "amount": "0.00770792",
+        "currency": "USD"
+      },
+      "billingMode": "payg",
+      "estimated": true,
+      "costComplete": true,
+      "displayComplete": true,
+      "complete": true,
+      "displayStatus": "matched",
+      "aggregateMode": "single_currency",
+      "modelRef": "deepseek/deepseek-v4-pro",
+      "usageSource": "executor",
+      "pricingFingerprint": "77497348cb9b2cbc",
+      "rateBand": "peak",
+      "ratedAt": "2026-09-28T06:50:55.990543Z",
+      "catalogSource": "https://api-docs.deepseek.com/quick_start/pricing"
+    },
+    {
+      "original": {
+        "amount": "0.01187736",
+        "currency": "USD"
+      },
+      "valuations": {
+        "CNY": {
+          "money": {
+            "amount": "0.080982",
+            "currency": "CNY"
+          },
+          "basis": "official_table",
+          "source": "https://api-docs.deepseek.com/quick_start/pricing",
+          "asOf": "2026-09-28"
+        },
+        "USD": {
+          "money": {
+            "amount": "0.01187736",
+            "currency": "USD"
+          },
+          "basis": "identity",
+          "source": "https://api-docs.deepseek.com/quick_start/pricing",
+          "asOf": "2026-09-28"
+        }
+      },
+      "selected": {
+        "amount": "0.01187736",
+        "currency": "USD"
+      },
+      "billingMode": "payg",
+      "estimated": true,
+      "costComplete": true,
+      "displayComplete": true,
+      "complete": true,
+      "displayStatus": "matched",
+      "aggregateMode": "single_currency",
+      "modelRef": "deepseek/deepseek-v4-pro",
+      "usageSource": "executor",
+      "pricingFingerprint": "77497348cb9b2cbc",
+      "rateBand": "peak",
+      "ratedAt": "2026-09-28T06:51:32.98419Z",
+      "catalogSource": "https://api-docs.deepseek.com/quick_start/pricing"
+    },
+    {
+      "original": {
+        "amount": "0.009198816",
+        "currency": "USD"
+      },
+      "valuations": {
+        "CNY": {
+          "money": {
+            "amount": "0.0627192",
+            "currency": "CNY"
+          },
+          "basis": "official_table",
+          "source": "https://api-docs.deepseek.com/quick_start/pricing",
+          "asOf": "2026-09-28"
+        },
+        "USD": {
+          "money": {
+            "amount": "0.009198816",
+            "currency": "USD"
+          },
+          "basis": "identity",
+          "source": "https://api-docs.deepseek.com/quick_start/pricing",
+          "asOf": "2026-09-28"
+        }
+      },
+      "selected": {
+        "amount": "0.009198816",
+        "currency": "USD"
+      },
+      "billingMode": "payg",
+      "estimated": true,
+      "costComplete": true,
+      "displayComplete": true,
+      "complete": true,
+      "displayStatus": "matched",
+      "aggregateMode": "single_currency",
+      "modelRef": "deepseek/deepseek-v4-pro",
+      "usageSource": "executor",
+      "pricingFingerprint": "77497348cb9b2cbc",
+      "rateBand": "peak",
+      "ratedAt": "2026-09-28T06:52:18.03879Z",
+      "catalogSource": "https://api-docs.deepseek.com/quick_start/pricing"
+    },
+    {
+      "original": {
+        "amount": "0.0248358",
+        "currency": "USD"
+      },
+      "valuations": {
+        "CNY": {
+          "money": {
+            "amount": "0.169335",
+            "currency": "CNY"
+          },
+          "basis": "official_table",
+          "source": "https://api-docs.deepseek.com/quick_start/pricing",
+          "asOf": "2026-09-28"
+        },
+        "USD": {
+          "money": {
+            "amount": "0.0248358",
+            "currency": "USD"
+          },
+          "basis": "identity",
+          "source": "https://api-docs.deepseek.com/quick_start/pricing",
+          "asOf": "2026-09-28"
+        }
+      },
+      "selected": {
+        "amount": "0.0248358",
+        "currency": "USD"
+      },
+      "billingMode": "payg",
+      "estimated": true,
+      "costComplete": true,
+      "displayComplete": true,
+      "complete": true,
+      "displayStatus": "matched",
+      "aggregateMode": "single_currency",
+      "modelRef": "deepseek/deepseek-v4-pro",
+      "usageSource": "executor",
+      "pricingFingerprint": "77497348cb9b2cbc",
+      "rateBand": "peak",
+      "ratedAt": "2026-09-28T06:53:40.526825Z",
+      "catalogSource": "https://api-docs.deepseek.com/quick_start/pricing"
+    },
+    {
+      "original": {
+        "amount": "0.092426576",
+        "currency": "USD"
+      },
+      "valuations": {
+        "CNY": {
+          "money": {
+            "amount": "0.6301812",
+            "currency": "CNY"
+          },
+          "basis": "official_table",
+          "source": "https://api-docs.deepseek.com/quick_start/pricing",
+          "asOf": "2026-09-28"
+        },
+        "USD": {
+          "money": {
+            "amount": "0.092426576",
+            "currency": "USD"
+          },
+          "basis": "identity",
+          "source": "https://api-docs.deepseek.com/quick_start/pricing",
+          "asOf": "2026-09-28"
+        }
+      },
+      "selected": {
+        "amount": "0.092426576",
+        "currency": "USD"
+      },
+      "billingMode": "payg",
+      "estimated": true,
+      "costComplete": true,
+      "displayComplete": true,
+      "complete": true,
+      "displayStatus": "matched",
+      "aggregateMode": "single_currency",
+      "modelRef": "deepseek/deepseek-v4-pro",
+      "usageSource": "web-search",
+      "pricingFingerprint": "77497348cb9b2cbc",
+      "rateBand": "peak",
+      "ratedAt": "2026-09-28T06:54:40.214612Z",
+      "catalogSource": "https://api-docs.deepseek.com/quick_start/pricing"
+    },
+    {
+      "original": {
+        "amount": "0.00581724",
+        "currency": "USD"
+      },
+      "valuations": {
+        "CNY": {
+          "money": {
+            "amount": "0.039663",
+            "currency": "CNY"
+          },
+          "basis": "official_table",
+          "source": "https://api-docs.deepseek.com/quick_start/pricing",
+          "asOf": "2026-09-28"
+        },
+        "USD": {
+          "money": {
+            "amount": "0.00581724",
+            "currency": "USD"
+          },
+          "basis": "identity",
+          "source": "https://api-docs.deepseek.com/quick_start/pricing",
+          "asOf": "2026-09-28"
+        }
+      },
+      "selected": {
+        "amount": "0.00581724",
+        "currency": "USD"
+      },
+      "billingMode": "payg",
+      "estimated": true,
+      "costComplete": true,
+      "displayComplete": true,
+      "complete": true,
+      "displayStatus": "matched",
+      "aggregateMode": "single_currency",
+      "modelRef": "deepseek/deepseek-v4-pro",
+      "usageSource": "executor",
+      "pricingFingerprint": "77497348cb9b2cbc",
+      "rateBand": "peak",
+      "ratedAt": "2026-09-28T06:54:42.524618Z",
+      "catalogSource": "https://api-docs.deepseek.com/quick_start/pricing"
+    },
+    {
+      "original": {
+        "amount": "0.004178064",
+        "currency": "USD"
+      },
+      "valuations": {
+        "CNY": {
+          "money": {
+            "amount": "0.0284868",
+            "currency": "CNY"
+          },
+          "basis": "official_table",
+          "source": "https://api-docs.deepseek.com/quick_start/pricing",
+          "asOf": "2026-09-28"
+        },
+        "USD": {
+          "money": {
+            "amount": "0.004178064",
+            "currency": "USD"
+          },
+          "basis": "identity",
+          "source": "https://api-docs.deepseek.com/quick_start/pricing",
+          "asOf": "2026-09-28"
+        }
+      },
+      "selected": {
+        "amount": "0.004178064",
+        "currency": "USD"
+      },
+      "billingMode": "payg",
+      "estimated": true,
+      "costComplete": true,
+      "displayComplete": true,
+      "complete": true,
+      "displayStatus": "matched",
+      "aggregateMode": "single_currency",
+      "modelRef": "deepseek/deepseek-v4-pro",
+      "usageSource": "executor",
+      "pricingFingerprint": "77497348cb9b2cbc",
+      "rateBand": "peak",
+      "ratedAt": "2026-09-28T06:54:47.271492Z",
+      "catalogSource": "https://api-docs.deepseek.com/quick_start/pricing"
+    },
+    {
+      "original": {
+        "amount": "0.014055976",
+        "currency": "USD"
+      },
+      "valuations": {
+        "CNY": {
+          "money": {
+            "amount": "0.0958362",
+            "currency": "CNY"
+          },
+          "basis": "official_table",
+          "source": "https://api-docs.deepseek.com/quick_start/pricing",
+          "asOf": "2026-09-28"
+        },
+        "USD": {
+          "money": {
+            "amount": "0.014055976",
+            "currency": "USD"
+          },
+          "basis": "identity",
+          "source": "https://api-docs.deepseek.com/quick_start/pricing",
+          "asOf": "2026-09-28"
+        }
+      },
+      "selected": {
+        "amount": "0.014055976",
+        "currency": "USD"
+      },
+      "billingMode": "payg",
+      "estimated": true,
+      "costComplete": true,
+      "displayComplete": true,
+      "complete": true,
+      "displayStatus": "matched",
+      "aggregateMode": "single_currency",
+      "modelRef": "deepseek/deepseek-v4-pro",
+      "usageSource": "executor",
+      "pricingFingerprint": "77497348cb9b2cbc",
+      "rateBand": "peak",
+      "ratedAt": "2026-09-28T06:55:00.651819Z",
+      "catalogSource": "https://api-docs.deepseek.com/quick_start/pricing"
+    },
+    {
+      "original": {
+        "amount": "0.010184504",
+        "currency": "USD"
+      },
+      "valuations": {
+        "CNY": {
+          "money": {
+            "amount": "0.0694398",
+            "currency": "CNY"
+          },
+          "basis": "official_table",
+          "source": "https://api-docs.deepseek.com/quick_start/pricing",
+          "asOf": "2026-09-28"
+        },
+        "USD": {
+          "money": {
+            "amount": "0.010184504",
+            "currency": "USD"
+          },
+          "basis": "identity",
+          "source": "https://api-docs.deepseek.com/quick_start/pricing",
+          "asOf": "2026-09-28"
+        }
+      },
+      "selected": {
+        "amount": "0.010184504",
+        "currency": "USD"
+      },
+      "billingMode": "payg",
+      "estimated": true,
+      "costComplete": true,
+      "displayComplete": true,
+      "complete": true,
+      "displayStatus": "matched",
+      "aggregateMode": "single_currency",
+      "modelRef": "deepseek/deepseek-v4-pro",
+      "usageSource": "executor",
+      "pricingFingerprint": "77497348cb9b2cbc",
+      "rateBand": "peak",
+      "ratedAt": "2026-09-28T06:55:23.351724Z",
+      "catalogSource": "https://api-docs.deepseek.com/quick_start/pricing"
+    },
+    {
+      "original": {
+        "amount": "0.048420328",
+        "currency": "USD"
+      },
+      "valuations": {
+        "CNY": {
+          "money": {
+            "amount": "0.3301386",
+            "currency": "CNY"
+          },
+          "basis": "official_table",
+          "source": "https://api-docs.deepseek.com/quick_start/pricing",
+          "asOf": "2026-09-28"
+        },
+        "USD": {
+          "money": {
+            "amount": "0.048420328",
+            "currency": "USD"
+          },
+          "basis": "identity",
+          "source": "https://api-docs.deepseek.com/quick_start/pricing",
+          "asOf": "2026-09-28"
+        }
+      },
+      "selected": {
+        "amount": "0.048420328",
+        "currency": "USD"
+      },
+      "billingMode": "payg",
+      "estimated": true,
+      "costComplete": true,
+      "displayComplete": true,
+      "complete": true,
+      "displayStatus": "matched",
+      "aggregateMode": "single_currency",
+      "modelRef": "deepseek/deepseek-v4-pro",
+      "usageSource": "executor",
+      "pricingFingerprint": "77497348cb9b2cbc",
+      "rateBand": "peak",
+      "ratedAt": "2026-09-28T06:58:26.431749Z",
+      "catalogSource": "https://api-docs.deepseek.com/quick_start/pricing"
+    }
+  ],
+  "estimated": true,
+  "compactions": 0,
+  "readiness_checks": 0,
+  "readiness_allowed": 0,
+  "readiness_blocks": 0,
+  "readiness_recoveries": 0,
+  "readiness_errors": 0,
+  "readiness_missing_project_checks": 0,
+  "readiness_incomplete_todos": 0,
+  "readiness_command_mismatches": 0,
+  "readiness_missing_acceptance_criteria": 0,
+  "readiness_missing_verification": 0,
+  "readiness_missing_review": 0,
+  "readiness_missing_signoff": 0,
+  "readiness_missing_action_evidence": 0,
+  "readiness_missing_mutation": 0,
+  "capability_routes": 1,
+  "capability_routed_candidates": 2,
+  "capability_routed_prefer": 1,
+  "capability_routed_suggest": 1,
+  "capability_discovery": {
+    "Lists": 0,
+    "Searches": 0,
+    "Inspects": 0,
+    "ResultCount": 0,
+    "ResultBytes": 0,
+    "NetworkCalls": 0
+  },
+  "capability_arguments": {
+    "Validations": 30,
+    "Fail": 1,
+    "Skip": 0,
+    "RemoteDispatch": 0
+  },
+  "capability_loop_guard": {
+    "RepeatFailures": 0,
+    "RepeatClarifications": 0,
+    "SoftBudgetNudges": 0,
+    "BlockedCalls": 0
+  },
+  "capability_mcp_lists": {
+    "SharedHost": 0,
+    "DiskCache": 0,
+    "Remote": 0,
+    "DurationMs": 0,
+    "ToolCount": 0,
+    "SchemaBytes": 0
+  },
+  "capability_tool_exec": {
+    "Calls": 30,
+    "ReadOnly": 12,
+    "Parallel": 4,
+    "QueueMs": 4,
+    "ExecMs": 338971,
+    "RawBytes": 1305748,
+    "VisibleBytes": 168273
+  },
+  "capability_phases": {
+    "ProviderWaitMs": 791024,
+    "ToolExecMs": 338339,
+    "SubagentWaitMs": 0,
+    "UserWaitMs": 0,
+    "CompactMs": 0,
+    "ReviewMs": 0
+  },
+  "complete": true,
+  "usage_by_source": {
+    "executor": {
+      "calls": 28,
+      "prompt_tokens": 1566561,
+      "completion_tokens": 40019,
+      "cost": 0.30347521600000005,
+      "original_costs": {
+        "USD": 0.30347521600000005
+      }
+    },
+    "web-search": {
+      "calls": 4,
+      "prompt_tokens": 594744,
+      "completion_tokens": 10204,
+      "cost": 0.32274633599999997,
+      "original_costs": {
+        "USD": 0.32274633599999997
+      }
+    }
+  },
+  "arm": "full",
+  "duration_ms": 1130162,
+  "outcome": "success",
+  "tool_calls": 30,
+  "tool_failures": 1,
+  "tool_duration_ms": 338971,
+  "subagent_tool_calls": 0,
+  "retries": 0,
+  "tool_calls_by_name": {
+    "bash": 21,
+    "read_file": 4,
+    "web_fetch": 1,
+    "web_search": 4
+  },
+  "tool_failures_by_name": {
+    "web_fetch": 1
+  }
+}

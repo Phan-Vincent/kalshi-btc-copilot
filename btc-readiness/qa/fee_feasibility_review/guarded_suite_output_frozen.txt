@@ -1,0 +1,116 @@
+{
+  "suites": [
+    {
+      "suite": "candidate_existing",
+      "exit_code": 0,
+      "command": [
+        "/opt/homebrew/opt/python@3.14/bin/python3.14",
+        "-B",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        ".",
+        "-p",
+        "test_*.py",
+        "-v"
+      ],
+      "cwd": "/Users/you/.codex/.chatgpt-projects/g-p-PROJECT/qa_btc_2026-09-27/outputs/copilot_remediation_candidate",
+      "run": 51
+    },
+    {
+      "suite": "candidate_adversarial",
+      "exit_code": 0,
+      "command": [
+        "/opt/homebrew/opt/python@3.14/bin/python3.14",
+        "-B",
+        "remediation_audit.py",
+        "candidate"
+      ],
+      "cwd": "/Users/you/.codex/.chatgpt-projects/g-p-PROJECT/qa_btc_2026-09-27"
+    },
+    {
+      "suite": "candidate_added_regressions",
+      "exit_code": 0,
+      "command": [
+        "/opt/homebrew/opt/python@3.14/bin/python3.14",
+        "-B",
+        "test_remediation.py"
+      ],
+      "cwd": "/Users/you/.codex/.chatgpt-projects/g-p-PROJECT/qa_btc_2026-09-27",
+      "run": 19
+    },
+    {
+      "suite": "candidate_ui",
+      "exit_code": 0,
+      "command": [
+        "node",
+        "remediation_ui.cjs"
+      ],
+      "cwd": "/Users/you/.codex/.chatgpt-projects/g-p-PROJECT/qa_btc_2026-09-27"
+    },
+    {
+      "suite": "candidate_acceptance",
+      "exit_code": 0,
+      "command": [
+        "/opt/homebrew/opt/python@3.14/bin/python3.14",
+        "-B",
+        "test_acceptance.py"
+      ],
+      "cwd": "/Users/you/.codex/.chatgpt-projects/g-p-PROJECT/qa_btc_2026-09-27",
+      "run": 17
+    },
+    {
+      "suite": "candidate_operating_bounds",
+      "exit_code": 0,
+      "command": [
+        "/opt/homebrew/opt/python@3.14/bin/python3.14",
+        "-B",
+        "test_operating_bounds.py"
+      ],
+      "cwd": "/Users/you/.codex/.chatgpt-projects/g-p-PROJECT/qa_btc_2026-09-27/validation_package",
+      "run": 14
+    },
+    {
+      "suite": "candidate_package_contract",
+      "exit_code": 0,
+      "command": [
+        "/opt/homebrew/opt/python@3.14/bin/python3.14",
+        "-B",
+        "test_package_contract.py"
+      ],
+      "cwd": "/Users/you/.codex/.chatgpt-projects/g-p-PROJECT/qa_btc_2026-09-27/validation_package",
+      "run": 8
+    }
+  ],
+  "python_methods_run": 149,
+  "python_passed": 148,
+  "python_skipped": 1,
+  "ui_run": 24,
+  "ui_passed": 24,
+  "golden_run": 14,
+  "golden_passed": 14,
+  "safety": {
+    "production_sources_unchanged": true,
+    "changed_paths": [],
+    "study002_seal_intact": true,
+    "study002_manifest_unchanged": true,
+    "study002_runtime_absent": true,
+    "candidate_runtime_absent": true,
+    "candidate_approval_absent": true
+  }
+}
+{
+  "integrity": "PASS",
+  "frozen_files": 74,
+  "package_sha256": "36ba118f780f9f7d769ed6ee2307f60e3737e11778065c1e343e47bf115df3c5",
+  "activation_authorized": false,
+  "qa_status": "QA BLOCKED"
+}
+{
+  "integrity": "PASS",
+  "frozen_files": 74,
+  "package_sha256": "36ba118f780f9f7d769ed6ee2307f60e3737e11778065c1e343e47bf115df3c5",
+  "activation_authorized": false,
+  "qa_status": "QA BLOCKED"
+}
