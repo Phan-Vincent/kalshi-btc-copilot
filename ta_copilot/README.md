@@ -37,6 +37,7 @@ The Acer uses its system Python `websockets` package (16.1) for public Coinbase 
 - **Browser delivery**: `/api/stream` pushes state with Server-Sent Events. State is computed once per timeframe per roughly one-second cache lifetime and shared with `/api/state`. At most 12 SSE clients are admitted; additional clients receive HTTP 503 and the page falls back to `/api/state` polling. The watcher still uses `/api/state`.
 - **Indicators per timeframe**: EMA 9/21/50/200, RSI 14 (Wilder), MACD 12/26/9, Bollinger 20/2 (%B, width), ATR 14, Stochastic 14/3, anchored VWAP (from the Kalshi window open on 1m; from the first loaded bar otherwise), and fractal swing support/resistance.
 - **Tally**: each reading is bull, bear or neutral. The lean is shown only when one side leads by 2 or more. RSI/Bollinger extremes count as neutral ("stretched") rather than as reversal calls. The tally is **unvalidated** and is not a trade signal.
+- **Family vote** (2026-10-03): below the legacy count, one vote each for **trend** (EMA stack, EMA 9/21, EMA 200, MACD and VWAP; it votes when 3 or more of the 5 agree), **momentum** (RSI 14 inside 30–70) and, on 1m only, **flow** (60 s taker imbalance at ±0.20 or beyond; the flow tracker resets at each window open, so flow is neutral in the opening record and covers only the window's elapsed seconds during its first minute). It shows the net (bull families minus bear families) and a family lean when |net| ≥ 2. Bollinger %B, Stochastic and stretched RSI appear as muted **context** rows and never count toward families. The legacy count and lean are unchanged, so old and new records compare directly. Under the lean, a track-record line shows how the legacy 1m lean at window open has scored against settlement, with its Wilson 95% interval (`tally_record` in `/api/state`).
 
 - **Live stream** (`/api/stream`, SSE, 1 event/s): a full state on connect, on a Kalshi window change and once a minute; other events carry only the newest 5 points of each series, merged by time in the page (about 17 KB/s per open tab). The page falls back to polling `/api/state` if SSE fails.
 
@@ -49,13 +50,23 @@ The Acer uses its system Python `websockets` package (16.1) for public Coinbase 
 
 `btc-ta-watch.timer` runs every five minutes as a separate Acer user timer. It checks the dashboard service, `/api/state`, `stale`, and feed errors older than 10 minutes. It sends a `[BTC TA]` Telegram message on a problem, recovery, and every six hours while unhealthy. This deployment does not send an installation test message. The watcher reads the existing Acer Telegram configuration locally and keeps its own state in `~/btc-ta/state/` with private permissions. It does not send a daily alive message.
 
-The dashboard prefetches the next public market and captures composite spot and indicators at its scheduled opening. Kalshi may still show the market as `initialized` then, with no target or usable YES quotes. In that case, the snapshot is held privately in `~/btc-ta/state/tally_pending.json`; after the public target appears, one `open` line is appended to `tally_log.jsonl`. The line distinguishes `captured_at` from `target_observed_at`, and leaves opening YES bid/ask null if no valid quote existed at capture. It includes the per-timeframe tally, RSI and MACD histogram. After settlement, a separate `settled` line includes the public `result` and `expiration_value` when present. A restart in the middle of a window does not label a late snapshot as an opening observation. Logging runs in its own thread and has no effect on the dashboard response.
+The dashboard prefetches the next public market and captures composite spot and indicators at its scheduled opening. Kalshi may still show the market as `initialized` then, with no target or usable YES quotes. In that case, the snapshot is held privately in `~/btc-ta/state/tally_pending.json`; after the public target appears, one `open` line is appended to `tally_log.jsonl`. The line distinguishes `captured_at` from `target_observed_at`, and leaves opening YES bid/ask null if no valid quote existed at capture. It includes the per-timeframe tally, RSI, MACD histogram, family votes, `family_net` and `family_lean`, plus the 60 s flow imbalance and the 1m realized σ in dollars (`sigma_1m_usd`). After settlement, a separate `settled` line includes the public `result` and `expiration_value` when present. A restart in the middle of a window does not label a late snapshot as an opening observation. Logging runs in its own thread and has no effect on the dashboard response.
+
+Inside each window, one `minute` line is appended at each whole minute 1–14 (written only within 2 s of `:00`; a restart never backfills missed minutes). It records the ticker, minute, seconds left, composite, 60 s average, target, 1m σ, fresh YES bid and ask with their age (null when stale or missing), the 1m flow imbalance, the stale flags, and every timeframe's legacy tally and family vote. It records no outcomes and makes no Kalshi request of its own. Each row is roughly 1.5 KB, so the log grows by about 2 MB a day.
 
 ```sh
 ssh acer 'cd ~/btc-ta && python3 tally_report.py'
 ```
 
-The report is descriptive only, with per-timeframe hit rates and Wilson 95% intervals. It flags scored sample sizes under 100 as too small to mean anything. The dashboard never reads it.
+The report is descriptive only, and the dashboard never reads it. Its sections:
+
+- **Legacy:** the original per-timeframe opening-lean hit rates with Wilson 95% intervals, flagging samples under 100.
+- **Size of the move:** the Spearman correlation of the opening net score with settlement value − target, with a bootstrap interval.
+- **Minute horizon:** the 1m `family_net` against the next 1 and 3 minutes of composite and YES mid, with mean change by net value and a block bootstrap that resamples whole windows.
+- **Market:** the legacy 1m lean against the market's side near open. Kalshi usually has no quote at `:00`, so this uses the minute-1 mid.
+- **PRIMARY:** one pre-declared test, the Spearman correlation of 1m `family_net` with the next 3-minute composite change, over the first 800 windows with minute rows. It is evaluated only on or after 2026-10-14 00:00 UTC and reports "CI excludes 0" or "CI includes 0".
+
+Every other section is labeled exploratory. With about 1,000 windows the report takes roughly half a minute to run.
 
 ## Tests
 

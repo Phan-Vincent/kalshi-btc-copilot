@@ -75,6 +75,9 @@ h2 { font-size: 13px; margin: 0 0 8px; text-transform: uppercase; letter-spacing
 .mtf td, .mtf th { text-align: center; padding: 3px 2px; }
 .mtf td:first-child, .mtf th:first-child { text-align: left; color: var(--muted); }
 .mtf tr.total td { border-top: 1px solid var(--line); font-weight: 600; }
+.families { margin-top: 6px; font-size: 13px; overflow-wrap: anywhere; }
+.record { margin-top: 4px; font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+tr.context td { color: var(--muted); }
 .dist-block { margin-top: 10px; padding: 8px 10px; border-radius: 8px; background: color-mix(in srgb, var(--neutral) 10%, transparent); }
 .dist-block.bull { background: color-mix(in srgb, var(--bull) 14%, transparent); }
 .dist-block.bear { background: color-mix(in srgb, var(--bear) 14%, transparent); }
@@ -87,7 +90,7 @@ footer { margin-top: 14px; font-size: 12px; color: var(--muted); }
 <div class="wrap">
   <header>
     <h1>BTC TA Copilot</h1>
-    <span class="pill">Public data · one experimental paper trigger</span>
+    <span class="pill">Read-only · public data · descriptive, not a trade signal</span>
     <span id="live" class="live"><span class="dot"></span><span id="liveText">Connecting…</span></span>
     <span class="clock" id="clock"></span>
   </header>
@@ -125,6 +128,8 @@ footer { margin-top: 14px; font-size: 12px; color: var(--muted); }
       <div class="big" id="lean">—</div>
       <div class="bar"><span id="bBull" style="background:var(--bull)"></span><span id="bNeu" style="background:var(--neutral)"></span><span id="bBear" style="background:var(--bear)"></span></div>
       <div class="row"><span class="bull" id="nBull">—</span><span class="neutral" id="nNeu"></span><span class="bear" id="nBear"></span></div>
+      <div class="families" id="families">—</div>
+      <div class="record" id="tallyRecord"></div>
       <div class="label" style="margin-top:10px">All indicators by timeframe</div>
       <table class="mtf"><thead id="mtfHead"></thead><tbody id="mtf"></tbody></table>
     </div>

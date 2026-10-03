@@ -18,7 +18,12 @@ const base = () => ({
   timeScale: {borderColor: css('--line'), timeVisible: true, secondsVisible: false},
   crosshair: {mode: 0}, autoSize: true,
 });
-const main = LightweightCharts.createChart($('chart'), base());
+// The wheel and vertical swipes scroll the page, not the chart: the chart is
+// most of a phone screen and would otherwise trap scrolling. Drag pans it;
+// pinch, or dragging an axis, zooms it.
+const main = LightweightCharts.createChart($('chart'), {...base(),
+  handleScroll: {mouseWheel: false, pressedMouseMove: true, horzTouchDrag: true, vertTouchDrag: false},
+  handleScale: {mouseWheel: false, pinch: true, axisPressedMouseMove: true, axisDoubleClickReset: true}});
 const rsiC = LightweightCharts.createChart($('rsi'), base());
 const macdC = LightweightCharts.createChart($('macd'), base());
 const cvdC = LightweightCharts.createChart($('cvd'), base());
@@ -210,8 +215,20 @@ function render(s) {
   $('lean').innerHTML = `<span class="${t.lean === 'bullish' ? 'bull' : t.lean === 'bearish' ? 'bear' : 'neutral'}">${t.lean[0].toUpperCase() + t.lean.slice(1)}</span>`;
   $('bBull').style.width = t.bull / n * 100 + '%'; $('bNeu').style.width = t.neutral / n * 100 + '%'; $('bBear').style.width = t.bear / n * 100 + '%';
   $('nBull').textContent = `${t.bull} bull`; $('nNeu').textContent = `${t.neutral} neutral`; $('nBear').textContent = `${t.bear} bear`;
+  // One vote per family (trend, momentum, 1m flow); the legacy count above is unchanged.
+  const fam = (s.frames['1m'] || f).family;
+  $('families').innerHTML = fam ? Object.entries(fam.votes).map(([k, vote]) =>
+    `${k[0].toUpperCase() + k.slice(1)} <span class="${vote}">${vote}</span>`).join(' · ') +
+    ` → net ${fam.net > 0 ? '+' : ''}${fam.net} (<span class="${fam.lean === 'bullish' ? 'bull' : fam.lean === 'bearish' ? 'bear' : 'neutral'}">${fam.lean}</span>)` : '—';
+  const rec = s.tally_record;
+  $('tallyRecord').textContent = !rec || !rec.scored ? 'Lean at open: no scored windows yet'
+    : `Lean at open: ${rec.hits}/${rec.scored} (${(rec.rate * 100).toFixed(1)}%), 95% [${(rec.wilson95[0] * 100).toFixed(1)}%, ` +
+      `${(rec.wilson95[1] * 100).toFixed(1)}%] · interval ${rec.includes_50 ? 'includes' : 'excludes'} 50%` +
+      (rec.too_few ? ' · too few to judge' : '');
 
-  $('readings').innerHTML = f.readings.map(r => `<tr><td>${r.name}</td><td class="muted">${r.detail}</td><td>${badge(r.state)}</td></tr>`).join('');
+  $('readings').innerHTML = f.readings.map(r => r.family === 'context'
+    ? `<tr class="context"><td>${r.name}</td><td>${r.detail} · context, not counted in families</td><td>${badge(r.state)}</td></tr>`
+    : `<tr><td>${r.name}</td><td class="muted">${r.detail}</td><td>${badge(r.state)}</td></tr>`).join('');
   const lv = [['Resistance (swing)', usd(v.resistance)], ['Support (swing)', usd(v.support)],
     ['ATR 14', usd(v.atr)], ['BB upper / lower', `${usd(v.bb_upper, 0)} / ${usd(v.bb_lower, 0)}`],
     ['BB width', v.bb_width_pct == null ? '—' : v.bb_width_pct.toFixed(2) + '%'], ['VWAP', usd(v.vwap)],

@@ -55,6 +55,14 @@ VENUE_MAX_DEVIATION = 0.005
 # displayed window for this long"; a just-promoted window gets a short grace
 # because its first metadata can only come from the 30 s listing prefetch.
 KALSHI_STALE_AFTER = 10
+# Tally families. The legacy bull/bear/lean count is kept unchanged; families
+# give one vote each to trend, momentum and (1m only) order flow, so five
+# readings that all measure trend no longer outvote everything else.
+TREND_READINGS = ("EMA stack", "EMA 9/21", "EMA 200", "MACD")  # plus the VWAP reading
+TREND_MAJORITY = 3            # trend family votes when 3+ of its 5 readings agree
+FLOW_FAMILY_THRESHOLD = 0.20  # 60 s taker imbalance at or beyond +/-0.20 votes
+FAMILY_LEAN_MARGIN = 2        # family_lean needs |family_net| >= 2
+MINUTE_CAPTURE_SLACK = 2.0    # a minute row is written only within 2 s of :00
 KALSHI_PROMOTION_GRACE = 5
 # Served on every response. The page needs the unpkg chart script, its inline
 # stylesheet, the data-URL favicon and same-origin fetch/EventSource only.
@@ -455,6 +463,46 @@ def analyze(bars, price, anchor, vwap_label="VWAP"):
     return {"values": v, "readings": readings, "tally": tally, "chart": chart}
 
 
+def reading_family(reading):
+    """Family a reading votes in: trend, momentum, or context (never counted)."""
+    name = reading["name"]
+    if name in TREND_READINGS or name.startswith("VWAP"):
+        return "trend"
+    if name == "RSI 14" and "stretched" not in reading["detail"]:
+        return "momentum"
+    return "context"
+
+
+def family_tally(readings, flow_imbalance=None, with_flow=False):
+    """One vote per family; the legacy tally is left untouched.
+
+    Trend votes with the side that has TREND_MAJORITY or more of its readings.
+    Momentum is RSI 14 inside its 30-70 range (stretched RSI is context).
+    Flow, on 1m only, is the 60 s taker imbalance against FLOW_FAMILY_THRESHOLD;
+    no flow data counts as neutral.
+    """
+    trend = [r["state"] for r in readings if reading_family(r) == "trend"]
+    votes = {"trend": ("bull" if trend.count("bull") >= TREND_MAJORITY
+                       else "bear" if trend.count("bear") >= TREND_MAJORITY else "neutral")}
+    rsi_reading = next((r for r in readings if reading_family(r) == "momentum"), None)
+    votes["momentum"] = rsi_reading["state"] if rsi_reading else "neutral"
+    if with_flow:
+        votes["flow"] = ("neutral" if flow_imbalance is None
+                         else "bull" if flow_imbalance >= FLOW_FAMILY_THRESHOLD
+                         else "bear" if flow_imbalance <= -FLOW_FAMILY_THRESHOLD else "neutral")
+    net = sum(v == "bull" for v in votes.values()) - sum(v == "bear" for v in votes.values())
+    return {"votes": votes, "net": net,
+            "lean": ("bullish" if net >= FAMILY_LEAN_MARGIN
+                     else "bearish" if net <= -FAMILY_LEAN_MARGIN else "mixed")}
+
+
+def frame_family(result, name, flow_imbalance):
+    for reading in result["readings"]:
+        reading["family"] = reading_family(reading)
+    result["family"] = family_tally(result["readings"], flow_imbalance, with_flow=name == "1m")
+    return result
+
+
 def aggregate(bars, width):
     """Merge sorted bars into `width`-second bars aligned to the epoch, dropping a
     leading group that doesn't start on the boundary (it would be partial)."""
@@ -720,6 +768,7 @@ class Feed:
                     "market_observed_at": self.market_at if active else None,
                     "composite": self.composite,
                     "coinbase_spot": self.spot["price"] if self.spot else None,
+                    "flow_imbalance": self.flow.rolling(at).get("imbalance"),
                     "bars": {tf: [dict(b) for b in rows] for tf, rows in self.bars.items()}}
         if self.tally_logger.submit(snapshot):
             self.captured_tickers.add(ticker)
@@ -1008,7 +1057,8 @@ class Feed:
             if name == "1m":
                 a["values"]["close"] = b[-1]["close"]
                 a["values"]["close_prev"] = b[-2]["close"] if len(b) > 1 else None
-            frames[name] = a if name == tf else {k: a[k] for k in ("values", "readings", "tally")}
+            frame_family(a, name, (flow.get("one_minute") or {}).get("imbalance"))
+            frames[name] = a if name == tf else {k: a[k] for k in ("values", "readings", "tally", "family")}
         m1 = bars["1m"]
 
         def ref(minutes):
@@ -1033,6 +1083,7 @@ class Feed:
                                                    and grace_left <= 0),
                 "kalshi_grace_left": grace_left,
                 "window": window, "frames": frames,
+                "tally_record": self.tally_logger.record if self.tally_logger else None,
                 "errors": errors, "vwap_anchor": iso(anchor)}
 
 
@@ -1045,9 +1096,11 @@ def opening_record(snapshot):
             if len(bars) < 30:
                 continue
             anchor = int(parse_ts(market["open_time"])) if tf == "1m" else bars[0]["time"]
-            result = analyze(bars, price, anchor)
+            result = frame_family(analyze(bars, price, anchor), tf, snapshot.get("flow_imbalance"))
             frames[tf] = {**result["tally"], "rsi": result["values"]["rsi"],
-                          "macd_hist": result["values"]["macd_hist"]}
+                          "macd_hist": result["values"]["macd_hist"],
+                          "family": result["family"]["votes"], "family_net": result["family"]["net"],
+                          "family_lean": result["family"]["lean"]}
     return {"type": "open", "ticker": market["ticker"], "open_time": market["open_time"],
             "close_time": market["close_time"], "captured_at": iso(snapshot["captured_at"]),
             "capture_delay_seconds": round(snapshot["captured_at"] - parse_ts(market["open_time"]), 3),
@@ -1059,7 +1112,52 @@ def opening_record(snapshot):
                                    else None),
             "target": market.get("floor_strike"), "composite_spot": snapshot["composite"],
             "timeframes": frames, "yes_bid": market.get("yes_bid_dollars"),
-            "yes_ask": market.get("yes_ask_dollars")}
+            "yes_ask": market.get("yes_ask_dollars"),
+            "flow_imbalance_1m": snapshot.get("flow_imbalance"),
+            "sigma_1m_usd": opening_sigma_usd(snapshot)}
+
+
+def opening_sigma_usd(snapshot):
+    bars, price = snapshot["bars"].get("1m") or [], snapshot["coinbase_spot"]
+    sigma = realized_sigma([b["close"] for b in bars]) if bars else None
+    return sigma * price if sigma is not None and price is not None else None
+
+
+def minute_record(state, now):
+    """One in-window research row per whole minute (minutes 1-14), or None.
+
+    Outcomes are not recorded here; the report derives them from later rows.
+    """
+    window = state.get("window") if state.get("ready") else None
+    if not window:
+        return None
+    open_ts = parse_ts(window["open_time"])
+    minute = int((now - open_ts) // 60)
+    if not 1 <= minute <= 14 or now - (open_ts + minute * 60) > MINUTE_CAPTURE_SLACK:
+        return None
+
+    def quote(side):
+        q = (window.get("display_quotes") or {}).get(side)
+        if state.get("kalshi_stale") or not q or q.get("price") is None or q["age"] > KALSHI_STALE_AFTER:
+            return None
+        price = optional_float(q["price"])  # book levels arrive as decimal strings
+        return None if price is None else {"price": price, "age": round(q["age"], 2), "source": q["source"]}
+
+    frames = {}
+    for tf, frame in (state.get("frames") or {}).items():
+        family = frame.get("family") or {}
+        frames[tf] = {**frame["tally"], "rsi": frame["values"].get("rsi"),
+                      "macd_hist": frame["values"].get("macd_hist"),
+                      "family": family.get("votes"), "family_net": family.get("net"),
+                      "family_lean": family.get("lean")}
+    return {"type": "minute", "ticker": window["ticker"], "minute": minute,
+            "captured_at": iso(now), "seconds_left": round(window["seconds_left"], 2),
+            "composite": state.get("composite"), "average_60s": state.get("average_60s"),
+            "target": window.get("strike"), "sigma_1m_usd": window.get("sigma_1m_usd"),
+            "yes_bid": quote("yes_bid"), "yes_ask": quote("yes_ask"),
+            "flow_imbalance_1m": ((state.get("order_flow") or {}).get("one_minute") or {}).get("imbalance"),
+            "stale": state.get("stale"), "kalshi_stale": state.get("kalshi_stale"),
+            "timeframes": frames}
 
 
 def settled_record(ticker, market, now):
@@ -1072,6 +1170,17 @@ def settled_record(ticker, market, now):
     return record
 
 
+def wilson95(hits, n):
+    if n == 0:
+        return None
+    z = 1.959963984540054
+    p = hits / n
+    denominator = 1 + z * z / n
+    center = (p + z * z / (2 * n)) / denominator
+    half = z * math.sqrt(p * (1 - p) / n + z * z / (4 * n * n)) / denominator
+    return center - half, center + half
+
+
 class TallyLogger:
     """Append opening/settlement research records off the serving thread."""
     def __init__(self, state_dir, feed):
@@ -1081,8 +1190,12 @@ class TallyLogger:
         self.queue = queue.Queue(maxsize=32)
         self.opened = {}
         self.settled = set()
+        self.results = {}
         self.pending_open = {}
         self.pending_snapshots = {}
+        self.minute_captured = None
+        # Replaced, never mutated, so request threads can read it lock-free.
+        self.record = None
 
     def submit(self, snapshot):
         try:
@@ -1098,13 +1211,17 @@ class TallyLogger:
         try:
             with self.path.open(encoding="utf-8") as handle:
                 for line in handle:
+                    if line.startswith('{"type":"minute"'):
+                        continue
                     row = json.loads(line)
                     if row.get("type") == "open":
                         self.opened[row["ticker"]] = row
                     elif row.get("type") == "settled":
                         self.settled.add(row["ticker"])
+                        self.results[row["ticker"]] = row.get("result")
         except FileNotFoundError:
             pass
+        self.refresh_record()
         if self.path.exists():
             os.chmod(self.path, 0o600)
         try:
@@ -1183,11 +1300,50 @@ class TallyLogger:
                     continue
                 self.append(record)
                 self.settled.add(ticker)
+                self.results[ticker] = record["result"]
+                self.refresh_record()
                 with self.feed.lock:
                     self.feed.errors.pop("tally_settle", None)
             except Exception as exc:
                 with self.feed.lock:
                     self.feed._note("tally_settle", exc)
+
+    def refresh_record(self):
+        """Track record of the legacy 1m lean at open, shown under the lean."""
+        hits = scored = 0
+        for ticker, row in self.opened.items():
+            lean = (row.get("timeframes") or {}).get("1m", {}).get("lean")
+            outcome = self.results.get(ticker)
+            if lean not in ("bullish", "bearish") or outcome not in ("yes", "no"):
+                continue
+            scored += 1
+            hits += (lean == "bullish") == (outcome == "yes")
+        interval = wilson95(hits, scored)
+        self.record = {"timeframe": "1m", "measure": "legacy lean at window open vs settlement",
+                       "hits": hits, "scored": scored,
+                       "rate": hits / scored if scored else None,
+                       "wilson95": list(interval) if interval else None,
+                       "includes_50": interval is None or interval[0] <= 0.5 <= interval[1],
+                       "too_few": scored < 100}
+
+    def capture_minute(self, now):
+        row = minute_record(cached_state("1m"), now)
+        if row is None or (row["ticker"], row["minute"]) == self.minute_captured:
+            return
+        self.append(row)
+        self.minute_captured = (row["ticker"], row["minute"])
+
+    def run_minutes(self):
+        """Write one row per whole minute inside a window; missed minutes stay missing."""
+        while True:
+            time.sleep(60.5 - time.time() % 60)
+            try:
+                self.capture_minute(time.time())
+                with self.feed.lock:
+                    self.feed.errors.pop("tally_minute", None)
+            except Exception as exc:
+                with self.feed.lock:
+                    self.feed._note("tally_minute", exc)
 
     def run(self):
         try:
@@ -1398,6 +1554,7 @@ def main():
     args = ap.parse_args()
     FEED.tally_logger = TallyLogger(HERE / "state", FEED)
     threading.Thread(target=FEED.tally_logger.run, daemon=True).start()
+    threading.Thread(target=FEED.tally_logger.run_minutes, daemon=True).start()
     for name in VENUE_URLS:
         threading.Thread(target=FEED.run_venue, args=(name,), daemon=True).start()
     threading.Thread(target=FEED.run_upcoming, daemon=True).start()
