@@ -218,13 +218,16 @@ function render(s) {
   // One vote per family (trend, momentum, 1m flow); the legacy count above is unchanged.
   const fam = (s.frames['1m'] || f).family;
   $('families').innerHTML = fam ? Object.entries(fam.votes).map(([k, vote]) =>
-    `${k[0].toUpperCase() + k.slice(1)} <span class="${vote}">${vote}</span>`).join(' · ') +
+    k === 'flow' && fam.flow_ready === false
+      ? `Flow <span class="neutral">warming up (${Math.floor(fam.flow_coverage_seconds || 0)}/60 s)</span>`
+      : `${k[0].toUpperCase() + k.slice(1)} <span class="${vote}">${vote}</span>`).join(' · ') +
     ` → net ${fam.net > 0 ? '+' : ''}${fam.net} (<span class="${fam.lean === 'bullish' ? 'bull' : fam.lean === 'bearish' ? 'bear' : 'neutral'}">${fam.lean}</span>)` : '—';
   const rec = s.tally_record;
   $('tallyRecord').textContent = !rec || !rec.scored ? 'Lean at open: no scored windows yet'
     : `Lean at open: ${rec.hits}/${rec.scored} (${(rec.rate * 100).toFixed(1)}%), 95% [${(rec.wilson95[0] * 100).toFixed(1)}%, ` +
       `${(rec.wilson95[1] * 100).toFixed(1)}%] · interval ${rec.includes_50 ? 'includes' : 'excludes'} 50%` +
       (rec.too_few ? ' · too few to judge' : '');
+  if (rec?.skipped_lines > 0) $('tallyRecord').textContent += ` · log: ${rec.skipped_lines} unreadable lines skipped`;
 
   $('readings').innerHTML = f.readings.map(r => r.family === 'context'
     ? `<tr class="context"><td>${r.name}</td><td>${r.detail} · context, not counted in families</td><td>${badge(r.state)}</td></tr>`

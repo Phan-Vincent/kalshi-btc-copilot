@@ -15,6 +15,7 @@ import math
 import os
 import queue
 import statistics
+import sys
 import threading
 import time
 from datetime import datetime, timezone
@@ -61,6 +62,7 @@ KALSHI_STALE_AFTER = 10
 TREND_READINGS = ("EMA stack", "EMA 9/21", "EMA 200", "MACD")  # plus the VWAP reading
 TREND_MAJORITY = 3            # trend family votes when 3+ of its 5 readings agree
 FLOW_FAMILY_THRESHOLD = 0.20  # 60 s taker imbalance at or beyond +/-0.20 votes
+FLOW_MIN_COVERAGE_SECONDS = 60  # flow votes only on a full 60 s of the current window
 FAMILY_LEAN_MARGIN = 2        # family_lean needs |family_net| >= 2
 MINUTE_CAPTURE_SLACK = 2.0    # a minute row is written only within 2 s of :00
 KALSHI_PROMOTION_GRACE = 5
@@ -473,13 +475,28 @@ def reading_family(reading):
     return "context"
 
 
-def family_tally(readings, flow_imbalance=None, with_flow=False):
+def flow_family_vote(flow_imbalance, flow_coverage=None):
+    """The 1m flow vote, or neutral until the window has a full 60 s of flow.
+
+    The tracker resets at each 15-minute window open, so its "60 s" imbalance
+    is only a 60 s sample once that much of the window has elapsed;
+    ``flow_coverage`` is those elapsed seconds.
+    """
+    if (flow_imbalance is None or flow_coverage is None
+            or flow_coverage < FLOW_MIN_COVERAGE_SECONDS):
+        return "neutral"
+    return ("bull" if flow_imbalance >= FLOW_FAMILY_THRESHOLD
+            else "bear" if flow_imbalance <= -FLOW_FAMILY_THRESHOLD else "neutral")
+
+
+def family_tally(readings, flow_imbalance=None, with_flow=False, flow_coverage=None):
     """One vote per family; the legacy tally is left untouched.
 
     Trend votes with the side that has TREND_MAJORITY or more of its readings.
     Momentum is RSI 14 inside its 30-70 range (stretched RSI is context).
-    Flow, on 1m only, is the 60 s taker imbalance against FLOW_FAMILY_THRESHOLD;
-    no flow data counts as neutral.
+    Flow, on 1m only, is the 60 s taker imbalance against FLOW_FAMILY_THRESHOLD,
+    once FLOW_MIN_COVERAGE_SECONDS of the current window have passed; no flow
+    data, and an under-covered window, both count as neutral.
     """
     trend = [r["state"] for r in readings if reading_family(r) == "trend"]
     votes = {"trend": ("bull" if trend.count("bull") >= TREND_MAJORITY
@@ -487,19 +504,23 @@ def family_tally(readings, flow_imbalance=None, with_flow=False):
     rsi_reading = next((r for r in readings if reading_family(r) == "momentum"), None)
     votes["momentum"] = rsi_reading["state"] if rsi_reading else "neutral"
     if with_flow:
-        votes["flow"] = ("neutral" if flow_imbalance is None
-                         else "bull" if flow_imbalance >= FLOW_FAMILY_THRESHOLD
-                         else "bear" if flow_imbalance <= -FLOW_FAMILY_THRESHOLD else "neutral")
+        votes["flow"] = flow_family_vote(flow_imbalance, flow_coverage)
     net = sum(v == "bull" for v in votes.values()) - sum(v == "bear" for v in votes.values())
-    return {"votes": votes, "net": net,
-            "lean": ("bullish" if net >= FAMILY_LEAN_MARGIN
-                     else "bearish" if net <= -FAMILY_LEAN_MARGIN else "mixed")}
+    family = {"votes": votes, "net": net,
+              "lean": ("bullish" if net >= FAMILY_LEAN_MARGIN
+                       else "bearish" if net <= -FAMILY_LEAN_MARGIN else "mixed")}
+    if with_flow:
+        covered = 0.0 if flow_coverage is None else flow_coverage
+        family["flow_coverage_seconds"] = min(covered, FLOW_MIN_COVERAGE_SECONDS)
+        family["flow_ready"] = covered >= FLOW_MIN_COVERAGE_SECONDS
+    return family
 
 
-def frame_family(result, name, flow_imbalance):
+def frame_family(result, name, flow_imbalance, flow_coverage=None):
     for reading in result["readings"]:
         reading["family"] = reading_family(reading)
-    result["family"] = family_tally(result["readings"], flow_imbalance, with_flow=name == "1m")
+    result["family"] = family_tally(result["readings"], flow_imbalance,
+                                    with_flow=name == "1m", flow_coverage=flow_coverage)
     return result
 
 
@@ -769,6 +790,9 @@ class Feed:
                     "composite": self.composite,
                     "coinbase_spot": self.spot["price"] if self.spot else None,
                     "flow_imbalance": self.flow.rolling(at).get("imbalance"),
+                    "flow_coverage": (min(FLOW_MIN_COVERAGE_SECONDS,
+                                          max(0.0, at - self.flow.window_open))
+                                      if self.flow.window_open is not None else None),
                     "bars": {tf: [dict(b) for b in rows] for tf, rows in self.bars.items()}}
         if self.tally_logger.submit(snapshot):
             self.captured_tickers.add(ticker)
@@ -998,6 +1022,12 @@ class Feed:
             flow = self.flow.snapshot(now)
             flow["partial_window"] = (flow["partial_window"] or
                                        self.flow_gap_window == flow["window"]["open_epoch"])
+            # The flow tracker resets at each 15-minute boundary, so its "60 s"
+            # imbalance only covers the elapsed part of this window until the
+            # first minute has passed.
+            flow_open = flow["window"].get("open_epoch")
+            flow_coverage = (min(FLOW_MIN_COVERAGE_SECONDS, max(0.0, now - flow_open))
+                             if flow_open is not None else None)
             path = list(self.window_path)
             book = dict(self.book) if self.book else None
             book_at = self.book_at
@@ -1057,7 +1087,7 @@ class Feed:
             if name == "1m":
                 a["values"]["close"] = b[-1]["close"]
                 a["values"]["close_prev"] = b[-2]["close"] if len(b) > 1 else None
-            frame_family(a, name, (flow.get("one_minute") or {}).get("imbalance"))
+            frame_family(a, name, (flow.get("one_minute") or {}).get("imbalance"), flow_coverage)
             frames[name] = a if name == tf else {k: a[k] for k in ("values", "readings", "tally", "family")}
         m1 = bars["1m"]
 
@@ -1091,12 +1121,17 @@ def opening_record(snapshot):
     market = snapshot["market"]
     frames = {}
     price = snapshot["coinbase_spot"]
+    # Capture lands within 3 s of the window open, so the 1m flow has well
+    # under 60 s of coverage and its vote is always neutral. The measured
+    # imbalance is still recorded below as context.
+    coverage = snapshot.get("flow_coverage") or 0.0
     if price is not None:
         for tf, bars in snapshot["bars"].items():
             if len(bars) < 30:
                 continue
             anchor = int(parse_ts(market["open_time"])) if tf == "1m" else bars[0]["time"]
-            result = frame_family(analyze(bars, price, anchor), tf, snapshot.get("flow_imbalance"))
+            result = frame_family(analyze(bars, price, anchor), tf,
+                                  snapshot.get("flow_imbalance"), 0)
             frames[tf] = {**result["tally"], "rsi": result["values"]["rsi"],
                           "macd_hist": result["values"]["macd_hist"],
                           "family": result["family"]["votes"], "family_net": result["family"]["net"],
@@ -1114,6 +1149,7 @@ def opening_record(snapshot):
             "timeframes": frames, "yes_bid": market.get("yes_bid_dollars"),
             "yes_ask": market.get("yes_ask_dollars"),
             "flow_imbalance_1m": snapshot.get("flow_imbalance"),
+            "flow_coverage_seconds": coverage,
             "sigma_1m_usd": opening_sigma_usd(snapshot)}
 
 
@@ -1188,12 +1224,14 @@ class TallyLogger:
         self.pending_path = state_dir / "tally_pending.json"
         self.feed = feed
         self.queue = queue.Queue(maxsize=32)
+        self.append_lock = threading.Lock()
         self.opened = {}
         self.settled = set()
         self.results = {}
         self.pending_open = {}
         self.pending_snapshots = {}
         self.minute_captured = None
+        self.skipped_lines = 0
         # Replaced, never mutated, so request threads can read it lock-free.
         self.record = None
 
@@ -1208,19 +1246,39 @@ class TallyLogger:
     def prepare(self):
         self.path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
         os.chmod(self.path.parent, 0o700)
+        skipped = []
+        self.skipped_lines = 0
         try:
-            with self.path.open(encoding="utf-8") as handle:
-                for line in handle:
-                    if line.startswith('{"type":"minute"'):
+            with self.path.open("rb") as handle:
+                for number, line in enumerate(handle, 1):
+                    if not line.strip():
                         continue
-                    row = json.loads(line)
+                    try:
+                        row = json.loads(line)
+                    except (ValueError, UnicodeDecodeError):
+                        skipped.append(number)
+                        continue
+                    if not isinstance(row, dict):
+                        skipped.append(number)
+                        continue
                     if row.get("type") == "open":
-                        self.opened[row["ticker"]] = row
+                        if "ticker" not in row:
+                            skipped.append(number)
+                            continue
+                        self.opened.setdefault(row["ticker"], row)
                     elif row.get("type") == "settled":
-                        self.settled.add(row["ticker"])
-                        self.results[row["ticker"]] = row.get("result")
+                        if "ticker" not in row:
+                            skipped.append(number)
+                            continue
+                        if row["ticker"] not in self.settled:
+                            self.settled.add(row["ticker"])
+                            self.results[row["ticker"]] = row.get("result")
         except FileNotFoundError:
             pass
+        self.skipped_lines = len(skipped)
+        if skipped:
+            print(f"Tally log: skipped {len(skipped)} unreadable lines "
+                  f"(first line numbers: {', '.join(map(str, skipped[:5]))}).", file=sys.stderr)
         self.refresh_record()
         if self.path.exists():
             os.chmod(self.path, 0o600)
@@ -1279,13 +1337,23 @@ class TallyLogger:
 
     def append(self, row):
         payload = (json.dumps(row, separators=(",", ":"), allow_nan=False) + "\n").encode()
-        fd = os.open(self.path, os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o600)
-        try:
-            os.fchmod(fd, 0o600)
-            with os.fdopen(fd, "ab", closefd=False) as handle:
-                handle.write(payload)
-        finally:
-            os.close(fd)
+        with self.append_lock:
+            self.path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+            os.chmod(self.path.parent, 0o700)
+            fd = os.open(self.path, os.O_RDWR | os.O_CREAT | os.O_APPEND, 0o600)
+            try:
+                os.fchmod(fd, 0o600)
+                size = os.fstat(fd).st_size
+                if size and os.pread(fd, 1, size - 1) != b"\n":
+                    payload = b"\n" + payload
+                remaining = memoryview(payload)
+                while remaining:
+                    written = os.write(fd, remaining)
+                    if written <= 0:
+                        raise OSError("short tally log write")
+                    remaining = remaining[written:]
+            finally:
+                os.close(fd)
 
     def settle_pending(self, now):
         for ticker, row in list(self.opened.items()):
@@ -1321,6 +1389,7 @@ class TallyLogger:
         interval = wilson95(hits, scored)
         self.record = {"timeframe": "1m", "measure": "legacy lean at window open vs settlement",
                        "hits": hits, "scored": scored,
+                       "skipped_lines": self.skipped_lines,
                        "rate": hits / scored if scored else None,
                        "wilson95": list(interval) if interval else None,
                        "includes_50": interval is None or interval[0] <= 0.5 <= interval[1],

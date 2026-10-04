@@ -46,22 +46,43 @@ def wilson95(hits, n):
     return center - half, center + half
 
 
-def load_rows(path):
+def load_rows(path, skipped_lines=None):
     """All research rows: opening, settled and minute records."""
     opened, settled, minutes = {}, {}, {}
+    skipped = 0
     try:
-        with path.open(encoding="utf-8") as handle:
+        with path.open("rb") as handle:
             for line in handle:
-                row = json.loads(line)
+                if not line.strip():
+                    continue
+                try:
+                    row = json.loads(line)
+                except (ValueError, UnicodeDecodeError):
+                    skipped += 1
+                    continue
+                if not isinstance(row, dict):
+                    skipped += 1
+                    continue
                 kind = row.get("type")
                 if kind == "open":
-                    opened.setdefault(row["ticker"], row)
+                    if "ticker" in row:
+                        opened.setdefault(row["ticker"], row)
+                    else:
+                        skipped += 1
                 elif kind == "settled":
-                    settled.setdefault(row["ticker"], row)
+                    if "ticker" in row:
+                        settled.setdefault(row["ticker"], row)
+                    else:
+                        skipped += 1
                 elif kind == "minute":
-                    minutes.setdefault(row["ticker"], {}).setdefault(row["minute"], row)
+                    if "ticker" in row and "minute" in row:
+                        minutes.setdefault(row["ticker"], {}).setdefault(row["minute"], row)
+                    else:
+                        skipped += 1
     except FileNotFoundError:
         pass
+    if skipped_lines is not None:
+        skipped_lines.append(skipped)
     return opened, settled, minutes
 
 
@@ -369,7 +390,11 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("path", nargs="?", type=Path, default=Path.home() / "btc-ta/state/tally_log.jsonl")
     args = parser.parse_args()
-    print(report(*load_rows(args.path)))
+    skipped = []
+    rows = load_rows(args.path, skipped)
+    if skipped[0]:
+        print(f"Skipped {skipped[0]} unreadable log lines.")
+    print(report(*rows))
 
 
 if __name__ == "__main__":
