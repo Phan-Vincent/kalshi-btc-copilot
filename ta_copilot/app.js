@@ -76,8 +76,8 @@ function spark(id, points, target = null) {
 }
 
 // Strip context per timeframe: [seconds per bar, bars of lookback, label].
-const CONTEXT = {'1m': [60, 60, 'last 1 h'], '5m': [300, 48, 'last 4 h'], '10m': [600, 48, 'last 8 h'],
-                 '15m': [900, 48, 'last 12 h'], '1h': [3600, 48, 'last 2 days']};
+const CONTEXT = {'1m': [60, 15, 'last 15 min'], '5m': [300, 12, 'last 1 h'], '10m': [600, 12, 'last 2 h'],
+                 '15m': [900, 12, 'last 3 h'], '1h': [3600, 12, 'last 12 h']};
 
 // Candle closes from the selected timeframe before the window, the 1 s composite
 // path inside it (shaded), the target across the whole view, and the time still
