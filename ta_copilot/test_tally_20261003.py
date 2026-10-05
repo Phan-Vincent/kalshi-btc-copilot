@@ -50,15 +50,17 @@ class FamilyTests(unittest.TestCase):
 
     def test_flow_thresholds_and_absence_off_1m(self):
         rows = trend(["bull"] * 5) + [reading("RSI 14", "neutral", "50.0")]
-        flow = lambda x: ta.family_tally(rows, x, with_flow=True)["votes"]["flow"]
+        flow = lambda x: ta.family_tally(rows, x, with_flow=True, flow_coverage=60)["votes"]["flow"]
         self.assertEqual(flow(0.20), "bull")
         self.assertEqual(flow(0.1999), "neutral")
         self.assertEqual(flow(-0.20), "bear")
         self.assertEqual(flow(None), "neutral")
         self.assertNotIn("flow", ta.family_tally(rows, 0.9)["votes"])
-        both = ta.family_tally(rows + [reading("RSI 14", "bull", "60")], 0.5, with_flow=True)
+        both = ta.family_tally(rows + [reading("RSI 14", "bull", "60")], 0.5,
+                               with_flow=True, flow_coverage=60)
         self.assertEqual((both["net"], both["lean"]), (2, "bullish"))
-        against = ta.family_tally(trend(["bear"] * 5) + [reading("RSI 14", "bear", "40")], -0.3, with_flow=True)
+        against = ta.family_tally(trend(["bear"] * 5) + [reading("RSI 14", "bear", "40")], -0.3,
+                                  with_flow=True, flow_coverage=60)
         self.assertEqual((against["net"], against["lean"]), (-3, "bearish"))
 
     def test_legacy_tally_is_unchanged_by_families(self):
@@ -90,7 +92,8 @@ class FamilyTests(unittest.TestCase):
         row = ta.opening_record({"market": market, "captured_at": 15000.2, "composite": 350,
                                  "coinbase_spot": 349, "flow_imbalance": 0.25, "bars": {"1m": bars}})
         frame = row["timeframes"]["1m"]
-        self.assertEqual(frame["family"]["flow"], "bull")
+        self.assertEqual(frame["family"]["flow"], "neutral")
+        self.assertEqual(row["flow_coverage_seconds"], 0)
         self.assertIn(frame["family_lean"], ("bullish", "bearish", "mixed"))
         self.assertGreater(row["sigma_1m_usd"], 0)
         self.assertEqual(row["flow_imbalance_1m"], 0.25)
