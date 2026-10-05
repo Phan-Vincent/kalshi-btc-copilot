@@ -12,6 +12,7 @@ import json
 import math
 from pathlib import Path
 import random
+import statistics
 
 TIMEFRAMES = ("1m", "5m", "10m", "15m", "1h")
 
@@ -46,8 +47,11 @@ def wilson95(hits, n):
     return center - half, center + half
 
 
-def load_rows(path, skipped_lines=None):
-    """All research rows: opening, settled and minute records."""
+def load_rows(path, skipped_lines=None, closes=None):
+    """All research rows: opening, settled and minute records.
+
+    Pass a dict as ``closes`` to also collect closing-minute proxy rows by ticker.
+    """
     opened, settled, minutes = {}, {}, {}
     skipped = 0
     try:
@@ -74,6 +78,11 @@ def load_rows(path, skipped_lines=None):
                         settled.setdefault(row["ticker"], row)
                     else:
                         skipped += 1
+                elif kind == "close":
+                    if "ticker" not in row:
+                        skipped += 1
+                    elif closes is not None:
+                        closes.setdefault(row["ticker"], row)
                 elif kind == "minute":
                     if "ticker" in row and "minute" in row:
                         minutes.setdefault(row["ticker"], {}).setdefault(row["minute"], row)
@@ -375,11 +384,35 @@ def primary_section(opened, minutes, now):
     return lines
 
 
-def report(opened, settled, minutes=None, now=None):
+def proxy_section(closes, settled):
+    """Our closing-minute composite mean against Kalshi's settlement value."""
+    errors, incomplete = [], 0
+    for ticker, row in sorted(closes.items(), key=lambda item: item[1].get("close_time") or ""):
+        settlement = (settled.get(ticker) or {}).get("expiration_value")
+        if settlement is None or row.get("proxy_avg_60s") is None:
+            continue
+        if row.get("samples") != 60:
+            incomplete += 1
+            continue
+        errors.append(float(row["proxy_avg_60s"]) - float(settlement))
+    lines = ["", "== Proxy vs settlement " + EXPLORATORY + " ==",
+             f"Closing-minute composite mean minus Kalshi expiration_value; {len(errors)} complete windows, "
+             f"{incomplete} with fewer than 60 samples left out."]
+    if errors:
+        absolute = sorted(abs(e) for e in errors)
+        p90 = absolute[min(len(absolute) - 1, math.ceil(0.9 * len(absolute)) - 1)]
+        lines.append(f"median |error| ${statistics.median(absolute):.2f}, 90% within ${p90:.2f}, "
+                     f"bias {statistics.fmean(errors):+.2f}, max |error| ${absolute[-1]:.2f}")
+    return lines
+
+
+def report(opened, settled, minutes=None, now=None, closes=None):
     minutes = minutes or {}
     now = now or datetime.now(timezone.utc)
     lines = legacy_section(opened, settled)
     lines += settlement_section(opened, settled)
+    if closes is not None:
+        lines += proxy_section(closes, settled)
     lines += minute_section(minutes)
     lines += market_section(opened, settled, minutes)
     lines += primary_section(opened, minutes, now)
@@ -391,10 +424,11 @@ def main():
     parser.add_argument("path", nargs="?", type=Path, default=Path.home() / "btc-ta/state/tally_log.jsonl")
     args = parser.parse_args()
     skipped = []
-    rows = load_rows(args.path, skipped)
+    closes = {}
+    rows = load_rows(args.path, skipped, closes)
     if skipped[0]:
         print(f"Skipped {skipped[0]} unreadable log lines.")
-    print(report(*rows))
+    print(report(*rows, closes=closes))
 
 
 if __name__ == "__main__":

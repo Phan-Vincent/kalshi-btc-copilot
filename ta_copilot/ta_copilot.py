@@ -64,6 +64,8 @@ TREND_MAJORITY = 3            # trend family votes when 3+ of its 5 readings agr
 FLOW_FAMILY_THRESHOLD = 0.20  # 60 s taker imbalance at or beyond +/-0.20 votes
 FLOW_MIN_COVERAGE_SECONDS = 60  # flow votes only on a full 60 s of the current window
 FAMILY_LEAN_MARGIN = 2        # family_lean needs |family_net| >= 2
+PROXY_RECORD_WINDOWS = 200    # proxy-vs-settlement readout uses the latest 200 windows
+PROXY_RECORD_MIN = 20         # below this, the readout says "too few to judge"
 MINUTE_CAPTURE_SLACK = 2.0    # a minute row is written only within 2 s of :00
 KALSHI_PROMOTION_GRACE = 5
 # Served on every response. The page needs the unpkg chart script, its inline
@@ -569,6 +571,7 @@ class Feed:
         self.composite_at = 0.0
         self.composite_details = {}
         self.samples = deque(maxlen=60)
+        self.close_boundary = None  # last 15-minute boundary the sampler saw
         self.average_60s = None
         self.tally_logger = None
         self.feed_modes = {"Coinbase": "REST fallback", "Kraken": "REST fallback"}
@@ -734,10 +737,15 @@ class Feed:
 
     def sample_composite(self, at=None):
         at = time.time() if at is None else at
+        close_row = None
         with self.lock:
             value, details = composite_quote(self.venues, at)
             self.composite, self.composite_details = value, details
             self.composite_at = at if value is not None else 0.0
+            boundary = int(at // 900) * 900
+            if self.close_boundary is not None and boundary > self.close_boundary:
+                close_row = self._close_proxy(boundary, at)
+            self.close_boundary = boundary
             if self.samples and self.samples[-1][0] == int(at):
                 self.samples.pop()
             self.samples.append((int(at), value))
@@ -771,6 +779,23 @@ class Feed:
                         self._capture_open(market, at)
                 except Exception as exc:
                     self._note("tally_log", exc)
+        if close_row and self.tally_logger:
+            self.tally_logger.submit(close_row)
+
+    def _close_proxy(self, boundary, at):
+        """Our 60 s composite mean over the settlement minute B-60..B-1, or None.
+
+        Called on the first sample at or after boundary B, before that sample
+        is appended, so the deque still holds the closing minute.
+        """
+        markets = ([self.market] if self.market else []) + list(self.upcoming_markets.values())
+        market = next((m for m in markets if parse_ts(m["close_time"]) == boundary), None)
+        if market is None:
+            return None
+        prices = [price for t, price in self.samples if boundary - 60 <= t < boundary and price is not None]
+        return {"type": "close", "ticker": market["ticker"], "close_time": market["close_time"],
+                "proxy_avg_60s": statistics.fmean(prices) if prices else None,
+                "samples": len(prices), "captured_at": iso(at)}
 
     def _capture_open(self, market, at):
         ticker = market["ticker"]
@@ -1114,6 +1139,7 @@ class Feed:
                 "kalshi_grace_left": grace_left,
                 "window": window, "frames": frames,
                 "tally_record": self.tally_logger.record if self.tally_logger else None,
+                "proxy_record": self.tally_logger.proxy if self.tally_logger else None,
                 "errors": errors, "vwap_anchor": iso(anchor)}
 
 
@@ -1206,6 +1232,16 @@ def settled_record(ticker, market, now):
     return record
 
 
+def proxy_summary(errors):
+    """Median and 90th-percentile absolute error and mean signed error, in dollars."""
+    if not errors:
+        return {"n": 0, "median_abs": None, "p90_abs": None, "bias": None, "too_few": True}
+    absolute = sorted(abs(e) for e in errors)
+    p90 = absolute[min(len(absolute) - 1, math.ceil(0.9 * len(absolute)) - 1)]
+    return {"n": len(errors), "median_abs": statistics.median(absolute), "p90_abs": p90,
+            "bias": statistics.fmean(errors), "too_few": len(errors) < PROXY_RECORD_MIN}
+
+
 def wilson95(hits, n):
     if n == 0:
         return None
@@ -1232,8 +1268,11 @@ class TallyLogger:
         self.pending_snapshots = {}
         self.minute_captured = None
         self.skipped_lines = 0
-        # Replaced, never mutated, so request threads can read it lock-free.
+        self.closes = {}
+        self.expirations = {}
+        # Replaced, never mutated, so request threads can read them lock-free.
         self.record = None
+        self.proxy = None
 
     def submit(self, snapshot):
         try:
@@ -1273,6 +1312,12 @@ class TallyLogger:
                         if row["ticker"] not in self.settled:
                             self.settled.add(row["ticker"])
                             self.results[row["ticker"]] = row.get("result")
+                            self.expirations[row["ticker"]] = row.get("expiration_value")
+                    elif row.get("type") == "close":
+                        if "ticker" not in row:
+                            skipped.append(number)
+                            continue
+                        self.closes.setdefault(row["ticker"], row)
         except FileNotFoundError:
             pass
         self.skipped_lines = len(skipped)
@@ -1280,6 +1325,7 @@ class TallyLogger:
             print(f"Tally log: skipped {len(skipped)} unreadable lines "
                   f"(first line numbers: {', '.join(map(str, skipped[:5]))}).", file=sys.stderr)
         self.refresh_record()
+        self.refresh_proxy()
         if self.path.exists():
             os.chmod(self.path, 0o600)
         try:
@@ -1356,7 +1402,9 @@ class TallyLogger:
                 os.close(fd)
 
     def settle_pending(self, now):
-        for ticker, row in list(self.opened.items()):
+        # Windows with only a close row (the server started mid-window) still
+        # need their settlement to score the closing-minute proxy.
+        for ticker, row in list({**self.closes, **self.opened}.items()):
             if ticker in self.settled:
                 continue
             try:
@@ -1369,7 +1417,9 @@ class TallyLogger:
                 self.append(record)
                 self.settled.add(ticker)
                 self.results[ticker] = record["result"]
+                self.expirations[ticker] = record.get("expiration_value")
                 self.refresh_record()
+                self.refresh_proxy()
                 with self.feed.lock:
                     self.feed.errors.pop("tally_settle", None)
             except Exception as exc:
@@ -1394,6 +1444,23 @@ class TallyLogger:
                        "wilson95": list(interval) if interval else None,
                        "includes_50": interval is None or interval[0] <= 0.5 <= interval[1],
                        "too_few": scored < 100}
+
+    def accept_close(self, row):
+        if row["ticker"] in self.closes:
+            return
+        self.append(row)
+        self.closes[row["ticker"]] = row
+        self.refresh_proxy()
+
+    def refresh_proxy(self):
+        """Our closing-minute composite mean vs Kalshi's settlement value."""
+        errors = []
+        for ticker, row in sorted(self.closes.items(), key=lambda item: item[1].get("close_time") or ""):
+            settled = optional_float(self.expirations.get(ticker))
+            proxy = optional_float(row.get("proxy_avg_60s"))
+            if row.get("samples") == 60 and settled is not None and proxy is not None:
+                errors.append(proxy - settled)
+        self.proxy = proxy_summary(errors[-PROXY_RECORD_WINDOWS:])
 
     def capture_minute(self, now):
         row = minute_record(cached_state("1m"), now)
@@ -1424,9 +1491,12 @@ class TallyLogger:
         while True:
             try:
                 snapshot = self.queue.get(timeout=1)
-                ticker = snapshot["market"]["ticker"]
-                if ticker not in self.opened:
-                    self.pending_snapshots[ticker] = snapshot
+                if snapshot.get("type") == "close":
+                    self.accept_close(snapshot)
+                else:
+                    ticker = snapshot["market"]["ticker"]
+                    if ticker not in self.opened:
+                        self.pending_snapshots[ticker] = snapshot
             except queue.Empty:
                 pass
             for ticker, snapshot in list(self.pending_snapshots.items()):

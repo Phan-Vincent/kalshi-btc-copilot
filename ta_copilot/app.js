@@ -150,6 +150,11 @@ function render(s) {
   $('price').textContent = usd(px);
   $('composite').textContent = usd(s.composite);
   $('average60').textContent = usd(s.average_60s);
+  // Our closing-minute composite mean vs Kalshi's settlement value (BRTI 60 s average).
+  const proxy = s.proxy_record;
+  $('proxyRecord').textContent = !proxy || !proxy.n ? 'Proxy vs settlement: no scored windows yet'
+    : `Proxy vs settlement (last ${proxy.n} windows): median ${usd(proxy.median_abs)}, 90% within ${usd(proxy.p90_abs)}, ` +
+      `bias ${sgn(proxy.bias)}` + (proxy.too_few ? ' · too few to judge' : '');
   $('venues').innerHTML = Object.entries(s.venues || {}).map(([name, q]) =>
     `<tr><td>${name} ${s.feed_modes?.[name] ? '(' + s.feed_modes[name] + ')' : ''}</td><td>${usd(q.price)}</td><td>${q.age == null ? '—' : q.age.toFixed(1) + 's'} ${q.included ? 'included' : 'excluded: ' + q.excluded_reason}</td></tr>`).join('');
   $('bidask').textContent = `${usd(s.spot.bid)} / ${usd(s.spot.ask)}`;
