@@ -8,6 +8,7 @@ primary measure. Everything except the primary measure is exploratory.
 """
 import argparse
 from datetime import datetime, timezone
+import hashlib
 import json
 import math
 from pathlib import Path
@@ -357,7 +358,9 @@ def primary_result(opened, minutes, now):
               "evaluate_at": PRIMARY_EVALUATE_AT.isoformat()}
     if now < PRIMARY_EVALUATE_AT or len(eligible) < PRIMARY_MIN_WINDOWS:
         return {**status, "evaluated": False}
-    chosen = {t for _, t in eligible[:PRIMARY_MIN_WINDOWS]}
+    # A list, not a set: the window order feeds the bootstrap, and set order
+    # follows PYTHONHASHSEED, which made the interval differ between runs.
+    chosen = [t for _, t in eligible[:PRIMARY_MIN_WINDOWS]]
     groups = forward_changes({t: minutes[t] for t in chosen}, PRIMARY_HORIZON)
     by_window = [[(family_net(row, PRIMARY_TIMEFRAME), change) for row, change, _ in rows
                   if family_net(row, PRIMARY_TIMEFRAME) is not None and change is not None]
@@ -366,7 +369,9 @@ def primary_result(opened, minutes, now):
     interval = block_bootstrap(by_window, spearman)
     return {**status, "evaluated": True, "rows": len(pairs), "rho": spearman(pairs), "ci": interval,
             "verdict": None if interval is None else
-            ("CI excludes 0" if interval[0] > 0 or interval[1] < 0 else "CI includes 0")}
+            ("CI excludes 0" if interval[0] > 0 or interval[1] < 0 else "CI includes 0"),
+            "tickers": chosen, "selection_sha256": hashlib.sha256("\n".join(chosen).encode()).hexdigest(),
+            "seed": BOOTSTRAP_SEED, "rounds": BOOTSTRAP_ROUNDS}
 
 
 def primary_section(opened, minutes, now):
@@ -381,7 +386,21 @@ def primary_section(opened, minutes, now):
         rho = result["rho"]
         lines.append(f"rows {result['rows']}, rho {'n/a' if rho is None else f'{rho:+.3f}'}, "
                      f"{ci_text(result['ci'])} -> {result['verdict'] or 'undetermined'}")
+        lines.append(f"selection sha256 {result['selection_sha256'][:16]}, first {result['tickers'][0]}, "
+                     f"last {result['tickers'][-1]}, seed {result['seed']}, {result['rounds']} rounds")
     return lines
+
+
+def write_manifest(path, log_path, opened, minutes, now):
+    """Record exactly what the primary was computed from, for re-running it later."""
+    result = primary_result(opened, minutes, now)
+    manifest = {"evaluated_at": now.isoformat(), "log": str(log_path),
+                "log_sha256": hashlib.sha256(Path(log_path).read_bytes()).hexdigest(),
+                "code_sha256": hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
+                "timeframe": PRIMARY_TIMEFRAME, "horizon": PRIMARY_HORIZON,
+                "min_windows": PRIMARY_MIN_WINDOWS, **result}
+    Path(path).write_text(json.dumps(manifest, indent=1) + "\n", encoding="utf-8")
+    return manifest
 
 
 def proxy_section(closes, settled):
@@ -422,13 +441,19 @@ def report(opened, settled, minutes=None, now=None, closes=None):
 def main():
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("path", nargs="?", type=Path, default=Path.home() / "btc-ta/state/tally_log.jsonl")
+    parser.add_argument("--manifest", type=Path,
+                        help="also write the primary's selection, seed, input and code digests as JSON")
     args = parser.parse_args()
     skipped = []
     closes = {}
     rows = load_rows(args.path, skipped, closes)
     if skipped[0]:
         print(f"Skipped {skipped[0]} unreadable log lines.")
-    print(report(*rows, closes=closes))
+    now = datetime.now(timezone.utc)
+    print(report(*rows, now=now, closes=closes))
+    if args.manifest:
+        write_manifest(args.manifest, args.path, rows[0], rows[2], now)
+        print(f"Primary manifest written to {args.manifest}")
 
 
 if __name__ == "__main__":

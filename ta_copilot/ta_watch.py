@@ -16,6 +16,10 @@ TELEGRAM = Path.home() / ".config/btc-study/telegram.json"
 API = "http://127.0.0.1:8770/api/state?tf=1m"
 REPEAT_SECONDS = 6 * 3600
 FEED_ERROR_SECONDS = 10 * 60
+# Kalshi context must stay stale across checks spanning this long (the third
+# consecutive five-minute check) before it counts: rollovers recover in seconds.
+KALSHI_STALE_SECONDS = 8 * 60
+DEFAULT_STATE = {"active": False, "last_sent_at": 0}
 
 
 def secure_state_dir():
@@ -45,9 +49,45 @@ def error_start_times(state, prior, now):
     return starts
 
 
-def problems(service_active, state, now, feed_since=None):
+def load_previous(now):
+    """Saved watcher state; an unreadable or malformed file is set aside, not fatal."""
+    try:
+        previous = json.loads(STATE_FILE.read_text(encoding="utf-8"))
+    except FileNotFoundError:
+        return dict(DEFAULT_STATE)
+    except (OSError, ValueError):
+        previous = None
+    if valid_state(previous):
+        return previous
+    try:
+        os.replace(STATE_FILE, STATE_FILE.with_suffix(f".corrupt-{int(now)}"))
+    except OSError:
+        pass
+    print("[BTC TA] watcher state unreadable; set aside and reset", file=sys.stderr)
+    return dict(DEFAULT_STATE)
+
+
+def valid_state(value):
+    number = (int, float)
+    return (isinstance(value, dict) and isinstance(value.get("active", False), bool)
+            and isinstance(value.get("last_sent_at", 0), number)
+            and isinstance(value.get("feed_since", {}), dict)
+            and all(isinstance(v, number) for v in value.get("feed_since", {}).values())
+            and isinstance(value.get("kalshi_stale_since"), (*number, type(None))))
+
+
+def kalshi_stale_since(state, prior, now):
+    """When the current stretch of stale Kalshi context began, or None if fresh."""
+    if not state or not state.get("kalshi_stale"):
+        return None
+    return prior if prior is not None else now
+
+
+def problems(service_active, state, now, feed_since=None, kalshi_since=None):
     found = []
-    if not service_active:
+    if service_active is None:
+        found.append("service status unknown (systemctl failed)")
+    elif not service_active:
         found.append("service inactive")
     if state is None:
         found.append("/api/state unavailable")
@@ -56,6 +96,8 @@ def problems(service_active, state, now, feed_since=None):
         found.append("/api/state not ready")
     if state.get("stale"):
         found.append("/api/state stale")
+    if state.get("kalshi_stale") and kalshi_since is not None and now - kalshi_since >= KALSHI_STALE_SECONDS:
+        found.append("Kalshi window missing or stale >8 min")
     feed_since = error_start_times(state, {}, now) if feed_since is None else feed_since
     for name, error in sorted(state.get("errors", {}).items()):
         if now - feed_since.get(name, now) > FEED_ERROR_SECONDS:
@@ -86,8 +128,12 @@ def send_message(text):
 
 
 def check():
-    service = subprocess.run(["systemctl", "--user", "is-active", "--quiet", "btc-ta-copilot.service"],
-                             timeout=5, check=False).returncode == 0
+    """(service active: True/False/None if unknown, state or None). Never raises."""
+    try:
+        service = subprocess.run(["systemctl", "--user", "is-active", "--quiet", "btc-ta-copilot.service"],
+                                 timeout=5, check=False).returncode == 0
+    except Exception:
+        service = None
     try:
         with urlopen(API, timeout=5) as response:
             if response.status != 200:
@@ -108,17 +154,17 @@ def main():
             return 0
         if len(sys.argv) != 1:
             return 2
-        try:
-            previous = json.loads(STATE_FILE.read_text(encoding="utf-8"))
-        except FileNotFoundError:
-            previous = {"active": False, "last_sent_at": 0}
         now = time.time()
+        previous = load_previous(now)
         service, state = check()
         feed_since = error_start_times(state, previous.get("feed_since", {}), now)
-        message, next_state = transition(previous, problems(service, state, now, feed_since), now)
+        kalshi_since = kalshi_stale_since(state, previous.get("kalshi_stale_since"), now)
+        message, next_state = transition(previous, problems(service, state, now, feed_since, kalshi_since), now)
         if message:
             send_message(message)
-        store(STATE_FILE, json.dumps({**next_state, "feed_since": feed_since}) + "\n")
+        store(STATE_FILE, json.dumps({"active": next_state.get("active", False),
+                                      "last_sent_at": next_state.get("last_sent_at", 0),
+                                      "feed_since": feed_since, "kalshi_stale_since": kalshi_since}) + "\n")
         return 0
     except Exception:
         # No exception text: urllib exceptions can contain the bot-token URL.

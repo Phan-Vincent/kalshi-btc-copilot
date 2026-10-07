@@ -1266,6 +1266,8 @@ class TallyLogger:
         self.results = {}
         self.pending_open = {}
         self.pending_snapshots = {}
+        self.pending_closes = {}
+        self.next_settle = self.next_hydrate = 0
         self.minute_captured = None
         self.skipped_lines = 0
         self.closes = {}
@@ -1487,33 +1489,57 @@ class TallyLogger:
         except Exception as exc:
             with self.feed.lock:
                 self.feed._note("tally_log", exc)
-        next_settle = next_hydrate = 0
         while True:
             try:
-                snapshot = self.queue.get(timeout=1)
-                if snapshot.get("type") == "close":
-                    self.accept_close(snapshot)
-                else:
-                    ticker = snapshot["market"]["ticker"]
-                    if ticker not in self.opened:
-                        self.pending_snapshots[ticker] = snapshot
-            except queue.Empty:
-                pass
-            for ticker, snapshot in list(self.pending_snapshots.items()):
-                try:
-                    self.accept_snapshot(snapshot)
-                    del self.pending_snapshots[ticker]
+                self.step()
+                if "tally_worker" in self.feed.errors:
                     with self.feed.lock:
-                        self.feed.errors.pop("tally_log", None)
-                except Exception as exc:
+                        self.feed.errors.pop("tally_worker", None)
+            except Exception as exc:
+                # Nothing may end this thread: opening capture, hydration and
+                # settlement all live here.
+                with self.feed.lock:
+                    self.feed._note("tally_worker", exc)
+                time.sleep(1)
+
+    def step(self):
+        try:
+            snapshot = self.queue.get(timeout=1)
+            if snapshot.get("type") == "close":
+                if snapshot.get("ticker") not in self.closes:
+                    self.pending_closes[snapshot["ticker"]] = snapshot
+            else:
+                ticker = snapshot["market"]["ticker"]
+                if ticker not in self.opened:
+                    self.pending_snapshots[ticker] = snapshot
+        except queue.Empty:
+            pass
+        for ticker, snapshot in list(self.pending_snapshots.items()):
+            try:
+                self.accept_snapshot(snapshot)
+                del self.pending_snapshots[ticker]
+                with self.feed.lock:
+                    self.feed.errors.pop("tally_log", None)
+            except Exception as exc:
+                with self.feed.lock:
+                    self.feed._note("tally_log", exc)
+        # A failed close append (disk full, say) stays queued and is retried
+        # every pass; accept_close skips tickers already written.
+        for ticker, row in list(self.pending_closes.items()):
+            try:
+                self.accept_close(row)
+                del self.pending_closes[ticker]
+                if not self.pending_closes:
                     with self.feed.lock:
-                        self.feed._note("tally_log", exc)
-            if time.time() >= next_hydrate:
-                next_hydrate = time.time() + 5
-                self.hydrate_pending(time.time())
-            if time.time() < next_settle:
-                continue
-            next_settle = time.time() + 60
+                        self.feed.errors.pop("tally_close", None)
+            except Exception as exc:
+                with self.feed.lock:
+                    self.feed._note("tally_close", exc)
+        if time.time() >= self.next_hydrate:
+            self.next_hydrate = time.time() + 5
+            self.hydrate_pending(time.time())
+        if time.time() >= self.next_settle:
+            self.next_settle = time.time() + 60
             self.settle_pending(time.time())
 
 
@@ -1532,6 +1558,7 @@ STATE_CACHE = {}
 STATE_CACHE_LOCK = threading.Lock()
 SSE_LIMIT = 12
 SSE_SLOTS = threading.BoundedSemaphore(SSE_LIMIT)
+SOCKET_TIMEOUT = 30
 
 
 def cached_state(tf):
@@ -1606,6 +1633,9 @@ def tail_state(state, tf):
 
 class Handler(BaseHTTPRequestHandler):
     protocol_version = "HTTP/1.1"
+    # Socket timeout: a client that stops reading can't hold an SSE slot
+    # forever, and idle keep-alive connections close.
+    timeout = SOCKET_TIMEOUT
 
     def send_response(self, code, message=None):
         super().send_response(code, message)
@@ -1620,13 +1650,15 @@ class Handler(BaseHTTPRequestHandler):
             if not SSE_SLOTS.acquire(blocking=False):
                 self.send_error(503, "SSE client limit reached")
                 return
-            self.send_response(200)
-            self.send_header("Content-Type", "text/event-stream; charset=utf-8")
-            self.send_header("Cache-Control", "no-cache, no-transform")
-            self.send_header("Connection", "keep-alive")
-            self.send_header("X-Accel-Buffering", "no")
-            self.end_headers()
+            # The slot is released by the finally below from here on, including
+            # when the client drops while the headers are being written.
             try:
+                self.send_response(200)
+                self.send_header("Content-Type", "text/event-stream; charset=utf-8")
+                self.send_header("Cache-Control", "no-cache, no-transform")
+                self.send_header("Connection", "keep-alive")
+                self.send_header("X-Accel-Buffering", "no")
+                self.end_headers()
                 last_key, last_full = None, 0.0
                 while True:
                     try:
@@ -1645,7 +1677,7 @@ class Handler(BaseHTTPRequestHandler):
                     if full:
                         last_key, last_full = key, now
                     time.sleep(STREAM_INTERVAL)
-            except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError):
+            except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError, TimeoutError):
                 pass
             finally:
                 SSE_SLOTS.release()

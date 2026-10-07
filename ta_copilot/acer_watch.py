@@ -45,6 +45,9 @@ def dashboard_problem():
         return "dashboard not ready"
     if state.get("stale"):
         return "dashboard stale"
+    if state.get("kalshi_stale"):
+        # Two consecutive checks (5+ min) are needed to alert, so a rollover won't.
+        return "dashboard Kalshi window missing or stale"
     return None
 
 
@@ -68,6 +71,27 @@ def step(previous, found, now):
     if not found and active:
         return "[ACER] recovered: Acer and dashboard answering", {**state, "active": False, "last_sent_at": now}
     return None, state
+
+
+def load_previous(now):
+    """Saved alarm state; an unreadable or malformed file is set aside, not fatal."""
+    try:
+        previous = json.loads(STATE_FILE.read_text(encoding="utf-8"))
+    except FileNotFoundError:
+        return {}
+    except (OSError, ValueError):
+        previous = None
+    number = (int, float)
+    if (isinstance(previous, dict) and isinstance(previous.get("fails", 0), int)
+            and isinstance(previous.get("active", False), bool)
+            and isinstance(previous.get("last_sent_at", 0), number)):
+        return previous
+    try:
+        os.replace(STATE_FILE, STATE_FILE.with_suffix(f".corrupt-{int(now)}"))
+    except OSError:
+        pass
+    print("[ACER] watch state unreadable; set aside and reset", file=sys.stderr)
+    return {}
 
 
 def store(value):
@@ -94,11 +118,8 @@ def main():
     try:
         if not reachable(INTERNET):
             return 0  # the Mac is offline: no verdict, no state change
-        try:
-            previous = json.loads(STATE_FILE.read_text(encoding="utf-8"))
-        except FileNotFoundError:
-            previous = {}
-        message, state = step(previous, problems(), time.time())
+        now = time.time()
+        message, state = step(load_previous(now), problems(), now)
         if message:
             send_message(message)
         store(state)
