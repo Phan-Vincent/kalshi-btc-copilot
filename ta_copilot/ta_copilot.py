@@ -1310,6 +1310,9 @@ def minute_record(state, now):
 # settled row per ticker, so a row written without the value would hide it for
 # good: hold the row until the value appears or this long after close.
 SETTLE_VALUE_WAIT = 30 * 60
+# If the value still comes later, a `settled_value` row records it (readers
+# merge it into the settled row); asked for until this long after close.
+SETTLE_VALUE_RETRY = 24 * 3600
 
 
 def settled_record(ticker, market, now):
@@ -1362,6 +1365,7 @@ class TallyLogger:
         self.skipped_lines = 0
         self.closes = {}
         self.expirations = {}
+        self.value_pending = {}  # settled without expiration_value: ticker -> close epoch
         # Replaced, never mutated, so request threads can read them lock-free.
         self.record = None
         self.proxy = None
@@ -1377,7 +1381,7 @@ class TallyLogger:
     def prepare(self):
         self.path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
         os.chmod(self.path.parent, 0o700)
-        skipped = []
+        skipped, late_values = [], {}
         self.skipped_lines = 0
         try:
             with self.path.open("rb") as handle:
@@ -1404,8 +1408,20 @@ class TallyLogger:
                             self.expirations[row["ticker"]] = row.get("expiration_value")
                     elif row["type"] == "close":
                         self.closes.setdefault(row["ticker"], row)
+                    elif row["type"] == "settled_value":
+                        late_values.setdefault(row["ticker"], row["expiration_value"])
         except FileNotFoundError:
             pass
+        for ticker, value in late_values.items():
+            if ticker in self.settled and self.expirations.get(ticker) is None:
+                self.expirations[ticker] = value
+        now = time.time()
+        for ticker in self.settled:
+            row = self.opened.get(ticker) or self.closes.get(ticker)
+            if self.expirations.get(ticker) is None and row and row.get("close_time"):
+                close = parse_ts(row["close_time"])
+                if now - close <= SETTLE_VALUE_RETRY:
+                    self.value_pending[ticker] = close
         self.skipped_lines = len(skipped)
         if skipped:
             print(f"Tally log: skipped {len(skipped)} unreadable lines "
@@ -1506,10 +1522,28 @@ class TallyLogger:
                 self.settled.add(ticker)
                 self.results[ticker] = record["result"]
                 self.expirations[ticker] = record.get("expiration_value")
+                if record.get("expiration_value") is None:
+                    self.value_pending[ticker] = parse_ts(row["close_time"])
                 self.refresh_record()
                 self.refresh_proxy()
                 with self.feed.lock:
                     self.feed.errors.pop("tally_settle", None)
+            except Exception as exc:
+                with self.feed.lock:
+                    self.feed._note("tally_settle", exc)
+        for ticker, close in list(self.value_pending.items()):
+            if now - close > SETTLE_VALUE_RETRY:
+                del self.value_pending[ticker]  # give up; the settled row stands without it
+                continue
+            try:
+                market = get_json(f"{KALSHI}/markets/{quote(ticker, safe='')}")["market"]
+                if market.get("expiration_value") is None:
+                    continue
+                self.append({"type": "settled_value", "ticker": ticker, "recorded_at": iso(now),
+                             "expiration_value": market["expiration_value"]})
+                self.expirations[ticker] = market["expiration_value"]
+                del self.value_pending[ticker]
+                self.refresh_proxy()
             except Exception as exc:
                 with self.feed.lock:
                     self.feed._note("tally_settle", exc)

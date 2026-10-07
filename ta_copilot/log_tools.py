@@ -22,7 +22,7 @@ WINDOW = 900
 
 def row_key(row):
     kind = row.get("type")
-    if kind in ("open", "settled", "close") and "ticker" in row:
+    if kind in ("open", "settled", "close", "settled_value") and "ticker" in row:
         return kind, row["ticker"]
     if kind == "minute" and "ticker" in row and "minute" in row:
         return kind, row["ticker"], row["minute"]
@@ -74,7 +74,7 @@ def check(path):
     opened = {r["ticker"] for r in rows if r["type"] == "open"}
     settled = {r["ticker"] for r in rows if r["type"] == "settled"}
     gaps = window_gaps(rows)
-    print(f"{path}: " + ", ".join(f"{k} {kinds[k]}" for k in ("open", "settled", "close", "minute")))
+    print(f"{path}: " + ", ".join(f"{k} {kinds[k]}" for k in ("open", "settled", "close", "minute", "settled_value")))
     print(f"unreadable lines {bad}, duplicate keys {duplicates}, opened but not settled {len(opened - settled)}")
     print(f"missing windows between first and last open: {len(gaps)}")
     for start in gaps[:20]:

@@ -338,11 +338,12 @@ class RecordSchemaTests(unittest.TestCase):
             self.assertEqual(report.settlement_moves(opened, settled), [])
 
     def test_validator_accepts_real_row_shapes(self):
-        minute = {"type": "minute", "ticker": "T", "minute": 11, "captured_at": "x", "seconds_left": 239.5,
+        minute = {"type": "minute", "ticker": "T", "minute": 11, "captured_at": "2026-10-07T00:11:00.502458Z", "seconds_left": 239.5,
                   "composite": 84833.08, "average_60s": None, "target": 84862.28, "sigma_1m_usd": 9.8,
                   "yes_bid": {"price": 0.41, "age": 1.2, "source": "book"}, "yes_ask": None,
                   "flow_imbalance_1m": None, "stale": False, "kalshi_stale": False, "history_stale": [],
-                  "timeframes": {"1m": {"bull": 3, "family_net": -1}, "5m": {"family_net": None}}}
+                  "timeframes": {"1m": {"bull": 3, "bear": 1, "neutral": 4, "lean": "bullish", "family_net": -1},
+                                 "5m": {"family_net": None}}}
         opened = {"type": "open", "ticker": "T", "yes_bid": "0.41", "target": None, "composite_spot": 1.5}
         self.assertIsNone(report.record_problem(minute))
         self.assertIsNone(report.record_problem(opened))

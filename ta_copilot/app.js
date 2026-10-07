@@ -10,7 +10,10 @@ let serverOffsetMs = 0;
 // Freshness is judged on this page's own monotonic clock, from when a snapshot
 // was last accepted: an open stream that stops sending must not stay "Live".
 const FRESH_LIMIT_MS = 10000;
-let shown = null, shownAt = 0, shownServerMs = 0, streamHeardAt = 0, serverProblem = false, pollFailed = false;
+// `failure` is the newest transport/readiness problem; only an accepted
+// healthy snapshot clears it, so a clock tick can age the badge but never
+// declare recovery on its own.
+let shown = null, shownAt = 0, shownServerMs = 0, streamHeardAt = 0, failure = null;
 
 function localStorageGet(k) { try { return localStorage.getItem(k); } catch { return null; } }
 function localStorageSet(k, v) { try { localStorage.setItem(k, v); } catch {} }
@@ -254,7 +257,7 @@ function renderShared(s, f) {
   // The headline tally always reads the 1m frame; the tabs drive the chart and side cards.
   const head = s.frames['1m'] || f;
   if (!head) {
-    $('lean').textContent = '—'; $('families').textContent = '—';
+    $('lean').textContent = '—'; $('families').textContent = '—'; $('tallyStale').textContent = '';
   } else renderTally(s, head);
   renderMtf(s);
   const errs = Object.entries(s.errors || {});
@@ -263,7 +266,9 @@ function renderShared(s, f) {
 
 function renderTally(s, head) {
   const t = head.tally, n = t.bull + t.bear + t.neutral || 1;
-  $('tallyTf').textContent = s.frames['1m'] ? '1m' : s.timeframe;
+  const headTf = s.frames['1m'] ? '1m' : s.timeframe;
+  $('tallyTf').textContent = headTf;
+  $('tallyStale').textContent = s.history_stale?.includes(headTf) ? `${headTf} history stale; tally may be out of date` : '';
   $('readTf').textContent = $('lvlTf').textContent = s.timeframe;
   $('lean').innerHTML = `<span class="${t.lean === 'bullish' ? 'bull' : t.lean === 'bearish' ? 'bear' : 'neutral'}">${t.lean[0].toUpperCase() + t.lean.slice(1)}</span>`;
   $('bBull').style.width = t.bull / n * 100 + '%'; $('bNeu').style.width = t.neutral / n * 100 + '%'; $('bBear').style.width = t.bear / n * 100 + '%';
@@ -286,7 +291,9 @@ function renderTally(s, head) {
 function renderMtf(s) {
   // Every tally reading (rows) for every timeframe (columns), with the detail on hover.
   const tfs = ['1m', '5m', '10m', '15m', '1h'].filter(k => s.frames[k]);
-  $('mtfHead').innerHTML = `<tr><th></th>${tfs.map(k => `<th>${k}</th>`).join('')}</tr>`;
+  const stale = k => s.history_stale?.includes(k) || s.frames[k].history?.gap;
+  $('mtfHead').innerHTML = `<tr><th></th>${tfs.map(k => stale(k)
+    ? `<th class="stale" title="${k} history stale or incomplete">${k} ⚠</th>` : `<th>${k}</th>`).join('')}</tr>`;
   const mark = r => !r ? '<td class="muted">—</td>' :
     `<td class="${r.state}" title="${esc(r.name + ': ' + r.detail)}">${r.state === 'bull' ? '▲' : r.state === 'bear' ? '▼' : '•'}</td>`;
   $('mtf').innerHTML = MTF_ROWS.map(([label, prefix]) => `<tr><td>${label}</td>${tfs.map(k =>
@@ -333,7 +340,7 @@ function checkFreshness() {
   }
   if (!shown) return;
   const age = t - shownAt;
-  if (age > FRESH_LIMIT_MS) setLive(false, `No update for ${Math.floor(age / 1000)} s` + (pollFailed ? ' · server unreachable' : ''));
+  if (age > FRESH_LIMIT_MS) setLive(false, `No update for ${Math.floor(age / 1000)} s` + (failure ? ' · ' + failure : ''));
   else setStatus(shown, age / 1000);
 }
 
@@ -342,7 +349,7 @@ function checkFreshness() {
 function accept(s) {
   const at = Date.parse(s.server_time);
   if (s.timeframe !== tf || !(at >= shownServerMs)) return false;
-  shownServerMs = at; shown = s; shownAt = performance.now(); serverProblem = false;
+  shownServerMs = at; shown = s; shownAt = performance.now(); failure = null;
   render(s);
   setStatus(s);
   return true;
@@ -357,20 +364,25 @@ async function poll() {
   try {
     const r = await fetch('/api/state?tf=' + want, {cache: 'no-store', signal: ctl.signal});
     const s = await r.json();
-    pollFailed = false;
     if (ctl !== pollCtl || want !== tf) return;  // superseded
-    if (!s.ready) { setLive(false, 'Warming up…'); return; }
+    if (!s.ready) { fail('warming up'); return; }
     accept(s);
-  } catch (e) { if (ctl === pollCtl) { pollFailed = true; setLive(false, 'Server unreachable'); } }
+  } catch (e) { if (ctl === pollCtl) fail('server unreachable'); }
   finally { clearTimeout(deadline); if (pollCtl === ctl) pollCtl = null; }
 }
 function abortPoll() { if (pollCtl) { pollCtl.abort(); pollCtl = null; } }
+// Timeframes on screen whose candle history is stale: the selected chart's,
+// and 1m, which always supplies the headline tally.
+function staleShown(s) {
+  return [...new Set([s.timeframe, '1m'])].filter(k => s.history_stale?.includes(k));
+}
+function fail(text) { failure = text; setLive(false, text[0].toUpperCase() + text.slice(1)); }
 function setLive(ok, text) { $('live').className = 'live ' + (ok ? 'ok' : 'bad'); $('liveText').textContent = text; }
 function setStatus(s, aged = 0) {
-  if (serverProblem) setLive(false, 'Server state error');
+  if (failure) setLive(false, failure[0].toUpperCase() + failure.slice(1));
   else if (s.stale) setLive(false, 'STALE · spot or composite unavailable');
   else if (s.kalshi_stale) { $('live').className = 'live warn'; $('liveText').textContent = 'Live · Kalshi stale'; }
-  else if (s.history_stale?.includes(s.timeframe)) { $('live').className = 'live warn'; $('liveText').textContent = `Live · ${s.timeframe} history stale`; }
+  else if (staleShown(s).length) { $('live').className = 'live warn'; $('liveText').textContent = `Live · ${staleShown(s).join(' & ')} history stale`; }
   else setLive(true, `Live · spot ${(s.spot_age + aged).toFixed(1)}s`);
 }
 
@@ -421,7 +433,7 @@ function connectStream() {
     try {
       const s = JSON.parse(event.data);
       streamHeardAt = performance.now();
-      if (!s.ready) { setLive(false, 'Warming up…'); return; }
+      if (!s.ready) { fail('warming up'); return; }
       if (s.timeframe !== tf) return;
       if (!expand(s)) { connectStream(); return; }  // tail without a base: resync
       accept(s);
@@ -432,7 +444,7 @@ function connectStream() {
   current.addEventListener('problem', () => {
     if (source !== current) return;
     streamHeardAt = performance.now();
-    serverProblem = true; setLive(false, 'Server state error');
+    fail('server state error');
   });
   current.onerror = () => {
     if (source !== current) return;

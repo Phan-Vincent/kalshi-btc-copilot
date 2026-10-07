@@ -84,6 +84,7 @@ tr.context td { color: var(--muted); }
 .dist-big { font-size: 26px; font-weight: 650; font-variant-numeric: tabular-nums; letter-spacing: -.01em; line-height: 1.2; }
 footer { margin-top: 14px; font-size: 12px; color: var(--muted); }
 #errors { color: var(--bear); font-size: 12px; margin-top: 6px; }
+.stale-note, .mtf th.stale { color: var(--e9); }
 .frame-note { color: var(--e9); font-size: 12px; margin: 4px 0; } .frame-note:empty { display: none; }
 </style>
 </head>
@@ -126,7 +127,7 @@ footer { margin-top: 14px; font-size: 12px; color: var(--muted); }
       </div>
     </div>
     <div class="card">
-      <div class="label">Indicator tally · <span id="tallyTf">1m</span></div>
+      <div class="label">Indicator tally · <span id="tallyTf">1m</span> <span id="tallyStale" class="stale-note"></span></div>
       <div class="big" id="lean">—</div>
       <div class="bar"><span id="bBull" style="background:var(--bull)"></span><span id="bNeu" style="background:var(--neutral)"></span><span id="bBear" style="background:var(--bear)"></span></div>
       <div class="row"><span class="bull" id="nBull">—</span><span class="neutral" id="nNeu"></span><span class="bear" id="nBear"></span></div>

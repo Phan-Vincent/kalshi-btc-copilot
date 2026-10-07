@@ -11,6 +11,7 @@ from datetime import datetime, timezone
 import hashlib
 import json
 import math
+import os
 from pathlib import Path
 import random
 import statistics
@@ -41,25 +42,47 @@ EXPLORATORY_NOTE = ("Sections marked [exploratory] make many comparisons; expect
 # One check shared by every reader (this report, the server's startup load and
 # log_tools), so a row that parses as JSON but can't be used is skipped and
 # counted the same way everywhere instead of crashing a reader or becoming
-# evidence. Numbers may be JSON numbers or numeric strings (Kalshi sends
-# strings) but must be finite: the string "NaN" is not a value.
-RECORD_TYPES = ("open", "settled", "close", "minute")
+# evidence. It checks every field a reader consumes:
+# * numbers the server writes itself must be finite JSON numbers (a string
+#   "101" would break later arithmetic); only Kalshi's `expiration_value` and
+#   YES quote prices, which readers convert with float(), may also be numeric
+#   strings ("NaN"/"inf" never pass);
+# * timestamps must parse as ISO 8601;
+# * per-timeframe counts (bull/bear/neutral, family_net) must be integers and
+#   lean a string, with bull and bear present together.
+RECORD_TYPES = ("open", "settled", "close", "minute", "settled_value")
 NUMERIC_FIELDS = ("composite", "composite_spot", "average_60s", "target", "sigma_1m_usd", "seconds_left",
-                  "proxy_avg_60s", "expiration_value", "flow_imbalance_1m", "capture_delay_seconds",
-                  "flow_coverage_seconds")
+                  "proxy_avg_60s", "flow_imbalance_1m", "capture_delay_seconds", "flow_coverage_seconds")
+STRING_NUMERIC_FIELDS = ("expiration_value",)
 QUOTE_FIELDS = ("yes_bid", "yes_ask")
+TIME_FIELDS = ("captured_at", "recorded_at", "open_time", "close_time", "target_observed_at")
+COUNT_FIELDS = ("bull", "bear", "neutral", "family_net")
 
 
-def finite_or_none(value):
-    """True for None or a finite number / numeric string; booleans are not numbers."""
+def finite_or_none(value, strings=False):
+    """True for None or a finite number (or numeric string if ``strings``); booleans are not numbers."""
     if value is None:
         return True
     if isinstance(value, bool) or not isinstance(value, (int, float, str)):
+        return False
+    if isinstance(value, str) and not strings:
         return False
     try:
         return math.isfinite(float(value))
     except ValueError:
         return False
+
+
+def is_timestamp(value):
+    try:
+        datetime.fromisoformat(value.replace("Z", "+00:00"))
+        return True
+    except (AttributeError, ValueError):
+        return False
+
+
+def is_count(value):
+    return isinstance(value, int) and not isinstance(value, bool)
 
 
 def record_problem(row):
@@ -75,26 +98,40 @@ def record_problem(row):
         return "bad ticker"
     if kind == "minute":
         minute = row.get("minute")
-        if isinstance(minute, bool) or not isinstance(minute, int) or not 0 <= minute <= 15:
+        if not is_count(minute) or not 0 <= minute <= 15:
             return "bad minute"
-    for key in ("captured_at", "recorded_at", "open_time", "close_time"):
-        if key in row and row[key] is not None and not isinstance(row[key], str):
+        if row.get("captured_at") is None:
+            return "bad captured_at"
+    if kind == "settled_value" and row.get("expiration_value") is None:
+        return "bad expiration_value"
+    for key in TIME_FIELDS:
+        if row.get(key) is not None and not is_timestamp(row[key]):
             return f"bad {key}"
     for key in NUMERIC_FIELDS:
         if not finite_or_none(row.get(key)):
             return f"bad {key}"
+    for key in STRING_NUMERIC_FIELDS:
+        if not finite_or_none(row.get(key), strings=True):
+            return f"bad {key}"
     for key in QUOTE_FIELDS:
         quote = row.get(key)
-        if not (finite_or_none(quote) or isinstance(quote, dict) and finite_or_none(quote.get("price"))):
+        # Quote prices are read with float(), and early minute rows stored
+        # book prices as decimal strings, so numeric strings are valid here.
+        if not (finite_or_none(quote, strings=True)
+                or isinstance(quote, dict) and finite_or_none(quote.get("price"), strings=True)):
             return f"bad {key}"
     frames = row.get("timeframes")
     if frames is not None:
         if not isinstance(frames, dict) or not all(isinstance(f, dict) for f in frames.values()):
             return "bad timeframes"
         for frame in frames.values():
-            net = frame.get("family_net")
-            if net is not None and (isinstance(net, bool) or not isinstance(net, int)):
-                return "bad family_net"
+            for key in COUNT_FIELDS:
+                if frame.get(key) is not None and not is_count(frame[key]):
+                    return f"bad {key}"
+            if ("bull" in frame) != ("bear" in frame):
+                return "bad bull/bear"
+            if frame.get("lean") is not None and not isinstance(frame["lean"], str):
+                return "bad lean"
     return None
 
 
@@ -114,7 +151,7 @@ def load_rows(path, skipped_lines=None, closes=None):
 
     Pass a dict as ``closes`` to also collect closing-minute proxy rows by ticker.
     """
-    opened, settled, minutes = {}, {}, {}
+    opened, settled, minutes, late_values = {}, {}, {}, {}
     skipped = 0
     try:
         with path.open("rb") as handle:
@@ -137,6 +174,8 @@ def load_rows(path, skipped_lines=None, closes=None):
                     opened.setdefault(row["ticker"], row)
                 elif kind == "settled":
                     settled.setdefault(row["ticker"], row)
+                elif kind == "settled_value":
+                    late_values.setdefault(row["ticker"], row["expiration_value"])
                 elif kind == "close":
                     if closes is not None:
                         closes.setdefault(row["ticker"], row)
@@ -144,6 +183,11 @@ def load_rows(path, skipped_lines=None, closes=None):
                     minutes.setdefault(row["ticker"], {}).setdefault(row["minute"], row)
     except FileNotFoundError:
         pass
+    # A settled row written before Kalshi published its value is completed by
+    # a later `settled_value` row (see ta_copilot.SETTLE_VALUE_WAIT).
+    for ticker, value in late_values.items():
+        if ticker in settled and settled[ticker].get("expiration_value") is None:
+            settled[ticker] = {**settled[ticker], "expiration_value": value}
     if skipped_lines is not None:
         skipped_lines.append(skipped)
     return opened, settled, minutes
@@ -234,7 +278,7 @@ def ci_text(interval, digits=3):
 
 
 def legacy_net(frame):
-    return frame["bull"] - frame["bear"]
+    return frame["bull"] - frame["bear"] if "bull" in frame else None
 
 
 # --- outcomes ----------------------------------------------------------------
@@ -444,10 +488,30 @@ def primary_section(opened, minutes, now):
     return lines
 
 
-def write_manifest(path, log_path, opened, minutes, now):
-    """Record exactly what the primary was computed from, for re-running it later."""
+def snapshot_log(source, manifest_path):
+    """Copy the log once, beside the manifest, and return the copy's path.
+
+    The report and the manifest are both computed from this copy, so rows
+    appended to the live log meanwhile can't make them disagree, and the exact
+    input is kept for re-running.
+    """
+    data = Path(source).read_bytes()
+    copy = Path(manifest_path).with_suffix(".input.jsonl")
+    temp = copy.with_suffix(".tmp")
+    fd = os.open(temp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, "wb") as handle:
+        handle.write(data)
+    os.replace(temp, copy)
+    return copy
+
+
+def write_manifest(path, log_path, opened, minutes, now, source=None):
+    """Record exactly what the primary was computed from, for re-running it later.
+
+    ``log_path`` must be the immutable copy the rows were loaded from."""
     result = primary_result(opened, minutes, now)
     manifest = {"evaluated_at": now.isoformat(), "log": str(log_path),
+                "source_log": str(source or log_path),
                 "log_sha256": hashlib.sha256(Path(log_path).read_bytes()).hexdigest(),
                 "code_sha256": hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
                 "timeframe": PRIMARY_TIMEFRAME, "horizon": PRIMARY_HORIZON,
@@ -499,14 +563,15 @@ def main():
     args = parser.parse_args()
     skipped = []
     closes = {}
-    rows = load_rows(args.path, skipped, closes)
+    source = snapshot_log(args.path, args.manifest) if args.manifest else args.path
+    rows = load_rows(source, skipped, closes)
     if skipped[0]:
         print(f"Skipped {skipped[0]} unreadable log lines.")
     now = datetime.now(timezone.utc)
     print(report(*rows, now=now, closes=closes))
     if args.manifest:
-        write_manifest(args.manifest, args.path, rows[0], rows[2], now)
-        print(f"Primary manifest written to {args.manifest}")
+        write_manifest(args.manifest, source, rows[0], rows[2], now, source=args.path)
+        print(f"Primary manifest written to {args.manifest}; its exact input is {source}")
 
 
 if __name__ == "__main__":
