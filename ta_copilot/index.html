@@ -84,6 +84,7 @@ tr.context td { color: var(--muted); }
 .dist-big { font-size: 26px; font-weight: 650; font-variant-numeric: tabular-nums; letter-spacing: -.01em; line-height: 1.2; }
 footer { margin-top: 14px; font-size: 12px; color: var(--muted); }
 #errors { color: var(--bear); font-size: 12px; margin-top: 6px; }
+.frame-note { color: var(--e9); font-size: 12px; margin: 4px 0; } .frame-note:empty { display: none; }
 </style>
 </head>
 <body>
@@ -155,6 +156,7 @@ footer { margin-top: 14px; font-size: 12px; color: var(--muted); }
         <span><i style="background:var(--e50)"></i>EMA 50</span><span><i style="background:var(--bb)"></i>Bollinger 20,2</span>
         <span><i style="background:var(--vwap)"></i>VWAP <span id="vwapNote"></span></span><span><i style="background:var(--strike)"></i>Kalshi target</span>
       </div>
+      <div id="frameNote" class="frame-note"></div>
       <div id="chart" class="chart"></div>
       <div class="legend" style="margin-top:8px">RSI 14 <span id="rsiNow"></span></div>
       <div id="rsi" class="sub"></div>

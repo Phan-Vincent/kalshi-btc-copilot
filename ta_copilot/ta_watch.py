@@ -96,6 +96,8 @@ def problems(service_active, state, now, feed_since=None, kalshi_since=None):
         found.append("/api/state not ready")
     if state.get("stale"):
         found.append("/api/state stale")
+    if state.get("history_stale"):
+        found.append("candle history stale: " + ", ".join(state["history_stale"]))
     if state.get("kalshi_stale") and kalshi_since is not None and now - kalshi_since >= KALSHI_STALE_SECONDS:
         found.append("Kalshi window missing or stale >8 min")
     feed_since = error_start_times(state, {}, now) if feed_since is None else feed_since

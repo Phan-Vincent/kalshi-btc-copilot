@@ -7,6 +7,10 @@ const TZ = -new Date().getTimezoneOffset() * 60;  // chart shows local time
 const shift = arr => arr.map(p => ({...p, time: p.time + TZ}));
 let tf = localStorageGet('ta_tf') || '1m', fitNext = true, last = null, strikeLine = null;
 let serverOffsetMs = 0;
+// Freshness is judged on this page's own monotonic clock, from when a snapshot
+// was last accepted: an open stream that stops sending must not stay "Live".
+const FRESH_LIMIT_MS = 10000;
+let shown = null, shownAt = 0, shownServerMs = 0, streamHeardAt = 0, serverProblem = false, pollFailed = false;
 
 function localStorageGet(k) { try { return localStorage.getItem(k); } catch { return null; } }
 function localStorageSet(k, v) { try { localStorage.setItem(k, v); } catch {} }
@@ -54,7 +58,7 @@ main.timeScale().subscribeVisibleTimeRangeChange(syncFollowers);
 
 document.querySelectorAll('#tabs button').forEach(b => {
   b.classList.toggle('on', b.dataset.tf === tf);
-  b.onclick = () => { tf = b.dataset.tf; localStorageSet('ta_tf', tf); fitNext = true;
+  b.onclick = () => { tf = b.dataset.tf; localStorageSet('ta_tf', tf); fitNext = true; shownServerMs = 0; abortPoll();
     document.querySelectorAll('#tabs button').forEach(x => x.classList.toggle('on', x === b)); connectStream(); };
 });
 
@@ -120,9 +124,30 @@ function quoteSources(bid, ask) {
 function render(s) {
   last = s;
   serverOffsetMs = Date.parse(s.server_time) - Date.now();
-  const f = s.frames[s.timeframe]; if (!f) return;
-  const c = f.chart, v = f.values, px = s.spot.price;
+  const f = s.frames[s.timeframe];
+  if (f) renderFrame(s, f); else clearFrame();
+  $('frameNote').textContent = frameNote(s, f);
+  renderShared(s, f);
+}
 
+function frameNote(s, f) {
+  if (!f) return `${s.timeframe} history unavailable (warming up or fetch failing); chart and readings hidden.`;
+  const h = f.history || {};
+  if (h.stale) return `${s.timeframe} candle history is ${Math.round(h.lag_seconds || 0)} s behind; readings may be stale.`;
+  if (h.gap) return `${s.timeframe} history has missing bars; readings may be unreliable.`;
+  return '';
+}
+
+function clearFrame() {
+  [candles, vol, rsiS, macdL, macdSig, macdH, ...Object.values(L)].forEach(x => x.setData([]));
+  candles.setMarkers([]);
+  if (strikeLine) { candles.removePriceLine(strikeLine); strikeLine = null; }
+  $('readings').innerHTML = ''; $('levels').innerHTML = '';
+  $('rsiNow').textContent = ''; $('macdNow').textContent = '';
+}
+
+function renderFrame(s, f) {
+  const c = f.chart, v = f.values;
   candles.setData(shift(c.candles));
   vol.setData(shift(c.volume.map(x => ({time: x.time, value: x.value,
     color: (x.up ? css('--bull') : css('--bear')) + '55'}))));
@@ -146,7 +171,20 @@ function render(s) {
   if (fitNext) { const n = c.candles.length; main.timeScale().setVisibleLogicalRange({from: n - 120, to: n + 3}); fitNext = false; }
   syncFollowers();  // setData on a follower can reset its range
   $('vwapNote').textContent = s.timeframe === '1m' ? '(anchored at window open)' : '(anchored at first loaded bar)';
+  $('readings').innerHTML = f.readings.map(r => r.family === 'context'
+    ? `<tr class="context"><td>${r.name}</td><td>${r.detail} · context, not counted in families</td><td>${badge(r.state)}</td></tr>`
+    : `<tr><td>${r.name}</td><td class="muted">${r.detail}</td><td>${badge(r.state)}</td></tr>`).join('');
+  const lv = [['Resistance (swing)', usd(v.resistance)], ['Support (swing)', usd(v.support)],
+    ['ATR 14', usd(v.atr)], ['BB upper / lower', `${usd(v.bb_upper, 0)} / ${usd(v.bb_lower, 0)}`],
+    ['BB width', v.bb_width_pct == null ? '—' : v.bb_width_pct.toFixed(2) + '%'], ['VWAP', usd(v.vwap)],
+    ['EMA 200', usd(v.ema200)]];
+  $('levels').innerHTML = lv.map(([a, b]) => `<tr><td class="muted">${a}</td><td>${b}</td></tr>`).join('');
+  $('rsiNow').textContent = v.rsi == null ? '' : '· ' + v.rsi.toFixed(1);
+  $('macdNow').textContent = v.macd_hist == null ? '' : `· hist ${v.macd_hist >= 0 ? '+' : ''}${v.macd_hist.toFixed(2)}`;
+}
 
+function renderShared(s, f) {
+  const px = s.spot.price, flow = s.order_flow || {};
   $('price').textContent = usd(px);
   $('composite').textContent = usd(s.composite);
   $('average60').textContent = usd(s.average_60s);
@@ -183,7 +221,7 @@ function render(s) {
     $('stripLow').textContent = usd(w.low_since_open);
     $('stripAvg').textContent = s.composite == null || s.average_60s == null ? '—' : sgn(s.composite - s.average_60s);
     $('pathNote').textContent = w.path_partial ? 'Observed path is partial for this window.' : '';
-    contextSpark('windowPath', c.candles, w.price_path, w, s.timeframe);
+    contextSpark('windowPath', f ? f.chart.candles : [], w.price_path, w, s.timeframe);
     $('bookAge').textContent = w.orderbook_age == null ? '' : `· book ${w.orderbook_age.toFixed(1)}s old`;
     $('yesDepth').textContent = `${depth(book.yes_bid)} / ${depth(book.yes_ask)}`;
     $('noDepth').textContent = `${depth(book.no_bid)} / ${depth(book.no_ask)}`;
@@ -214,14 +252,24 @@ function render(s) {
   $('flowCoverage').textContent = flow.partial_window ? 'Flow observed since connection; earlier window trades may be missing.' : 'Flow observed from window open.';
 
   // The headline tally always reads the 1m frame; the tabs drive the chart and side cards.
-  const t = (s.frames['1m'] || f).tally, n = t.bull + t.bear + t.neutral || 1;
+  const head = s.frames['1m'] || f;
+  if (!head) {
+    $('lean').textContent = '—'; $('families').textContent = '—';
+  } else renderTally(s, head);
+  renderMtf(s);
+  const errs = Object.entries(s.errors || {});
+  $('errors').textContent = errs.length ? 'Feed errors: ' + errs.map(([k, e]) => `${k} — ${e.error}`).join(' · ') : '';
+}
+
+function renderTally(s, head) {
+  const t = head.tally, n = t.bull + t.bear + t.neutral || 1;
   $('tallyTf').textContent = s.frames['1m'] ? '1m' : s.timeframe;
   $('readTf').textContent = $('lvlTf').textContent = s.timeframe;
   $('lean').innerHTML = `<span class="${t.lean === 'bullish' ? 'bull' : t.lean === 'bearish' ? 'bear' : 'neutral'}">${t.lean[0].toUpperCase() + t.lean.slice(1)}</span>`;
   $('bBull').style.width = t.bull / n * 100 + '%'; $('bNeu').style.width = t.neutral / n * 100 + '%'; $('bBear').style.width = t.bear / n * 100 + '%';
   $('nBull').textContent = `${t.bull} bull`; $('nNeu').textContent = `${t.neutral} neutral`; $('nBear').textContent = `${t.bear} bear`;
   // One vote per family (trend, momentum, 1m flow); the legacy count above is unchanged.
-  const fam = (s.frames['1m'] || f).family;
+  const fam = head.family;
   $('families').innerHTML = fam ? Object.entries(fam.votes).map(([k, vote]) =>
     k === 'flow' && fam.flow_ready === false
       ? `Flow <span class="neutral">warming up (${Math.floor(fam.flow_coverage_seconds || 0)}/60 s)</span>`
@@ -233,18 +281,9 @@ function render(s) {
       `${(rec.wilson95[1] * 100).toFixed(1)}%] · interval ${rec.includes_50 ? 'includes' : 'excludes'} 50%` +
       (rec.too_few ? ' · too few to judge' : '');
   if (rec?.skipped_lines > 0) $('tallyRecord').textContent += ` · log: ${rec.skipped_lines} unreadable lines skipped`;
+}
 
-  $('readings').innerHTML = f.readings.map(r => r.family === 'context'
-    ? `<tr class="context"><td>${r.name}</td><td>${r.detail} · context, not counted in families</td><td>${badge(r.state)}</td></tr>`
-    : `<tr><td>${r.name}</td><td class="muted">${r.detail}</td><td>${badge(r.state)}</td></tr>`).join('');
-  const lv = [['Resistance (swing)', usd(v.resistance)], ['Support (swing)', usd(v.support)],
-    ['ATR 14', usd(v.atr)], ['BB upper / lower', `${usd(v.bb_upper, 0)} / ${usd(v.bb_lower, 0)}`],
-    ['BB width', v.bb_width_pct == null ? '—' : v.bb_width_pct.toFixed(2) + '%'], ['VWAP', usd(v.vwap)],
-    ['EMA 200', usd(v.ema200)]];
-  $('levels').innerHTML = lv.map(([a, b]) => `<tr><td class="muted">${a}</td><td>${b}</td></tr>`).join('');
-  $('rsiNow').textContent = v.rsi == null ? '' : '· ' + v.rsi.toFixed(1);
-  $('macdNow').textContent = v.macd_hist == null ? '' : `· hist ${v.macd_hist >= 0 ? '+' : ''}${v.macd_hist.toFixed(2)}`;
-
+function renderMtf(s) {
   // Every tally reading (rows) for every timeframe (columns), with the detail on hover.
   const tfs = ['1m', '5m', '10m', '15m', '1h'].filter(k => s.frames[k]);
   $('mtfHead').innerHTML = `<tr><th></th>${tfs.map(k => `<th>${k}</th>`).join('')}</tr>`;
@@ -254,9 +293,6 @@ function render(s) {
     mark(s.frames[k].readings.find(r => r.name.startsWith(prefix)))).join('')}</tr>`).join('') +
     `<tr class="total"><td>Bull/bear</td>${tfs.map(k => { const x = s.frames[k].tally;
       return `<td class="${x.lean === 'bullish' ? 'bull' : x.lean === 'bearish' ? 'bear' : 'neutral'}">${x.bull}/${x.bear}</td>`; }).join('')}</tr>`;
-
-  const errs = Object.entries(s.errors || {});
-  $('errors').textContent = errs.length ? 'Feed errors: ' + errs.map(([k, e]) => `${k} — ${e.error}`).join(' · ') : '';
 }
 
 // Tally rows in server order: [label, reading-name prefix].
@@ -284,25 +320,61 @@ function tick() {
     $('countdown').textContent = `${Math.floor(left / 60)}:${String(Math.floor(left % 60)).padStart(2, '0')} left`;
     $('stripTime').textContent = $('countdown').textContent.replace(' left', '');
   }
+  checkFreshness();
 }
 
+function checkFreshness() {
+  const t = performance.now();
+  if (source && t - Math.max(streamHeardAt, streamOpenedAt) > FRESH_LIMIT_MS) {
+    // Open but silent: drop it, poll meanwhile, and reconnect.
+    source.close(); source = null;
+    startFallback();
+    if (!retry) retry = setTimeout(connectStream, 5000);
+  }
+  if (!shown) return;
+  const age = t - shownAt;
+  if (age > FRESH_LIMIT_MS) setLive(false, `No update for ${Math.floor(age / 1000)} s` + (pollFailed ? ' · server unreachable' : ''));
+  else setStatus(shown, age / 1000);
+}
+
+// Show a snapshot only if it is for the selected timeframe and not older than
+// the one on screen: a late poll response must not roll the page back.
+function accept(s) {
+  const at = Date.parse(s.server_time);
+  if (s.timeframe !== tf || !(at >= shownServerMs)) return false;
+  shownServerMs = at; shown = s; shownAt = performance.now(); serverProblem = false;
+  render(s);
+  setStatus(s);
+  return true;
+}
+
+// One poll at a time, with a deadline; a tab switch aborts the pending one.
+let pollCtl = null;
 async function poll() {
+  if (pollCtl) return;
+  const ctl = new AbortController(), want = tf, deadline = setTimeout(() => ctl.abort(), 5000);
+  pollCtl = ctl;
   try {
-    const r = await fetch('/api/state?tf=' + tf, {cache: 'no-store'});
+    const r = await fetch('/api/state?tf=' + want, {cache: 'no-store', signal: ctl.signal});
     const s = await r.json();
+    pollFailed = false;
+    if (ctl !== pollCtl || want !== tf) return;  // superseded
     if (!s.ready) { setLive(false, 'Warming up…'); return; }
-    render(s);
-    setStatus(s);
-  } catch (e) { setLive(false, 'Server unreachable'); }
+    accept(s);
+  } catch (e) { if (ctl === pollCtl) { pollFailed = true; setLive(false, 'Server unreachable'); } }
+  finally { clearTimeout(deadline); if (pollCtl === ctl) pollCtl = null; }
 }
+function abortPoll() { if (pollCtl) { pollCtl.abort(); pollCtl = null; } }
 function setLive(ok, text) { $('live').className = 'live ' + (ok ? 'ok' : 'bad'); $('liveText').textContent = text; }
-function setStatus(s) {
-  if (s.stale) setLive(false, 'STALE · spot or composite unavailable');
+function setStatus(s, aged = 0) {
+  if (serverProblem) setLive(false, 'Server state error');
+  else if (s.stale) setLive(false, 'STALE · spot or composite unavailable');
   else if (s.kalshi_stale) { $('live').className = 'live warn'; $('liveText').textContent = 'Live · Kalshi stale'; }
-  else setLive(true, `Live · spot ${s.spot_age.toFixed(1)}s`);
+  else if (s.history_stale?.includes(s.timeframe)) { $('live').className = 'live warn'; $('liveText').textContent = `Live · ${s.timeframe} history stale`; }
+  else setLive(true, `Live · spot ${(s.spot_age + aged).toFixed(1)}s`);
 }
 
-let source = null, retry = null, fallback = null, cache = null;
+let source = null, retry = null, fallback = null, cache = null, streamOpenedAt = 0;
 
 // Stream events after the first carry only the newest points of each series
 // (chart_tail / paths_tail); merge them by time into the last full snapshot.
@@ -343,17 +415,24 @@ function connectStream() {
   cache = null;
   if (!window.EventSource) { startFallback(); return; }
   const current = new EventSource('/api/stream?tf=' + encodeURIComponent(tf));
-  source = current;
+  source = current; streamOpenedAt = performance.now();
   current.addEventListener('state', event => {
     if (source !== current) return;
     try {
       const s = JSON.parse(event.data);
+      streamHeardAt = performance.now();
       if (!s.ready) { setLive(false, 'Warming up…'); return; }
+      if (s.timeframe !== tf) return;
       if (!expand(s)) { connectStream(); return; }  // tail without a base: resync
-      render(s);
-      setStatus(s);
+      accept(s);
       stopFallback();
     } catch { startFallback(); }
+  });
+  // The server could not serialize its state; it keeps the stream open.
+  current.addEventListener('problem', () => {
+    if (source !== current) return;
+    streamHeardAt = performance.now();
+    serverProblem = true; setLive(false, 'Server state error');
   });
   current.onerror = () => {
     if (source !== current) return;

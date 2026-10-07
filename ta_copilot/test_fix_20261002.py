@@ -247,6 +247,10 @@ class StateCacheTests(unittest.TestCase):
             with patch.object(ta, "cached_state", side_effect=lambda tf: next(values, {"ready": True, "stale": False})), \
                  patch.object(ta, "STREAM_INTERVAL", .01):
                 with urlopen(url, timeout=3) as response:
+                    # The failed serialization is announced, then the next good state follows.
+                    self.assertEqual(response.readline(), b"event: problem\n")
+                    self.assertEqual(json.loads(response.readline()[6:]), {"error": "state serialization"})
+                    self.assertEqual(response.readline(), b"\n")
                     self.assertEqual(response.readline(), b"event: state\n")
                     self.assertEqual(json.loads(response.readline()[6:])["ready"], True)
         finally:

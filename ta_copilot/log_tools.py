@@ -15,6 +15,8 @@ import os
 from pathlib import Path
 import sys
 
+from tally_report import record_problem
+
 WINDOW = 900
 
 
@@ -43,7 +45,7 @@ def read_rows(path):
             except (ValueError, UnicodeDecodeError):
                 bad += 1
                 continue
-            if isinstance(row, dict) and row_key(row):
+            if record_problem(row) is None:
                 rows.append(row)
             else:
                 bad += 1

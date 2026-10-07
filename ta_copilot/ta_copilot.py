@@ -24,6 +24,7 @@ from pathlib import Path
 from urllib.parse import parse_qs, quote, urlencode, urlparse
 from urllib.request import Request, urlopen
 
+from tally_report import record_problem
 from stream_flow import OrderFlow, parse_coinbase, parse_coinbase_spot, parse_kraken, MalformedMessage
 
 HERE = Path(__file__).resolve().parent
@@ -41,6 +42,14 @@ SERIES = "KXBTC15M"
 UA = {"User-Agent": "BTC-TA-Copilot/1.0 (read-only)", "Cache-Control": "no-cache"}
 TIMEFRAMES = {"1m": 60, "5m": 300, "10m": 600, "15m": 900, "1h": 3600}
 MAX_BARS = 300
+# Candle history quality, per timeframe. A frame is `stale` when its newest
+# fetched bar ended more than one bar plus HISTORY_SLACK seconds ago (the
+# ticker can patch the forming bar but cannot stand in for missing history),
+# and has a `gap` when bars are missing among its last HISTORY_GAP_BARS. The
+# ticker may open at most TICKER_BAR_LIMIT bars past the newest fetched bar.
+HISTORY_SLACK = 120
+HISTORY_GAP_BARS = 60
+TICKER_BAR_LIMIT = 3
 # Seconds between candle refreshes per timeframe; the forming bar is also
 # patched from the ticker on every spot poll.
 CANDLE_REFRESH = {"1m": 10, "5m": 30, "15m": 60, "1h": 120}
@@ -96,6 +105,31 @@ def iso(epoch):
 
 def parse_ts(text):
     return datetime.fromisoformat(text.replace("Z", "+00:00")).timestamp()
+
+
+def validate_candles(bars, sec, now):
+    """Raise ValueError if any bar can't be real OHLCV; the caller then keeps its last good history."""
+    if not bars:
+        raise ValueError("empty candle response")
+    for b in bars:
+        o, h, lo, c = b["open"], b["high"], b["low"], b["close"]
+        if min(o, h, lo, c) <= 0:
+            raise ValueError(f"nonpositive price in candle {b['time']}")
+        if not lo <= min(o, c) <= max(o, c) <= h:
+            raise ValueError(f"inconsistent OHLC in candle {b['time']}")
+        if b["volume"] < 0:
+            raise ValueError(f"negative volume in candle {b['time']}")
+        if b["time"] % sec or b["time"] > now + sec:
+            raise ValueError(f"misaligned candle time {b['time']}")
+
+
+def history_quality(bars, sec, fetched_last, now):
+    """Freshness and continuity of one timeframe's candles (see HISTORY_SLACK)."""
+    lag = None if fetched_last is None else max(0.0, now - fetched_last - sec)
+    recent = bars[-HISTORY_GAP_BARS:]
+    return {"lag_seconds": None if lag is None else round(lag, 1),
+            "stale": lag is None or lag > sec + HISTORY_SLACK,
+            "gap": any(b["time"] - a["time"] != sec for a, b in zip(recent, recent[1:]))}
 
 
 def finite_float(value):
@@ -549,6 +583,7 @@ class Feed:
         self.lock = threading.Lock()
         self.bars = {tf: [] for tf in TIMEFRAMES}
         self.bars_at = {tf: 0.0 for tf in TIMEFRAMES}
+        self.fetched_last = {tf: None for tf in TIMEFRAMES}  # newest fetched bar's start
         self.spot = None
         self.spot_at = 0.0
         self.market = None
@@ -577,6 +612,8 @@ class Feed:
         self.feed_modes = {"Coinbase": "REST fallback", "Kraken": "REST fallback"}
         self.socket_connected = {"Coinbase": False, "Kraken": False}
         self.stream_last_at = {"Coinbase": 0.0, "Kraken": 0.0}
+        # Receipt time of the last message vs time of the newest trade seen:
+        # a replayed or out-of-order frame is activity, not fresh data.
         self.stream_trade_at = {"Coinbase": 0.0, "Kraken": 0.0}
         self.flow = OrderFlow(large_trade_usd=LARGE_TRADE_USD)
         self.flow_gap_window = int(time.time() // 900) * 900
@@ -604,12 +641,17 @@ class Feed:
                                           "close": finite_float(r["close"]), "volume": finite_float(r["volume"])}
             end -= 300 * sec
         bars = sorted(found.values(), key=lambda b: b["time"])
+        validate_candles(bars, sec, time.time())
         derived = {name: aggregate(bars, width) for name, (src, width) in DERIVED.items() if src == tf}
         with self.lock:
             now = time.time()
-            self.bars[tf], self.bars_at[tf] = bars[-MAX_BARS:], now
+            held = self.fetched_last[tf]
+            if held is not None and bars[-1]["time"] < held:
+                raise ValueError("candle response older than held history")
+            self.bars[tf], self.bars_at[tf], self.fetched_last[tf] = bars[-MAX_BARS:], now, bars[-1]["time"]
             for name, agg in derived.items():
                 self.bars[name], self.bars_at[name] = agg[-MAX_BARS:], now
+                self.fetched_last[name] = agg[-1]["time"] if agg else None
             self.errors.pop(f"candles_{tf}", None)
 
     def poll_spot(self):
@@ -641,7 +683,7 @@ class Feed:
                 if bars[-1]["time"] == start:
                     b = bars[-1]
                     b["close"], b["high"], b["low"] = price, max(b["high"], price), min(b["low"], price)
-                elif bars[-1]["time"] < start:
+                elif bars[-1]["time"] < start and start - (self.fetched_last[tf] or start) <= TICKER_BAR_LIMIT * sec:
                     bars.append({"time": start, "open": price, "high": price, "low": price,
                                  "close": price, "volume": 0.0})
 
@@ -654,10 +696,9 @@ class Feed:
 
     def stream_active(self, name):
         with self.lock:
-            active = self.socket_connected[name] and time.time() - self.stream_last_at[name] < 10
-            if name == "Coinbase":
-                active = active and time.time() - self.stream_trade_at["Coinbase"] <= VENUE_MAX_AGE
-            return active
+            now = time.time()
+            return (self.socket_connected[name] and now - self.stream_last_at[name] < 10
+                    and now - self.stream_trade_at[name] <= VENUE_MAX_AGE)
 
     def handle_coinbase_message(self, message):
         data = json.loads(message) if isinstance(message, str) else message
@@ -687,12 +728,16 @@ class Feed:
             return
         now = time.time()
         with self.lock:
+            self.stream_last_at["Kraken"] = now
             for trade in trades:
                 if trade.timestamp > now + 2 or now - trade.timestamp > 20:
                     continue
                 self.flow.add_trade(trade)
+                self.stream_trade_at["Kraken"] = max(self.stream_trade_at["Kraken"], trade.timestamp)
+                current = self.venues.get("Kraken")
+                if current and trade.timestamp < current["at"]:
+                    continue  # replayed or out of order: never move the quote back
                 self.venues["Kraken"] = {"price": trade.price, "at": trade.timestamp, "age_basis": "trade"}
-                self.stream_last_at["Kraken"] = now
                 self.feed_modes["Kraken"] = "WebSocket"
                 self.errors.pop("venue_kraken", None)
 
@@ -1009,13 +1054,29 @@ class Feed:
                 with self.lock:
                     self._note("kalshi_context", exc)
 
+    def run_spot(self):
+        """REST spot fallback, on its own thread so slow candle requests can't delay it."""
+        next_at = 0.0
+        while True:
+            wait = next_at - time.monotonic()
+            if wait > 0:
+                time.sleep(wait)
+            next_at = time.monotonic() + SPOT_REFRESH
+            if self.stream_active("Coinbase"):
+                continue
+            try:
+                self.poll_spot()
+            except Exception as exc:
+                with self.lock:
+                    self._note("spot", exc)
+
     def run(self):
+        """Candle refreshes. Spot fallback is run_spot."""
         due = {}
         while True:
             now = time.time()
-            jobs = [] if self.stream_active("Coinbase") else [("spot", SPOT_REFRESH, self.poll_spot)]
-            jobs += [(f"candles_{tf}", CANDLE_REFRESH[tf], lambda tf=tf: self.poll_candles(tf))
-                     for tf in FETCHES]
+            jobs = [(f"candles_{tf}", CANDLE_REFRESH[tf], lambda tf=tf: self.poll_candles(tf))
+                    for tf in FETCHES]
             for key, every, fn in jobs:
                 if now >= due.get(key, 0):
                     try:
@@ -1031,6 +1092,7 @@ class Feed:
         now = time.time()
         with self.lock:
             bars = {k: [dict(b) for b in v] for k, v in self.bars.items()}
+            fetched_last = dict(self.fetched_last)
             spot, spot_at = dict(self.spot) if self.spot else None, self.spot_at
             market, market_at = self.market, self.market_at
             promoted_at = self.market_promoted_at
@@ -1041,7 +1103,7 @@ class Feed:
             modes = {"Bitstamp": "REST", "Gemini": "REST"}
             modes.update({name: ("WebSocket" if self.socket_connected[name] and
                                  now - self.stream_last_at[name] < 10 and
-                                 (name != "Coinbase" or now - self.stream_trade_at[name] <= VENUE_MAX_AGE)
+                                 now - self.stream_trade_at[name] <= VENUE_MAX_AGE
                                  else "REST fallback")
                           for name in self.feed_modes})
             flow = self.flow.snapshot(now)
@@ -1103,8 +1165,9 @@ class Feed:
             window.update(window_distance(strike, composite, window["seconds_left"], sig,
                                           close_ts, window_points))
 
-        frames = {}
+        frames, history = {}, {}
         for name, b in bars.items():
+            history[name] = history_quality(b, TIMEFRAMES[name], fetched_last[name], now)
             if len(b) < 30:
                 continue
             a = (analyze(b, price, anchor, "VWAP (window)") if name == "1m"
@@ -1113,7 +1176,8 @@ class Feed:
                 a["values"]["close"] = b[-1]["close"]
                 a["values"]["close_prev"] = b[-2]["close"] if len(b) > 1 else None
             frame_family(a, name, (flow.get("one_minute") or {}).get("imbalance"), flow_coverage)
-            frames[name] = a if name == tf else {k: a[k] for k in ("values", "readings", "tally", "family")}
+            a["history"] = history[name]
+            frames[name] = a if name == tf else {k: a[k] for k in ("values", "readings", "tally", "family", "history")}
         m1 = bars["1m"]
 
         def ref(minutes):
@@ -1128,6 +1192,11 @@ class Feed:
                 "average_60s": average_60s, "venues": venues,
                 "feed_modes": modes, "order_flow": flow,
                 "candle_age": {k: now - v for k, v in self.bars_at.items()},
+                # Data quality per timeframe, apart from fetch success: stale
+                # or gapped history still yields readings, so it is flagged.
+                "history": history,
+                "history_stale": [k for k in TIMEFRAMES if history[k]["stale"]],
+                "frames_unavailable": [k for k in TIMEFRAMES if k not in frames],
                 "stale": now - spot_at > STALE_AFTER or now - parse_ts(spot["time"]) > VENUE_MAX_AGE
                 or composite is None,
                 # Freshness of the displayed window: time since the last
@@ -1219,6 +1288,7 @@ def minute_record(state, now):
             "yes_bid": quote("yes_bid"), "yes_ask": quote("yes_ask"),
             "flow_imbalance_1m": ((state.get("order_flow") or {}).get("one_minute") or {}).get("imbalance"),
             "stale": state.get("stale"), "kalshi_stale": state.get("kalshi_stale"),
+            "history_stale": state.get("history_stale"),
             "timeframes": frames}
 
 
@@ -1299,26 +1369,20 @@ class TallyLogger:
                     except (ValueError, UnicodeDecodeError):
                         skipped.append(number)
                         continue
-                    if not isinstance(row, dict):
+                    problem = record_problem(row)
+                    if problem == "unknown type":
+                        continue
+                    if problem:
                         skipped.append(number)
                         continue
-                    if row.get("type") == "open":
-                        if "ticker" not in row:
-                            skipped.append(number)
-                            continue
+                    if row["type"] == "open":
                         self.opened.setdefault(row["ticker"], row)
-                    elif row.get("type") == "settled":
-                        if "ticker" not in row:
-                            skipped.append(number)
-                            continue
+                    elif row["type"] == "settled":
                         if row["ticker"] not in self.settled:
                             self.settled.add(row["ticker"])
                             self.results[row["ticker"]] = row.get("result")
                             self.expirations[row["ticker"]] = row.get("expiration_value")
-                    elif row.get("type") == "close":
-                        if "ticker" not in row:
-                            skipped.append(number)
-                            continue
+                    elif row["type"] == "close":
                         self.closes.setdefault(row["ticker"], row)
         except FileNotFoundError:
             pass
@@ -1669,6 +1733,9 @@ class Handler(BaseHTTPRequestHandler):
                         body = json.dumps(payload, separators=(",", ":"), allow_nan=False)
                     except ValueError as exc:
                         note_state_error(exc)
+                        # Tell the page now; it would otherwise only see silence.
+                        self.wfile.write(b'event: problem\ndata: {"error":"state serialization"}\n\n')
+                        self.wfile.flush()
                         time.sleep(STREAM_INTERVAL)
                         continue
                     clear_state_error()
@@ -1733,6 +1800,7 @@ def main():
     threading.Thread(target=FEED.run_market_context, daemon=True).start()
     threading.Thread(target=FEED.run_composite, daemon=True).start()
     threading.Thread(target=FEED.run, daemon=True).start()
+    threading.Thread(target=FEED.run_spot, daemon=True).start()
     for name in ("Coinbase", "Kraken"):
         threading.Thread(target=FEED.run_stream, args=(name,), daemon=True).start()
     server = ThreadingHTTPServer((args.host, args.port), Handler)

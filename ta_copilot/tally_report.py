@@ -37,6 +37,67 @@ EXPLORATORY_NOTE = ("Sections marked [exploratory] make many comparisons; expect
                     "Only the PRIMARY section is a pre-declared test.")
 
 
+# --- record schema ---------------------------------------------------------------
+# One check shared by every reader (this report, the server's startup load and
+# log_tools), so a row that parses as JSON but can't be used is skipped and
+# counted the same way everywhere instead of crashing a reader or becoming
+# evidence. Numbers may be JSON numbers or numeric strings (Kalshi sends
+# strings) but must be finite: the string "NaN" is not a value.
+RECORD_TYPES = ("open", "settled", "close", "minute")
+NUMERIC_FIELDS = ("composite", "composite_spot", "average_60s", "target", "sigma_1m_usd", "seconds_left",
+                  "proxy_avg_60s", "expiration_value", "flow_imbalance_1m", "capture_delay_seconds",
+                  "flow_coverage_seconds")
+QUOTE_FIELDS = ("yes_bid", "yes_ask")
+
+
+def finite_or_none(value):
+    """True for None or a finite number / numeric string; booleans are not numbers."""
+    if value is None:
+        return True
+    if isinstance(value, bool) or not isinstance(value, (int, float, str)):
+        return False
+    try:
+        return math.isfinite(float(value))
+    except ValueError:
+        return False
+
+
+def record_problem(row):
+    """Why a decoded log row is unusable, or None if it is a valid research record.
+
+    Rows of other types are not research records and return "unknown type"."""
+    if not isinstance(row, dict):
+        return "not an object"
+    kind = row.get("type")
+    if kind not in RECORD_TYPES:
+        return "unknown type"
+    if not isinstance(row.get("ticker"), str) or not row["ticker"]:
+        return "bad ticker"
+    if kind == "minute":
+        minute = row.get("minute")
+        if isinstance(minute, bool) or not isinstance(minute, int) or not 0 <= minute <= 15:
+            return "bad minute"
+    for key in ("captured_at", "recorded_at", "open_time", "close_time"):
+        if key in row and row[key] is not None and not isinstance(row[key], str):
+            return f"bad {key}"
+    for key in NUMERIC_FIELDS:
+        if not finite_or_none(row.get(key)):
+            return f"bad {key}"
+    for key in QUOTE_FIELDS:
+        quote = row.get(key)
+        if not (finite_or_none(quote) or isinstance(quote, dict) and finite_or_none(quote.get("price"))):
+            return f"bad {key}"
+    frames = row.get("timeframes")
+    if frames is not None:
+        if not isinstance(frames, dict) or not all(isinstance(f, dict) for f in frames.values()):
+            return "bad timeframes"
+        for frame in frames.values():
+            net = frame.get("family_net")
+            if net is not None and (isinstance(net, bool) or not isinstance(net, int)):
+                return "bad family_net"
+    return None
+
+
 def wilson95(hits, n):
     if n == 0:
         return None
@@ -65,30 +126,22 @@ def load_rows(path, skipped_lines=None, closes=None):
                 except (ValueError, UnicodeDecodeError):
                     skipped += 1
                     continue
-                if not isinstance(row, dict):
+                problem = record_problem(row)
+                if problem == "unknown type":
+                    continue  # not a research row; not counted as damage
+                if problem:
                     skipped += 1
                     continue
-                kind = row.get("type")
+                kind = row["type"]
                 if kind == "open":
-                    if "ticker" in row:
-                        opened.setdefault(row["ticker"], row)
-                    else:
-                        skipped += 1
+                    opened.setdefault(row["ticker"], row)
                 elif kind == "settled":
-                    if "ticker" in row:
-                        settled.setdefault(row["ticker"], row)
-                    else:
-                        skipped += 1
+                    settled.setdefault(row["ticker"], row)
                 elif kind == "close":
-                    if "ticker" not in row:
-                        skipped += 1
-                    elif closes is not None:
+                    if closes is not None:
                         closes.setdefault(row["ticker"], row)
-                elif kind == "minute":
-                    if "ticker" in row and "minute" in row:
-                        minutes.setdefault(row["ticker"], {}).setdefault(row["minute"], row)
-                    else:
-                        skipped += 1
+                else:
+                    minutes.setdefault(row["ticker"], {}).setdefault(row["minute"], row)
     except FileNotFoundError:
         pass
     if skipped_lines is not None:
