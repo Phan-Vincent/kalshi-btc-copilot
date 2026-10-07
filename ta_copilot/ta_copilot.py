@@ -129,7 +129,8 @@ def history_quality(bars, sec, fetched_last, now):
     recent = bars[-HISTORY_GAP_BARS:]
     return {"lag_seconds": None if lag is None else round(lag, 1),
             "stale": lag is None or lag > sec + HISTORY_SLACK,
-            "gap": any(b["time"] - a["time"] != sec for a, b in zip(recent, recent[1:]))}
+            "gap": any(b["time"] - a["time"] != sec for a, b in zip(recent, recent[1:]))
+            or any(b.get("partial") for b in recent)}
 
 
 def finite_float(value):
@@ -560,19 +561,31 @@ def frame_family(result, name, flow_imbalance, flow_coverage=None):
     return result
 
 
-def aggregate(bars, width):
+def aggregate(bars, width, source=None):
     """Merge sorted bars into `width`-second bars aligned to the epoch, dropping a
-    leading group that doesn't start on the boundary (it would be partial)."""
+    leading group that doesn't start on the boundary (it would be partial).
+
+    With ``source`` (the input bar width), a bucket missing any of its source
+    bars is marked ``"partial": True``; the last bucket is exempt while its
+    missing bars are still in the future (it is the forming bar). The gap check
+    in ``history_quality`` counts partial bars.
+    """
     groups = {}
     for b in bars:
         groups.setdefault(b["time"] // width * width, []).append(b)
     out = []
+    last_source = bars[-1]["time"] if bars else None
     for start, g in sorted(groups.items()):
         if not out and g[0]["time"] != start:
             continue
-        out.append({"time": start, "open": g[0]["open"], "close": g[-1]["close"],
-                    "high": max(b["high"] for b in g), "low": min(b["low"] for b in g),
-                    "volume": sum(b["volume"] for b in g)})
+        bar = {"time": start, "open": g[0]["open"], "close": g[-1]["close"],
+               "high": max(b["high"] for b in g), "low": min(b["low"] for b in g),
+               "volume": sum(b["volume"] for b in g)}
+        if source:
+            expected = {t for t in range(start, start + width, source) if t <= last_source}
+            if not expected <= {b["time"] for b in g}:
+                bar["partial"] = True
+        out.append(bar)
     return out
 
 
@@ -639,10 +652,10 @@ class Feed:
                 found[int(r["start"])] = {"time": int(r["start"]), "low": finite_float(r["low"]),
                                           "high": finite_float(r["high"]), "open": finite_float(r["open"]),
                                           "close": finite_float(r["close"]), "volume": finite_float(r["volume"])}
-            end -= 300 * sec
+            end -= 299 * sec  # the next page ends where this one starts: no bar falls between them
         bars = sorted(found.values(), key=lambda b: b["time"])
         validate_candles(bars, sec, time.time())
-        derived = {name: aggregate(bars, width) for name, (src, width) in DERIVED.items() if src == tf}
+        derived = {name: aggregate(bars, width, sec) for name, (src, width) in DERIVED.items() if src == tf}
         with self.lock:
             now = time.time()
             held = self.fetched_last[tf]
@@ -1197,6 +1210,7 @@ class Feed:
                 "history": history,
                 "history_stale": [k for k in TIMEFRAMES if history[k]["stale"]],
                 "frames_unavailable": [k for k in TIMEFRAMES if k not in frames],
+                "watcher_age": watcher_age(now),
                 "stale": now - spot_at > STALE_AFTER or now - parse_ts(spot["time"]) > VENUE_MAX_AGE
                 or composite is None,
                 # Freshness of the displayed window: time since the last
@@ -1290,6 +1304,12 @@ def minute_record(state, now):
             "stale": state.get("stale"), "kalshi_stale": state.get("kalshi_stale"),
             "history_stale": state.get("history_stale"),
             "timeframes": frames}
+
+
+# Kalshi can publish `result` before `expiration_value`. Readers keep the first
+# settled row per ticker, so a row written without the value would hide it for
+# good: hold the row until the value appears or this long after close.
+SETTLE_VALUE_WAIT = 30 * 60
 
 
 def settled_record(ticker, market, now):
@@ -1480,6 +1500,8 @@ class TallyLogger:
                 record = settled_record(ticker, market, now)
                 if record is None:
                     continue
+                if "expiration_value" not in record and now - parse_ts(row["close_time"]) < SETTLE_VALUE_WAIT:
+                    continue  # result is in, value not yet: ask again next pass
                 self.append(record)
                 self.settled.add(ticker)
                 self.results[ticker] = record["result"]
@@ -1622,6 +1644,16 @@ STATE_CACHE = {}
 STATE_CACHE_LOCK = threading.Lock()
 SSE_LIMIT = 12
 SSE_SLOTS = threading.BoundedSemaphore(SSE_LIMIT)
+# The Acer watcher stores its state after every completed run, so the file's
+# age is its heartbeat; /api/state reports it for the off-Acer alarm.
+WATCH_STATE = HERE / "state" / "ta_watch_state.json"
+
+
+def watcher_age(now):
+    try:
+        return round(now - WATCH_STATE.stat().st_mtime, 1)
+    except OSError:
+        return None
 SOCKET_TIMEOUT = 30
 
 

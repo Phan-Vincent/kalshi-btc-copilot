@@ -22,6 +22,9 @@ ACER = ("homelab.example-tailnet.ts.net", 22)  # MagicDNS name of the Acer
 DASHBOARD = "https://homelab.example-tailnet.ts.net:11443/api/state?tf=1m"
 INTERNET = ("api.telegram.org", 443)
 FAILS_BEFORE_ALERT = 2
+# The Acer's own watcher runs every 5 min and its state file's age is served
+# as `watcher_age`; three missed runs means it has stopped (None: older server).
+WATCHER_MAX_AGE = 15 * 60
 REPEAT_SECONDS = 6 * 3600
 
 
@@ -48,6 +51,9 @@ def dashboard_problem():
     if state.get("kalshi_stale"):
         # Two consecutive checks (5+ min) are needed to alert, so a rollover won't.
         return "dashboard Kalshi window missing or stale"
+    age = state.get("watcher_age")
+    if isinstance(age, (int, float)) and age > WATCHER_MAX_AGE:
+        return f"Acer watcher has not completed a run for {age / 60:.0f} min"
     return None
 
 

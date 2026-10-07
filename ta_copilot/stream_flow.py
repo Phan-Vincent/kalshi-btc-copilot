@@ -653,7 +653,7 @@ class OrderFlow:
         self.coverage_start = None
 
         self.counters = {"accepted": 0, "duplicate": 0, "outside_window": 0,
-                         "filtered_product": 0}
+                         "filtered_product": 0, "invalid": 0}
 
     # ------------------------------------------------------------ window
 
@@ -729,6 +729,12 @@ class OrderFlow:
             self._open_window(opened)
         elif opened < self.window_open:
             self.counters["outside_window"] += 1
+            return False
+
+        # Finite but absurd sizes (1e308) would make the totals infinite and
+        # the imbalance NaN, which strict JSON then refuses to serve.
+        if not (math.isfinite(trade.notional) and math.isfinite(self.buy_volume + self.sell_volume + trade.size)):
+            self.counters["invalid"] += 1
             return False
 
         key = trade.key
