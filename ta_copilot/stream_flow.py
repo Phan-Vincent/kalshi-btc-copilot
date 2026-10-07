@@ -653,7 +653,9 @@ class OrderFlow:
         self.coverage_start = None
 
         self.counters = {"accepted": 0, "duplicate": 0, "outside_window": 0,
-                         "filtered_product": 0, "invalid": 0}
+                         "filtered_product": 0}
+
+        self.counters["invalid"] = 0  # non-finite notional or volume (see add_trade)
 
     # ------------------------------------------------------------ window
 
