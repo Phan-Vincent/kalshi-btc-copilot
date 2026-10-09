@@ -136,9 +136,28 @@ function render(s) {
 function frameNote(s, f) {
   if (!f) return `${s.timeframe} history unavailable (warming up or fetch failing); chart and readings hidden.`;
   const h = f.history || {};
-  if (h.stale) return `${s.timeframe} candle history is ${Math.round(h.lag_seconds || 0)} s behind; readings may be stale.`;
-  if (h.gap) return `${s.timeframe} history has missing bars; readings may be unreliable.`;
+  if (h.stale) return `${s.timeframe} candle history is ${Math.round(h.lag_seconds || 0)} s behind; directional readings unavailable.`;
+  if (h.gap) return `${s.timeframe} history has missing bars; directional readings unavailable.`;
   return '';
+}
+
+function readingProblem(s, tf) {
+  if (s.no_update) return 'no update for over 10 s';
+  const f = s.frames[tf];
+  if (!f) return `${tf} history unavailable (warming up or fetch failing)`;
+  if (s.history_stale?.includes(tf) || f.history?.stale) return `${tf} history stale`;
+  if (f.history?.gap) return `${tf} history has missing bars`;
+  if (s.stale) return 'spot or composite unavailable';
+  return '';
+}
+
+function compositeQuality(s) {
+  const included = Object.values(s.venues || {}).filter(q => q.included && Number.isFinite(q.price));
+  const n = included.length;
+  if (!n || s.composite == null) return `Composite unavailable · ${n}/4 venues included`;
+  const prices = included.map(q => q.price);
+  return `${n}/4 venues included · ` + (n === 1 ? 'degraded: single venue' :
+    `venue range ${usd(Math.max(...prices) - Math.min(...prices))}`);
 }
 
 function clearFrame() {
@@ -174,7 +193,10 @@ function renderFrame(s, f) {
   if (fitNext) { const n = c.candles.length; main.timeScale().setVisibleLogicalRange({from: n - 120, to: n + 3}); fitNext = false; }
   syncFollowers();  // setData on a follower can reset its range
   $('vwapNote').textContent = s.timeframe === '1m' ? '(anchored at window open)' : '(anchored at first loaded bar)';
-  $('readings').innerHTML = f.readings.map(r => r.family === 'context'
+  const problem = readingProblem(s, s.timeframe);
+  $('readings').innerHTML = f.readings.map(r => problem
+    ? `<tr class="context"><td>${r.name}</td><td>${esc(problem)}</td><td class="muted">Unavailable</td></tr>`
+    : r.family === 'context'
     ? `<tr class="context"><td>${r.name}</td><td>${r.detail} · context, not counted in families</td><td>${badge(r.state)}</td></tr>`
     : `<tr><td>${r.name}</td><td class="muted">${r.detail}</td><td>${badge(r.state)}</td></tr>`).join('');
   const lv = [['Resistance (swing)', usd(v.resistance)], ['Support (swing)', usd(v.support)],
@@ -191,13 +213,20 @@ function renderShared(s, f) {
   $('price').textContent = usd(px);
   $('composite').textContent = usd(s.composite);
   $('average60').textContent = usd(s.average_60s);
+  $('compositeQuality').textContent = compositeQuality(s);
   // Our closing-minute composite mean vs Kalshi's settlement value (BRTI 60 s average).
   const proxy = s.proxy_record;
   $('proxyRecord').textContent = !proxy || !proxy.n ? 'Proxy vs settlement: no scored windows yet'
-    : `Proxy vs settlement (last ${proxy.n} windows): median ${usd(proxy.median_abs)}, 90% within ${usd(proxy.p90_abs)}, ` +
+    : `Historical proxy error (last ${proxy.n} scored windows): median ${usd(proxy.median_abs)}, 90% within ${usd(proxy.p90_abs)}, ` +
       `bias ${sgn(proxy.bias)}` + (proxy.too_few ? ' · too few to judge' : '');
+  const coverage = proxy?.coverage;
+  // Listed in the server's check order; only closes awaiting settlement can still be scored.
+  $('proxyCoverage').textContent = coverage ?
+    `All recorded closes: ${coverage.scored}/${coverage.total_closes} scored · ${coverage.incomplete_samples} incomplete samples · ` +
+    `${coverage.awaiting_settlement || 0} awaiting settlement · ${coverage.missing_settlement} settlement value unavailable · ` +
+    `${coverage.invalid_proxy} invalid proxy (each close counted once, in this order).` : '';
   $('venues').innerHTML = Object.entries(s.venues || {}).map(([name, q]) =>
-    `<tr><td>${name} ${s.feed_modes?.[name] ? '(' + s.feed_modes[name] + ')' : ''}</td><td>${usd(q.price)}</td><td>${q.age == null ? '—' : q.age.toFixed(1) + 's'} ${q.included ? 'included' : 'excluded: ' + q.excluded_reason}</td></tr>`).join('');
+    `<tr><td>${name} ${s.feed_modes?.[name] ? '(' + s.feed_modes[name] + ')' : ''}</td><td>${usd(q.price)}</td><td>${q.age == null ? '—' : q.age.toFixed(1) + 's'} (${q.age_basis === 'fetch' ? 'fetch age' : q.age_basis === 'trade' ? 'trade age' : q.age_basis === 'ticker' ? 'exchange timestamp age' : 'age basis unavailable'}) · ${q.included ? 'included' : 'excluded: ' + q.excluded_reason}</td></tr>`).join('');
   $('bidask').textContent = `${usd(s.spot.bid)} / ${usd(s.spot.ask)}`;
   $('chg').innerHTML = `${pct(px, s.ref_15m)} / ${pct(px, s.ref_1h)}`;
 
@@ -210,8 +239,13 @@ function renderShared(s, f) {
     const side = w.distance == null ? '' : w.distance >= 0 ? 'bull' : 'bear';
     $('distBlock').className = 'dist-block ' + side;
     $('dist').innerHTML = w.distance == null ? '—' : `<span class="${side}">${sgn(w.distance)} ${w.distance >= 0 ? 'above' : 'below'}</span>`;
-    $('sig').textContent = w.distance_sigmas == null ? '—' : `${w.distance_sigmas >= 0 ? '+' : '−'}${Math.abs(w.distance_sigmas).toFixed(2)}σ · sd ${usd(w.distance_sd_usd, 0)}`;
-    if (w.missing_seconds) $('sig').textContent += ` · ${w.missing_seconds} missing sample s projected`;
+    const sigmaProblem = readingProblem(s, '1m');
+    $('sig').textContent = sigmaProblem ? `Unavailable · ${sigmaProblem}` :
+      w.distance_sigmas == null ? '—' : `${w.distance_sigmas >= 0 ? '+' : '−'}${Math.abs(w.distance_sigmas).toFixed(2)}σ · sd ${usd(w.distance_sd_usd, 0)}`;
+    // Without a composite or target the server makes no projection and counts no samples.
+    $('settlementCoverage').textContent = w.distance_source === 'projected 60s average' && w.distance != null ?
+      `${w.observed_seconds || 0}/60 s observed · ${60 - (w.observed_seconds || 0)} s projected ` +
+      `(${w.missing_seconds || 0} missing elapsed seconds; remainder still ahead). Historical proxy error is separate.` : '';
     const book = w.orderbook_age != null && w.orderbook_age <= 10 ? w.orderbook || {} : {};
     const q = w.display_quotes || {};
     $('yesLabel').textContent = 'YES bid / ask';
@@ -235,6 +269,7 @@ function renderShared(s, f) {
     $('kalshiAge').textContent = 'Kalshi window unavailable';
     ['ticker', 'strike', 'dist', 'sig', 'yes', 'no'].forEach(id => $(id).textContent = id === 'ticker' ? '' : '—');
     $('distanceLabel').textContent = 'Composite vs target';
+    $('settlementCoverage').textContent = '';
     $('distBlock').className = 'dist-block';
     $('countdown').textContent = 'No open window';
     $('yesLabel').textContent = 'YES bid / ask'; $('noLabel').textContent = 'NO bid / ask';
@@ -255,34 +290,38 @@ function renderShared(s, f) {
   $('flowCoverage').textContent = flow.partial_window ? 'Flow observed since connection; earlier window trades may be missing.' : 'Flow observed from window open.';
 
   // The headline tally always reads the 1m frame; the tabs drive the chart and side cards.
-  const head = s.frames['1m'] || f;
-  if (!head) {
-    $('lean').textContent = '—'; $('families').textContent = '—'; $('tallyStale').textContent = '';
-  } else renderTally(s, head);
+  renderTally(s, s.frames['1m']);
   renderMtf(s);
   const errs = Object.entries(s.errors || {});
   $('errors').textContent = errs.length ? 'Feed errors: ' + errs.map(([k, e]) => `${k} — ${e.error}`).join(' · ') : '';
 }
 
 function renderTally(s, head) {
-  const t = head.tally, n = t.bull + t.bear + t.neutral || 1;
-  const headTf = s.frames['1m'] ? '1m' : s.timeframe;
-  $('tallyTf').textContent = headTf;
-  $('tallyStale').textContent = s.history_stale?.includes(headTf) ? `${headTf} history stale; tally may be out of date` : '';
+  const problem = readingProblem(s, '1m');
+  $('tallyTf').textContent = '1m';
+  $('tallyStale').textContent = problem;
   $('readTf').textContent = $('lvlTf').textContent = s.timeframe;
-  $('lean').innerHTML = `<span class="${t.lean === 'bullish' ? 'bull' : t.lean === 'bearish' ? 'bear' : 'neutral'}">${t.lean[0].toUpperCase() + t.lean.slice(1)}</span>`;
-  $('bBull').style.width = t.bull / n * 100 + '%'; $('bNeu').style.width = t.neutral / n * 100 + '%'; $('bBear').style.width = t.bear / n * 100 + '%';
-  $('nBull').textContent = `${t.bull} bull`; $('nNeu').textContent = `${t.neutral} neutral`; $('nBear').textContent = `${t.bear} bear`;
-  // One vote per family (trend, momentum, 1m flow); the legacy count above is unchanged.
-  const fam = head.family;
-  $('families').innerHTML = fam ? Object.entries(fam.votes).map(([k, vote]) =>
-    k === 'flow' && fam.flow_ready === false
-      ? `Flow <span class="neutral">warming up (${Math.floor(fam.flow_coverage_seconds || 0)}/60 s)</span>`
-      : `${k[0].toUpperCase() + k.slice(1)} <span class="${vote}">${vote}</span>`).join(' · ') +
-    ` → net ${fam.net > 0 ? '+' : ''}${fam.net} (<span class="${fam.lean === 'bullish' ? 'bull' : fam.lean === 'bearish' ? 'bear' : 'neutral'}">${fam.lean}</span>)` : '—';
+  if (problem) {
+    $('lean').innerHTML = '<span class="muted">Unavailable</span>';
+    $('families').innerHTML = `<span class="muted">${esc(problem)}</span>`;
+    ['bBull', 'bNeu', 'bBear'].forEach(id => $(id).style.width = '0%');
+    ['nBull', 'nNeu', 'nBear'].forEach(id => $(id).textContent = '');
+  } else {
+    const t = head.tally, n = t.bull + t.bear + t.neutral || 1;
+    $('lean').innerHTML = `<span class="${t.lean === 'bullish' ? 'bull' : t.lean === 'bearish' ? 'bear' : 'neutral'}">${t.lean[0].toUpperCase() + t.lean.slice(1)}</span>`;
+    $('bBull').style.width = t.bull / n * 100 + '%'; $('bNeu').style.width = t.neutral / n * 100 + '%'; $('bBear').style.width = t.bear / n * 100 + '%';
+    $('nBull').textContent = `${t.bull} bull`; $('nNeu').textContent = `${t.neutral} neutral`; $('nBear').textContent = `${t.bear} bear`;
+    // One vote per family (trend, momentum, 1m flow); the legacy count above is unchanged.
+    const fam = head.family;
+    $('families').innerHTML = fam ? Object.entries(fam.votes).map(([k, vote]) =>
+      k === 'flow' && fam.flow_ready === false
+        ? `Flow <span class="neutral">warming up (${Math.floor(fam.flow_coverage_seconds || 0)}/60 s)</span>`
+        : `${k[0].toUpperCase() + k.slice(1)} <span class="${vote}">${vote}</span>`).join(' · ') +
+      ` → net ${fam.net > 0 ? '+' : ''}${fam.net} (<span class="${fam.lean === 'bullish' ? 'bull' : fam.lean === 'bearish' ? 'bear' : 'neutral'}">${fam.lean}</span>)` : '—';
+  }
   const rec = s.tally_record;
-  $('tallyRecord').textContent = !rec || !rec.scored ? 'Lean at open: no scored windows yet'
-    : `Lean at open: ${rec.hits}/${rec.scored} (${(rec.rate * 100).toFixed(1)}%), 95% [${(rec.wilson95[0] * 100).toFixed(1)}%, ` +
+  $('tallyRecord').textContent = !rec || !rec.scored ? 'Legacy 1m opening lean vs settlement: no scored windows yet'
+    : `Legacy 1m opening lean vs settlement: ${rec.hits}/${rec.scored} (${(rec.rate * 100).toFixed(1)}%), 95% [${(rec.wilson95[0] * 100).toFixed(1)}%, ` +
       `${(rec.wilson95[1] * 100).toFixed(1)}%] · interval ${rec.includes_50 ? 'includes' : 'excludes'} 50%` +
       (rec.too_few ? ' · too few to judge' : '');
   if (rec?.skipped_lines > 0) $('tallyRecord').textContent += ` · log: ${rec.skipped_lines} unreadable lines skipped`;
@@ -297,8 +336,11 @@ function renderMtf(s) {
   const mark = r => !r ? '<td class="muted">—</td>' :
     `<td class="${r.state}" title="${esc(r.name + ': ' + r.detail)}">${r.state === 'bull' ? '▲' : r.state === 'bear' ? '▼' : '•'}</td>`;
   $('mtf').innerHTML = MTF_ROWS.map(([label, prefix]) => `<tr><td>${label}</td>${tfs.map(k =>
+    readingProblem(s, k) ? `<td class="muted" title="${esc(readingProblem(s, k))}">—</td>` :
     mark(s.frames[k].readings.find(r => r.name.startsWith(prefix)))).join('')}</tr>`).join('') +
     `<tr class="total"><td>Bull/bear</td>${tfs.map(k => { const x = s.frames[k].tally;
+      // A short mark: five "Unavailable" cells would overflow the card on a phone.
+      if (readingProblem(s, k)) return `<td class="muted" title="${esc(readingProblem(s, k))}">—</td>`;
       return `<td class="${x.lean === 'bullish' ? 'bull' : x.lean === 'bearish' ? 'bear' : 'neutral'}">${x.bull}/${x.bear}</td>`; }).join('')}</tr>`;
 }
 
@@ -321,7 +363,7 @@ function tick() {
     const left = Math.max(0, new Date(last.window.close_time) - now) / 1000;
     if (left === 0) {
       render({...last, server_time: now.toISOString(), window: null, kalshi_stale: true});
-      setStatus(last);
+      if (last.no_update) checkFreshness(); else setStatus(last);  // keep "No update" while silent
       return;
     }
     $('countdown').textContent = `${Math.floor(left / 60)}:${String(Math.floor(left % 60)).padStart(2, '0')} left`;
@@ -340,7 +382,17 @@ function checkFreshness() {
   }
   if (!shown) return;
   const age = t - shownAt;
-  if (age > FRESH_LIMIT_MS) setLive(false, `No update for ${Math.floor(age / 1000)} s` + (failure ? ' · ' + failure : ''));
+  if (age > FRESH_LIMIT_MS) {
+    // Re-render once without directional summaries. `no_update` is page-only,
+    // distinct from the server's `stale`; it isn't new data, so a pending
+    // chart fit (after a tab switch) waits for the next real snapshot.
+    if (last && !last.no_update) {
+      const fit = fitNext;
+      render({...last, no_update: true, server_time: new Date(Date.now() + serverOffsetMs).toISOString()});
+      fitNext = fit;
+    }
+    setLive(false, `No update for ${Math.floor(age / 1000)} s` + (failure ? ' · ' + failure : ''));
+  }
   else setStatus(shown, age / 1000);
 }
 

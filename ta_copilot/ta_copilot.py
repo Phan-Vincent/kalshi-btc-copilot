@@ -221,9 +221,12 @@ def window_distance(strike, composite, seconds_left, sigma_1m, close_ts, samples
         start, now = close_ts - 60, close_ts - seconds_left
         observed = {int(p["time"]): p["value"] for p in samples
                     if start <= p["time"] < now and p["value"] is not None}
-        expected = min(60, max(0, math.ceil(now - start)))
+        # A second is due once it has ended. The sampler stamps second t just
+        # after t begins, so the second in progress is never "missing", and an
+        # early sample of it can't hide an older gap.
+        expected = min(60, max(0, math.floor(now - start)))
         result["observed_seconds"] = len(observed)
-        result["missing_seconds"] = max(0, expected - len(observed))
+        result["missing_seconds"] = sum(int(start + k) not in observed for k in range(expected))
         reference = (sum(observed.values()) + composite * (60 - len(observed))) / 60
         factor = (seconds_left / 60) ** 3 / 3
     sigma_usd = sigma_1m * reference if sigma_1m is not None else None
@@ -1534,6 +1537,7 @@ class TallyLogger:
         for ticker, close in list(self.value_pending.items()):
             if now - close > SETTLE_VALUE_RETRY:
                 del self.value_pending[ticker]  # give up; the settled row stands without it
+                self.refresh_proxy()  # no longer awaited: its value is now unavailable
                 continue
             try:
                 market = get_json(f"{KALSHI}/markets/{quote(ticker, safe='')}")["market"]
@@ -1577,12 +1581,27 @@ class TallyLogger:
     def refresh_proxy(self):
         """Our closing-minute composite mean vs Kalshi's settlement value."""
         errors = []
+        coverage = {"total_closes": len(self.closes), "scored": 0, "incomplete_samples": 0,
+                    "awaiting_settlement": 0, "missing_settlement": 0, "invalid_proxy": 0}
         for ticker, row in sorted(self.closes.items(), key=lambda item: item[1].get("close_time") or ""):
             settled = optional_float(self.expirations.get(ticker))
             proxy = optional_float(row.get("proxy_avg_60s"))
-            if row.get("samples") == 60 and settled is not None and proxy is not None:
+            # Exclusive reasons, in this order; coverage spans all recorded closes.
+            # A value still being asked for is awaited, not missing.
+            if row.get("samples") != 60:
+                coverage["incomplete_samples"] += 1
+            elif settled is None and (ticker not in self.settled or ticker in self.value_pending):
+                coverage["awaiting_settlement"] += 1
+            elif settled is None:
+                coverage["missing_settlement"] += 1
+            elif proxy is None:
+                coverage["invalid_proxy"] += 1
+            else:
+                coverage["scored"] += 1
                 errors.append(proxy - settled)
-        self.proxy = proxy_summary(errors[-PROXY_RECORD_WINDOWS:])
+        summary = proxy_summary(errors[-PROXY_RECORD_WINDOWS:])
+        summary["coverage"] = coverage
+        self.proxy = summary
 
     def capture_minute(self, now):
         row = minute_record(cached_state("1m"), now)
