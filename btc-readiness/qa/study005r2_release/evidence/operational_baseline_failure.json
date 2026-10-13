@@ -1,0 +1,7 @@
+{
+  "test": "single-generation audit and study rollback",
+  "expected_audit_rows": 0,
+  "actual_audit_rows": 1,
+  "passed": false,
+  "production_access": false
+}

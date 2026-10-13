@@ -1,0 +1,40 @@
+#!/bin/bash
+# WAN failover for the Acer: prefer the wired uplink; when it can't reach the
+# internet (link up but router/ISP dead, as on 2026-10-11), prefer the Wi-Fi
+# backup (a hotspot or separate gateway, never the same router). Health is
+# tested per interface with ping -I, so a dead router behind a live cable counts
+# as down. Switching only adds/removes one low-metric default route via Wi-Fi.
+set -u
+WIRED=${WIRED:-enp2s0f1} WIFI=${WIFI:-wlp3s0}
+TARGETS=${TARGETS:-"1.1.1.1 9.9.9.9 8.8.8.8"}
+INTERVAL=${INTERVAL:-15} FAIL_AFTER=${FAIL_AFTER:-3} RECOVER_AFTER=${RECOVER_AFTER:-4}
+METRIC=50 STATE=/run/wan-failover.state
+
+log() { logger -t wan-failover "$*"; }
+reachable() { local t; for t in $TARGETS; do ping -n -q -c1 -W2 -I "$1" "$t" >/dev/null 2>&1 && return 0; done; return 1; }
+wifi_gw() { ip -4 route show default dev "$WIFI" | awk '$2=="via"{print $3; exit}'; }
+prefer_wifi() { local g; g=$(wifi_gw); [ -n "$g" ] && ip route replace default via "$g" dev "$WIFI" metric $METRIC proto static; }
+prefer_wired() { ip route del default dev "$WIFI" metric $METRIC proto static 2>/dev/null; true; }
+trap 'prefer_wired; log "stopped; wired preferred"; exit 0' TERM INT
+
+prefer_wired
+mode=wired fails=0 oks=0
+log "started: wired=$WIRED wifi=$WIFI fail_after=$FAIL_AFTER recover_after=$RECOVER_AFTER interval=${INTERVAL}s"
+while :; do
+  if reachable "$WIRED"; then fails=0; oks=$((oks+1)); else oks=0; fails=$((fails+1)); fi
+  if [ "$mode" = wired ]; then
+    if [ "$fails" -ge "$FAIL_AFTER" ]; then
+      if [ -n "$(wifi_gw)" ] && reachable "$WIFI" && prefer_wifi; then
+        mode=wifi; log "FAILOVER: $WIRED unreachable for $fails checks; default via $WIFI"
+      elif [ $((fails % 20)) -eq "$FAIL_AFTER" ]; then
+        log "$WIRED unreachable for $fails checks and $WIFI backup unavailable"
+      fi
+    fi
+  elif [ "$oks" -ge "$RECOVER_AFTER" ]; then
+    prefer_wired; mode=wired; log "RECOVERED: $WIRED reachable for $oks checks; wired preferred"
+  else
+    prefer_wifi || { prefer_wired; mode=wired; log "$WIFI backup lost; falling back to $WIRED"; }
+  fi
+  printf '%s fails=%s oks=%s at=%s\n' "$mode" "$fails" "$oks" "$(date -u +%FT%TZ)" > "$STATE"
+  sleep "$INTERVAL"
+done

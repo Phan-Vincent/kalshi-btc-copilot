@@ -1,0 +1,112 @@
+{
+  "scope": "SYNTHETIC_TEMPORARY_CAPACITY_MEASUREMENT_NOT_STRATEGY_VALIDATION",
+  "candidate_source_sha256": {
+    "coherent_runtime.py": "e618264a2f09b52768f88ec64075eb08708d512ce9d15eb6b8d38073df3d71db",
+    "btc_copilot.py": "dec4eaa13dedcf8933c309d75aaa5c4e197c0a265bdaca4c2c5197c1ef32f3a2",
+    "btc_copilot_research.py": "65340a2f1694b9d17e2b5e5dc20ec16701dd6b2602affe12c149cde4bea1f039",
+    "btc_copilot_evidence.py": "22624043c22d7afbf0aa4a032d593449ade24c75797315e0fc59d83a25ca04cc",
+    "study_policy.py": "e93759076be8a7d28ddf13a6ac1cb6b3018d21fc44ea292e214c4bb036a0d5af"
+  },
+  "measurement": {
+    "samples": 128,
+    "warmup_generations": 32,
+    "cadence_seconds": 15,
+    "network_blocked": true,
+    "temporary_database_removed": true,
+    "public_fixture_bytes": 1334876,
+    "synthetic_trades_per_window": 9000,
+    "compressed_raw_trade_window_bytes": 395450,
+    "runtime_seconds": 6.057,
+    "database_size_samples": [
+      {
+        "generations": 0,
+        "database_bytes": 167936
+      },
+      {
+        "generations": 32,
+        "database_bytes": 1548288
+      },
+      {
+        "generations": 64,
+        "database_bytes": 3186688
+      },
+      {
+        "generations": 96,
+        "database_bytes": 4395008
+      },
+      {
+        "generations": 128,
+        "database_bytes": 6037504
+      }
+    ],
+    "post_warmup_window_bytes_per_generation": [
+      51200.0,
+      37760.0,
+      51328.0
+    ],
+    "conservative_observed_bytes_per_generation": 51328.0,
+    "observation_payload_compressed_bytes": {
+      "min": 37002,
+      "mean": 37280.6953125,
+      "max": 37288
+    },
+    "retained_source_bytes": 106762,
+    "latest_publication_bytes": 51991,
+    "latest_state_bytes": 1936,
+    "table_counts": {
+      "generations": 128,
+      "observations": 128,
+      "markets": 3,
+      "checkpoints": 2,
+      "signals": 0,
+      "outcome_events": 0,
+      "implementations": 1
+    },
+    "sqlite_page_size": 4096,
+    "sqlite_version": "3.53.4",
+    "python_version": "3.14.8"
+  },
+  "projection": {
+    "collection_days": 70,
+    "release_wait_days": 2,
+    "generations_70_days": 403200,
+    "markets_70_days": 6720,
+    "extrapolated_generation_database_bytes": 20695617536,
+    "additional_all_markets_one_checkpoint_bytes": 2657424000,
+    "additional_outcome_rows_one_per_poll_72_days_at_4096_bytes": 1698693120,
+    "additional_source_budget_bytes": 1048576,
+    "subtotal_main_database_bytes": 25052783232,
+    "uncertainty_multiplier": 2,
+    "planning_main_database_bytes": 50105566464,
+    "projected_gb_per_day": 0.696,
+    "projected_72_day_gb": 50.106,
+    "quota_gib": 256,
+    "quota_bytes": 274877906944,
+    "projected_fraction_of_quota": 0.18228298891335726,
+    "main_database_cap_bytes": 91625619456,
+    "projected_fraction_of_main_database_cap": 0.5468510528112877,
+    "fits_main_database_cap": true,
+    "recommended_explicit_total_quota_gib": 144,
+    "recommended_minimum_free_space_reserve_gib": 16,
+    "default_total_quota_gib": 8,
+    "default_effective_main_database_bytes": 2862960640,
+    "default_main_budget_estimated_days_at_fixture_rate": 9.684,
+    "default_quota_sufficient_for_projection": false,
+    "quota_factor_explanation": "Runtime max_page_count reserves roughly 2/3 total quota for rollback journal and metadata; only about1/3 is available for main database."
+  },
+  "filesystem_metadata": {
+    "available_bytes_at_measurement": 555641176064,
+    "sufficient_for_recommended_quota_plus_16gib_reserve": true
+  },
+  "limits": [
+    "Repeated public fixture is compressible; this is not a worst-case bound or throughput benchmark.",
+    "Retimed synthetic snapshots exercise storage only, not genuine time-consistent market replay.",
+    "All generations retained. No VACUUM, deletion, downsampling, compressed archival or production changes were performed.",
+    "Additional checkpoint budget intentionally double-counts any already observed instances; signal rows use trade summaries.",
+    "Outcome budget assumes at most one settle_one event per15-secondpoll; different scheduling must be measured again.",
+    "Two-times planning headroom is a proposal, not proof that varying API payloads fit.",
+    "Free disk is momentary filesystem metadata, not reserved capacity or deployment approval.",
+    "Actual source changes require remeasurement and source/config/package review before activation."
+  ],
+  "activation_allowed": false
+}

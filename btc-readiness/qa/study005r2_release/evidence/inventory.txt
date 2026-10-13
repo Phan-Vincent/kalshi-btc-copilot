@@ -1,0 +1,11 @@
+{
+  "status": "WORKING_INVENTORY_NOT_AN_ACTIVATABLE_RELEASE",
+  "study_id": "btc-prospective-005r2-20261026",
+  "candidate_release": "5.5.0-study005r2",
+  "activation_allowed": false,
+  "advice_allowed": false,
+  "execution_allowed": false,
+  "scope": "Working Study 005 revision-2 inventory for QA. Not a release seal; activation, advice and execution remain disabled.",
+  "files": 34,
+  "manifest_sha256": "b343258c1fd8755a18e8eedc6598a6efe71d75b6581932a0f75768fb15057cb7"
+}
