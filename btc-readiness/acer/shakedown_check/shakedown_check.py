@@ -28,8 +28,25 @@ BAND = (300, 330)  # checkpoint band: seconds after a slot opens
 MIN_COVERAGE, MAX_FAIL_RATE, SKEW_WARN, TARGET_HOURS = 0.95, 0.01, 4.0, 72
 
 
+SKEW_SAMPLE, BATCH = 240, 20
+
+
 def connect():
-    return sqlite3.connect('file:%s?mode=ro' % DB, uri=True)
+    # Autocommit reads with a short busy wait. Every query below is fetched in full before any processing,
+    # so no shared lock outlives a single small statement. (On 2026-10-13 this check iterated a live
+    # 12-hour payload scan, held the lock for seconds, and the collector halted on "database is locked".)
+    return sqlite3.connect('file:%s?mode=ro' % DB, uri=True, timeout=1, isolation_level=None)
+
+
+def payloads(c, ids):
+    """Decoded snapshots for observation ids, fetched in small batches with a pause between them."""
+    out = []
+    for i in range(0, len(ids), BATCH):
+        part = ids[i:i + BATCH]
+        rows = c.execute('SELECT payload FROM observations WHERE id IN (%s)' % ','.join('?' * len(part)), part).fetchall()
+        out += [json.loads(zlib.decompress(b))['snapshot'] for (b,) in rows]
+        time.sleep(0.05)
+    return out
 
 
 def report(now):
@@ -40,21 +57,19 @@ def report(now):
             return {'problems': ['No COLLECTOR_START event: the shakedown has not started']}
         since = max(start, now - LOOKBACK)
         events = c.execute('SELECT epoch,kind,detail FROM runtime_events WHERE epoch>=?', (since,)).fetchall()
-        obs = [e for (e,) in c.execute('SELECT epoch FROM observations WHERE epoch>=?', (since,))]
-        enrolled = {round(o) for (o,) in c.execute('SELECT opened FROM markets WHERE checkpoint IS NOT NULL AND opened>=?', (since - 900,))}
-        skews = []
-        for (blob,) in c.execute('SELECT payload FROM observations WHERE epoch>=?', (since,)):
-            skews.append(json.loads(zlib.decompress(blob))['snapshot']['retrieval_health']['snapshot_skew_seconds'])
+        obs = [e for (e,) in c.execute('SELECT epoch FROM observations WHERE epoch>=?', (since,)).fetchall()]
+        enrolled = {round(o) for (o,) in c.execute('SELECT opened FROM markets WHERE checkpoint IS NOT NULL AND opened>=?', (since - 900,)).fetchall()}
+        recent = [i for (i,) in c.execute('SELECT id FROM observations WHERE epoch>=? ORDER BY id DESC LIMIT ?', (since, SKEW_SAMPLE)).fetchall()]
+        skews = [s['retrieval_health']['snapshot_skew_seconds'] for s in payloads(c, recent)]
         # Slots whose whole checkpoint band lies inside the window and has already passed.
         first = math.ceil((since - BAND[0]) / 900) * 900
         slots = [s for s in range(first, int(now), 900) if s + BAND[0] >= since and s + BAND[1] <= now]
         missed = [s for s in slots if s not in enrolled]
         miss_reasons = Counter()
-        for s in missed:
+        for s in missed[-12:]:  # the most recent misses are enough to name the cause
             near = [d for e, k, d in events if k == 'COLLECTION_FAILED' and s + BAND[0] - 15 <= e <= s + BAND[1]]
-            vetoes = []
-            for (blob,) in c.execute('SELECT payload FROM observations WHERE epoch BETWEEN ? AND ?', (s + BAND[0], s + BAND[1])):
-                vetoes += json.loads(zlib.decompress(blob))['snapshot'].get('operational_vetoes', [])
+            ids = [i for (i,) in c.execute('SELECT id FROM observations WHERE epoch BETWEEN ? AND ?', (s + BAND[0], s + BAND[1])).fetchall()]
+            vetoes = [v for snap in payloads(c, ids) for v in snap.get('operational_vetoes', [])]
             miss_reasons.update(set(near + vetoes) or {'NO OBSERVATION OR REASON IN THE BAND'})
         # Poll failure rate per full clock hour.
         hours = []

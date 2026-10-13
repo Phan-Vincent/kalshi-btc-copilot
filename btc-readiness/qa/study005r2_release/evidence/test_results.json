@@ -39,11 +39,11 @@
     {
       "name": "readiness_added",
       "exit_code": 0,
-      "run": 243,
+      "run": 244,
       "skipped": 0
     }
   ],
-  "python_methods_run": 384,
+  "python_methods_run": 385,
   "python_skipped": 1,
   "golden_passed": 14,
   "golden_run": 14,

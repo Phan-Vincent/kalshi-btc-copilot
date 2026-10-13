@@ -157,4 +157,23 @@ The 4.3 h soak on round 3c code captured **17/17 checkpoints** (skew p95 2.15 s)
    - Test: `test_missing_source_reports_its_underlying_cause`.
    - If 429s are confirmed, decide on mitigation with data. (The TA dashboard on the same host also polls Kalshi publicly from the same IP.)
 
-**Results.** Mac: 384 methods (1 skip), 14/14, 24/24. Acer Linux: 243 readiness tests plus every other suite pass. Manifest `d84119aa…`. Round 4 soak data archived as `…/runtime_shakedown_round4_20261013T0044Z`. **Shakedown restarted 2026-10-13 01:04:07 UTC → 72 h at about 2026-10-16 01:04 UTC.**
+**Results.** Mac: 384 methods (1 skip), 14/14, 24/24. Acer Linux: 243 readiness tests plus every other suite pass. Manifest `d84119aa…`. Round 4 soak data archived as `…/runtime_shakedown_round4_20261013T0044Z`. **Shakedown restarted 2026-10-13 01:04:07 UTC → 72 h at about 2026-10-16 01:04 UTC.** *(Superseded: see round 4c.)*
+
+**Live reboot test (2026-10-13 01:29 UTC, owner-initiated `sudo reboot`): passed.**
+- SIGTERM → clean COLLECTOR_STOP at 01:29:02; boot at 01:29:19; post-boot attestation at 01:31:57; `REBOOT_RESUME` plus COLLECTOR_START at 01:32:00 in the same database.
+- 3/3 checkpoints across the reboot.
+- Found and fixed a bug in `shakedown_start.py` (outside the release): it compared the raw boot id with the stored SHA-256 and would have reported every start as a reboot.
+
+## Round 4c (2026-10-13, Claude): writer lock wait, after the shakedown halted
+
+**What happened.** The shakedown halted at 03:00:41 UTC with `sqlite3.OperationalError: database is locked` → HALTED `FAILURE_RECORD_UNAVAILABLE`. 03:00 is when the twice-daily check runs. **That check iterated a live 12-hour payload scan** (about 115 MB, decompressing row by row), holding SQLite's shared lock for seconds. The runtime connects with **`timeout=0`**, so both the publication and the failure record failed instantly, which forces the halt. That check had passed at its own start, so the death went unflagged until the 15:00 UTC check: **about 15.5 h of shakedown lost**. A persisted halt requires review by design, so the run was archived (`…/runtime_shakedown_HALTED_lock_20261013T0300Z`).
+
+**Fixes.**
+- **Runtime:** `WRITER_LOCK_WAIT_SECONDS = 10` on the store's connection. A brief read-only reader (status, watch, checks) now delays a commit instead of failing it; a reader holding a lock longer than that still fails the write, as before.
+  - With `timeout=0`, any watch read overlapping a commit would have cost a poll, and two overlapping writes would have halted the 10-week study.
+  - **The reviewer must weigh this.**
+  - Test: `test_writer_waits_for_a_brief_reader_instead_of_halting` (a reader holds a shared lock for 1 s; `failure()` succeeds; verified to FAIL with `timeout=0`).
+- **The check (outside the release):** autocommit, `timeout=1`, every query fully fetched before processing; skew sampled from the last 240 observations in batches of 20, and veto reasons from at most 12 recent misses. Live: 6 back-to-back checks took about 0.2 s each with the collector unaffected.
+- **Immediate alert (outside the release):** `OnFailure=btc-r2-shakedown-alert.service` sends a Telegram within seconds, with the HALTED reason and the last log line, instead of waiting for the next twice-daily check.
+
+**Results.** Mac: 385 methods (1 skip), 14/14, 24/24. Acer Linux: 244 readiness tests plus every other suite pass. Manifest `63d975eb…`. **Shakedown restarted 2026-10-13 18:37:48 UTC → 72 h at about 2026-10-16 18:38 UTC.**

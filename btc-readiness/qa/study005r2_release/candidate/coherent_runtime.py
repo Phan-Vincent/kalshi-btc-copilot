@@ -29,6 +29,8 @@ def boot_identity():
     if not value:raise RuntimeBlocked('Missing boot identity')
     return hashlib.sha256(value.encode()).hexdigest()
 
+WRITER_LOCK_WAIT_SECONDS=10
+
 def finite(value):return type(value) in (int,float) and math.isfinite(value)
 
 def scrub_detail(error):
@@ -174,7 +176,10 @@ class EvidenceStore:
     @contextmanager
     def _connect(self):
         no_links(self.path)
-        with closing(sqlite3.connect(self.path,timeout=0,isolation_level=None)) as c:
+        # Wait briefly for read-only readers (status, watch, checks): with timeout=0 a reader holding its shared
+        # lock at commit time failed the write, and a long read on 2026-10-13 halted the shakedown
+        # (FAILURE_RECORD_UNAVAILABLE). A reader holding a lock past this still fails the write, as before.
+        with closing(sqlite3.connect(self.path,timeout=WRITER_LOCK_WAIT_SECONDS,isolation_level=None)) as c:
             c.execute('PRAGMA journal_mode=DELETE');c.execute('PRAGMA synchronous=FULL')
             c.execute('PRAGMA foreign_keys=ON')
             # Reserve twice database size for rollback journal plus metadata.

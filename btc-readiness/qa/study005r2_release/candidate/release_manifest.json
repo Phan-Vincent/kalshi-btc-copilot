@@ -23,7 +23,7 @@
     "btc_copilot_protocol.json": "1f67bba90077429de6ccdbd62970338da7da4cdda685feb1ee36038abb80ecd4",
     "btc_copilot_research.py": "65340a2f1694b9d17e2b5e5dc20ec16701dd6b2602affe12c149cde4bea1f039",
     "btc_copilot_settings.json": "47dedad12c34481024d90cc5fafa45293bafa990bc555bf5eaa6f4a8ab0c4eab",
-    "coherent_runtime.py": "accd8da4889c6e27585113bb0002abd7b1c1a24c13fcd389f23942db8484f33f",
+    "coherent_runtime.py": "4c6ed8656f74050ee6bbff5078d0495df51ebc80adb18e18b4436c59ee714b3e",
     "evidence_runner.py": "feeef541b2adb41d4380f29d89b3369f35e0d35991a2970365a223ac56336782",
     "fee_bound_proposal.py": "532442b9fa0c360937b6dc364034ef17d3d093895be441703cc1dec3243fea36",
     "fee_evidence_refresh_summary.json": "be2d635ee4c5788451931bc45b7f8713c58b03167deb997a49617a9c114e643a",

@@ -413,6 +413,27 @@ class GateTests(unittest.TestCase):
             offset=(target-opened)%900
             self.assertTrue(runner.LISTING_DELAY_SECONDS-1e-9<=offset<=900-runner.FINAL_CUTOFF_SECONDS+1e-9,(start,offset))
 
+    def test_writer_waits_for_a_brief_reader_instead_of_halting(self):
+        import threading,time as _time
+        c,s=f.fixture()
+        with tempfile.TemporaryDirectory() as td:
+            root=Path(td).resolve()
+            with EvidenceStore(root/'runtime',f.protocol_file(root),s['model_version'],{},boot_id='synthetic',wall=lambda:s['epoch']) as store:
+                locked=threading.Event()
+                def reader():  # a read-only checker holding its shared lock for 1 s
+                    db=sqlite3.connect('file:%s?mode=ro'%store.path,uri=True,isolation_level=None)
+                    try:
+                        db.execute('BEGIN');db.execute('SELECT COUNT(*) FROM runtime_events').fetchone();locked.set()
+                        _time.sleep(1.0);db.execute('COMMIT')
+                    finally:db.close()
+                t=threading.Thread(target=reader);t.start();locked.wait(5)
+                store.failure('COLLECTION_FAILED',ValueError('synthetic'))  # with timeout=0 this raised "locked" and halted
+                t.join()
+                self.assertFalse(store.halted)
+                db=sqlite3.connect(store.path)
+                try:self.assertEqual(db.execute("SELECT COUNT(*) FROM runtime_events WHERE kind='COLLECTION_FAILED'").fetchone()[0],1)
+                finally:db.close()
+
     def test_final_cutoff_is_an_expected_event_not_a_failure(self):
         from unittest.mock import Mock
         engine=Mock();engine.collect.side_effect=b.FinalCutoff('Decision completion inside the final entry cutoff')

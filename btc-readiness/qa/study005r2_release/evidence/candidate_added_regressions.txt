@@ -19,6 +19,6 @@ test_unknown_prior_health_and_same_source_never_confirm (__main__.Regression.tes
 test_walk_and_execution_duplicate_depth_rejected (__main__.Regression.test_walk_and_execution_duplicate_depth_rejected) ... ok
 
 ----------------------------------------------------------------------
-Ran 19 tests in 1.205s
+Ran 19 tests in 1.817s
 
 OK

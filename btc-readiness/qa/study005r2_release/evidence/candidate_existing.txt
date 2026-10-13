@@ -51,6 +51,6 @@ test_request_before_deadline_waits_then_first_eligible_consumed (test_study002.S
 test_settlement_fairness_with_backlog (test_study002.StudyTests.test_settlement_fairness_with_backlog) ... ok
 
 ----------------------------------------------------------------------
-Ran 51 tests in 0.796s
+Ran 51 tests in 1.975s
 
 OK
