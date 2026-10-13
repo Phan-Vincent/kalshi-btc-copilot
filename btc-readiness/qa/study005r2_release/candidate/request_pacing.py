@@ -14,6 +14,7 @@ class Pacer:
         self.clock=clock;self.sleep=sleep;self.lock=threading.Lock()
         self.updated=clock();self.tokens=0.;self.background_tokens=0.
         self.cooldown_until=0.;self.strikes=0
+        self.next_ticket=0;self.serving=0;self.abandoned=set()
     def _refill(self,now):
         if not math.isfinite(now) or now<self.updated:raise PaceError('Pacing clock invalid')
         elapsed=now-self.updated;self.updated=now
@@ -33,14 +34,30 @@ class Pacer:
     def acquire(self,cost,background=False,max_wait=5.):
         if type(max_wait) not in (int,float) or not math.isfinite(max_wait) or not 0<=max_wait<=5:raise PaceError('Invalid pacing deadline')
         deadline=self.clock()+max_wait
-        while True:
-            if self.clock()>deadline:raise PaceError('Read pacing deadline exceeded')
-            wait=self.try_acquire(cost,background)
-            if not wait:return
-            remaining=deadline-self.clock()
-            if wait>remaining or remaining<=0:raise PaceError('Read pacing deadline exceeded')
-            # No reservations: canceled/expired requests cannot build a dispatch burst.
-            self.sleep(min(wait,.1))
+        # First in, first out: only the head ticket may take tokens. Before, 10-token requests kept taking
+        # tokens as they trickled in and starved the 50-token benchmark, pushing snapshot skew past 5 s
+        # (live shakedown, 2026-10-13). Still no reservations: a waiting head holds no tokens, and a head
+        # that cannot be served in time gives up its turn instead of blocking the queue.
+        with self.lock:ticket=self.next_ticket;self.next_ticket+=1
+        try:
+            while True:
+                if self.clock()>deadline:raise PaceError('Read pacing deadline exceeded')
+                with self.lock:
+                    while self.serving in self.abandoned:self.abandoned.discard(self.serving);self.serving+=1
+                    head=self.serving==ticket
+                wait=self.try_acquire(cost,background) if head else .01
+                if head and not wait:
+                    with self.lock:self.serving+=1
+                    ticket=None;return
+                remaining=deadline-self.clock()
+                if (head and wait>remaining) or remaining<=0:raise PaceError('Read pacing deadline exceeded')
+                # No reservations: canceled/expired requests cannot build a dispatch burst.
+                self.sleep(min(wait,.1))
+        finally:
+            if ticket is not None:
+                with self.lock:
+                    if self.serving==ticket:self.serving+=1
+                    else:self.abandoned.add(ticket)
     def throttled(self):
         with self.lock:
             now=self.clock();self._refill(now)

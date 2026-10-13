@@ -176,4 +176,25 @@ The 4.3 h soak on round 3c code captured **17/17 checkpoints** (skew p95 2.15 s)
 - **The check (outside the release):** autocommit, `timeout=1`, every query fully fetched before processing; skew sampled from the last 240 observations in batches of 20, and veto reasons from at most 12 recent misses. Live: 6 back-to-back checks took about 0.2 s each with the collector unaffected.
 - **Immediate alert (outside the release):** `OnFailure=btc-r2-shakedown-alert.service` sends a Telegram within seconds, with the HALTED reason and the last log line, instead of waiting for the next twice-daily check.
 
-**Results.** Mac: 385 methods (1 skip), 14/14, 24/24. Acer Linux: 244 readiness tests plus every other suite pass. Manifest `63d975eb…`. **Shakedown restarted 2026-10-13 18:37:48 UTC → 72 h at about 2026-10-16 18:38 UTC.**
+**Results.** Mac: 385 methods (1 skip), 14/14, 24/24. Acer Linux: 244 readiness tests plus every other suite pass. Manifest `63d975eb…`. **Shakedown restarted 2026-10-13 18:37:48 UTC → 72 h at about 2026-10-16 18:38 UTC.** *(Superseded: see round 4d.)*
+
+## Round 4d (2026-10-13, Claude): FIFO pacing and a trade-fetch budget
+
+**Finding.** At US-afternoon load (about 19:00–19:30 UTC), skew reached p95 4.71 s and max 7.07 s, and 8 polls failed with "Decision completion outside valid observation window": about 3.6% of polls, which would fail the ≤1%/h gate. All 3 checkpoints were still enrolled.
+
+**Cause.** Measured directly with an idle pacer, the BRTI benchmark took 1.14 s median (p90 1.49 s, max 2.27 s). Inside the collector it took 2.22 s (p90 4.96 s, max 8.69 s).
+- The pacer served whoever grabbed tokens first, so the seven 10-token snapshot requests took tokens as they trickled in and **starved the 50-token benchmark**.
+- That delayed the trade fetch too, which at busy times (13 s) then overran the 20 s validity window.
+- The owner's apt upgrades (2026-10-12) were ruled out: no reboot pending, kernel current, load 0.3.
+
+**Fixes.**
+1. **`request_pacing.Pacer.acquire` is FIFO.** Each request takes a ticket and only the head may take tokens. There are still **no reservations**: a waiting head holds no tokens, and a head that cannot be served before its deadline raises PaceError and its ticket is skipped. Rates, buckets, costs, the 429 cooldown and the 5 s wait cap are unchanged. The benchmark is dispatched first in `collect()`, so it holds the first ticket. **The reviewer must weigh this pacing change.**
+2. **`TRADE_FETCH_BUDGET_SECONDS = 15`.** `trade_window` starts no new page 15 s after the poll began; a window cut short keeps its cursor, which means truncated → the existing "Recent trade window incomplete" veto. A logged veto for that poll, never a failed observation.
+
+**Tests.**
+- `test_pacer_serves_in_arrival_order_so_the_benchmark_is_not_starved`: real threads; the benchmark is served first.
+- `test_pacer_head_that_cannot_be_served_in_time_gives_up_its_turn`.
+- `test_trade_fetch_budget_marks_the_window_incomplete_instead_of_failing`.
+- All 13 existing `test_pacing` tests are unchanged and pass.
+
+**Results.** Mac: 388 methods (1 skip), 14/14, 24/24. Acer Linux: 247 readiness tests plus every other suite pass. Manifest `ef08e186…`. Pre-fix run archived as `…/runtime_shakedown_round4c_20261013T1838Z`. **Shakedown restarted 2026-10-13 19:38:55 UTC → 72 h at about 2026-10-16 19:39 UTC.** A live 15-minute busy-hour comparison is running.

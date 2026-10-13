@@ -104,6 +104,40 @@ class TradesTests(unittest.TestCase):
         source=(f.ROOT/'btc_copilot.py').read_text()
         self.assertIn("'Required data unavailable: '+', '.join(missing)+' ('+errors.get(missing[0],'no detail')+')'",source)
 
+    def test_pacer_serves_in_arrival_order_so_the_benchmark_is_not_starved(self):
+        import threading,time as _time
+        pacer=Pacer();order=[];lock=threading.Lock()
+        def ask(name,cost):
+            pacer.acquire(cost)
+            with lock:order.append(name)
+        big=threading.Thread(target=ask,args=('benchmark',50));big.start();_time.sleep(.05)
+        small=[threading.Thread(target=ask,args=('small%d'%i,10)) for i in range(3)]
+        for t in small:t.start()
+        for t in [big]+small:t.join()
+        # Without FIFO the 10-token requests finished first (at about 0.17, 0.33 and 0.5 s) and the benchmark last.
+        self.assertEqual(order[0],'benchmark')
+
+    def test_pacer_head_that_cannot_be_served_in_time_gives_up_its_turn(self):
+        now=[0.]
+        pacer=Pacer(clock=lambda:now[0],sleep=lambda s:now.__setitem__(0,now[0]+max(s,1e-6)))
+        from request_pacing import PaceError
+        with self.assertRaises(PaceError):pacer.acquire(60,max_wait=0.5)  # needs 1 s of refill: gives up
+        pacer.acquire(10,max_wait=5)  # the abandoned ticket must not block the queue
+        self.assertEqual(pacer.serving,pacer.next_ticket)
+
+    def test_trade_fetch_budget_marks_the_window_incomplete_instead_of_failing(self):
+        now=[1000.]
+        class Client:
+            def get(self,path,params):
+                now[0]+=4
+                return {'data':{'trades':[],'cursor':'more-%d'%now[0]},'request_started_at':'x','retrieved_at':'x'}
+        window=b.trade_window(Client(),'KXBTC15M-SYNTHETIC',1000.5,slices=1,deadline=1010,clock=lambda:now[0])
+        self.assertEqual(window['pages'],3)          # pages started at 1000, 1004 and 1008; none at 1012
+        self.assertTrue(window['data']['cursor'])    # incomplete, so a logged veto for this poll
+        source=(f.ROOT/'btc_copilot.py').read_text()
+        self.assertLess(source.index("'benchmark':lambda"),source.index("'market':lambda"))
+        self.assertIn('deadline=collection_epoch+TRADE_FETCH_BUDGET_SECONDS',source)
+
     def test_skew_covers_point_in_time_sources_not_the_anchored_trade_window(self):
         veto='Source snapshot skew exceeds freshness budget'
         self.assertNotIn(veto,self.collect_with(late='trades')['operational_vetoes'])

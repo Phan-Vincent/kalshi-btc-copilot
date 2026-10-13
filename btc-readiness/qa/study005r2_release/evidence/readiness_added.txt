@@ -38,10 +38,10 @@ test_not_activated_is_ok_with_info (test_acer_ops.StatusTests.test_not_activated
 test_not_activated_never_waits (test_acer_ops.StatusTests.test_not_activated_never_waits) ... ok
 test_reads_generation_timing_and_stale_is_crit (test_acer_ops.StatusTests.test_reads_generation_timing_and_stale_is_crit) ... ok
 test_startup_grace_then_crit (test_acer_ops.StatusTests.test_startup_grace_then_crit) ... ok
-test_status_never_queries_outcome_tables_and_is_read_only (test_acer_ops.StatusTests.test_status_never_queries_outcome_tables_and_is_read_only) ... /opt/homebrew/Cellar/python@3.15/3.15.0/Frameworks/Python.framework/Versions/3.15/lib/python3.15/copy.py:201: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x1093ed700>
+test_status_never_queries_outcome_tables_and_is_read_only (test_acer_ops.StatusTests.test_status_never_queries_outcome_tables_and_is_read_only) ... /opt/homebrew/Cellar/python@3.15/3.15.0/Frameworks/Python.framework/Versions/3.15/lib/python3.15/copy.py:201: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x1092e97e0>
   for key, value in x.items():
 ResourceWarning: Enable tracemalloc to get the object allocation traceback
-/opt/homebrew/Cellar/python@3.15/3.15.0/Frameworks/Python.framework/Versions/3.15/lib/python3.15/copy.py:201: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x1093ed620>
+/opt/homebrew/Cellar/python@3.15/3.15.0/Frameworks/Python.framework/Versions/3.15/lib/python3.15/copy.py:201: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x1092e9700>
   for key, value in x.items():
 ResourceWarning: Enable tracemalloc to get the object allocation traceback
 ok
@@ -249,22 +249,22 @@ test_hypothetical_fill_is_costed_with_0001_acceptance (test_study005r1_release.S
 test_missing_slot_reasons_and_imputation_monotonicity (test_study005r2.CoverageTests.test_missing_slot_reasons_and_imputation_monotonicity) ... ok
 test_reboot_gap_explained_in_report_summary_and_status (test_study005r2.CoverageTests.test_reboot_gap_explained_in_report_summary_and_status) ... ok
 test_status_counts_enrolled_checkpoint_not_band_observation (test_study005r2.CoverageTests.test_status_counts_enrolled_checkpoint_not_band_observation) ... ok
-test_final_cutoff_is_an_expected_event_not_a_failure (test_study005r2.GateTests.test_final_cutoff_is_an_expected_event_not_a_failure) ... /opt/homebrew/Cellar/python@3.15/3.15.0/Frameworks/Python.framework/Versions/3.15/lib/python3.15/copy.py:201: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x109385460>
+test_final_cutoff_is_an_expected_event_not_a_failure (test_study005r2.GateTests.test_final_cutoff_is_an_expected_event_not_a_failure) ... /opt/homebrew/Cellar/python@3.15/3.15.0/Frameworks/Python.framework/Versions/3.15/lib/python3.15/copy.py:201: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x109289460>
   for key, value in x.items():
 ResourceWarning: Enable tracemalloc to get the object allocation traceback
-/opt/homebrew/Cellar/python@3.15/3.15.0/Frameworks/Python.framework/Versions/3.15/lib/python3.15/copy.py:201: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x107f119a0>
+/opt/homebrew/Cellar/python@3.15/3.15.0/Frameworks/Python.framework/Versions/3.15/lib/python3.15/copy.py:201: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x108a43d80>
   for key, value in x.items():
 ResourceWarning: Enable tracemalloc to get the object allocation traceback
-/opt/homebrew/Cellar/python@3.15/3.15.0/Frameworks/Python.framework/Versions/3.15/lib/python3.15/copy.py:201: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x108b4ea40>
+/opt/homebrew/Cellar/python@3.15/3.15.0/Frameworks/Python.framework/Versions/3.15/lib/python3.15/copy.py:201: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x108a42b20>
   for key, value in x.items():
 ResourceWarning: Enable tracemalloc to get the object allocation traceback
-/opt/homebrew/Cellar/python@3.15/3.15.0/Frameworks/Python.framework/Versions/3.15/lib/python3.15/copy.py:201: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x109384900>
+/opt/homebrew/Cellar/python@3.15/3.15.0/Frameworks/Python.framework/Versions/3.15/lib/python3.15/copy.py:201: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x109288900>
   for key, value in x.items():
 ResourceWarning: Enable tracemalloc to get the object allocation traceback
-/opt/homebrew/Cellar/python@3.15/3.15.0/Frameworks/Python.framework/Versions/3.15/lib/python3.15/copy.py:201: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x108b4d8c0>
+/opt/homebrew/Cellar/python@3.15/3.15.0/Frameworks/Python.framework/Versions/3.15/lib/python3.15/copy.py:201: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x108a43680>
   for key, value in x.items():
 ResourceWarning: Enable tracemalloc to get the object allocation traceback
-/opt/homebrew/Cellar/python@3.15/3.15.0/Frameworks/Python.framework/Versions/3.15/lib/python3.15/copy.py:201: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x108b4eb20>
+/opt/homebrew/Cellar/python@3.15/3.15.0/Frameworks/Python.framework/Versions/3.15/lib/python3.15/copy.py:201: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x108a43ae0>
   for key, value in x.items():
 ResourceWarning: Enable tracemalloc to get the object allocation traceback
 ok
@@ -272,7 +272,7 @@ test_polls_certain_to_fail_are_skipped_and_nothing_else (test_study005r2.GateTes
 test_second_band_target_is_scheduled (test_study005r2.GateTests.test_second_band_target_is_scheduled) ... ok
 test_shakedown_seal_gate_requires_fresh_complete_summary (test_study005r2.GateTests.test_shakedown_seal_gate_requires_fresh_complete_summary) ... ok
 test_shakedown_summary_counts_real_checkpoints_and_hours (test_study005r2.GateTests.test_shakedown_summary_counts_real_checkpoints_and_hours) ... ok
-test_writer_waits_for_a_brief_reader_instead_of_halting (test_study005r2.GateTests.test_writer_waits_for_a_brief_reader_instead_of_halting) ... /opt/homebrew/Cellar/python@3.15/3.15.0/Frameworks/Python.framework/Versions/3.15/lib/python3.15/copy.py:201: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x108b4fd80>
+test_writer_waits_for_a_brief_reader_instead_of_halting (test_study005r2.GateTests.test_writer_waits_for_a_brief_reader_instead_of_halting) ... /opt/homebrew/Cellar/python@3.15/3.15.0/Frameworks/Python.framework/Versions/3.15/lib/python3.15/copy.py:201: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x108a418c0>
   for key, value in x.items():
 ResourceWarning: Enable tracemalloc to get the object allocation traceback
 ok
@@ -281,17 +281,20 @@ test_observation_trims_raw_trades_but_checkpoint_keeps_them (test_study005r2.Per
 test_signal_and_execution_evidence_use_trade_summary (test_study005r2.PersistenceTests.test_signal_and_execution_evidence_use_trade_summary) ... ok
 test_1500_trades_follow_cursor_and_filter_request_edges (test_study005r2.TradesTests.test_1500_trades_follow_cursor_and_filter_request_edges) ... ok
 test_30_page_cap_and_budget_under_20_seconds (test_study005r2.TradesTests.test_30_page_cap_and_budget_under_20_seconds) ... ok
-test_brti_window_one_or_two_seconds_short_is_accepted_but_not_three (test_study005r2.TradesTests.test_brti_window_one_or_two_seconds_short_is_accepted_but_not_three) ... /Users/you/Documents/kalshi-btc-readiness/btc-readiness/qa/study005r2_release/candidate/btc_copilot.py:129: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x109385460>
+test_brti_window_one_or_two_seconds_short_is_accepted_but_not_three (test_study005r2.TradesTests.test_brti_window_one_or_two_seconds_short_is_accepted_but_not_three) ... /Users/you/Documents/kalshi-btc-readiness/btc-readiness/qa/study005r2_release/candidate/btc_copilot.py:129: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x109289460>
   if price <= 0 or not price.is_finite():
 ResourceWarning: Enable tracemalloc to get the object allocation traceback
 ok
 test_missing_source_reports_its_underlying_cause (test_study005r2.TradesTests.test_missing_source_reports_its_underlying_cause) ... ok
+test_pacer_head_that_cannot_be_served_in_time_gives_up_its_turn (test_study005r2.TradesTests.test_pacer_head_that_cannot_be_served_in_time_gives_up_its_turn) ... ok
+test_pacer_serves_in_arrival_order_so_the_benchmark_is_not_starved (test_study005r2.TradesTests.test_pacer_serves_in_arrival_order_so_the_benchmark_is_not_starved) ... ok
 test_skew_covers_point_in_time_sources_not_the_anchored_trade_window (test_study005r2.TradesTests.test_skew_covers_point_in_time_sources_not_the_anchored_trade_window) ... ok
 test_slices_cover_window_and_merge_shared_boundary_trades (test_study005r2.TradesTests.test_slices_cover_window_and_merge_shared_boundary_trades) ... ok
+test_trade_fetch_budget_marks_the_window_incomplete_instead_of_failing (test_study005r2.TradesTests.test_trade_fetch_budget_marks_the_window_incomplete_instead_of_failing) ... ok
 test_trade_pages_are_requested_after_every_snapshot_request (test_study005r2.TradesTests.test_trade_pages_are_requested_after_every_snapshot_request) ... ok
 test_window_sliver_is_valid_but_outside_analysis_is_filtered (test_study005r2.TradesTests.test_window_sliver_is_valid_but_outside_analysis_is_filtered) ... ok
 
 ----------------------------------------------------------------------
-Ran 244 tests in 21.239s
+Ran 247 tests in 15.155s
 
 OK

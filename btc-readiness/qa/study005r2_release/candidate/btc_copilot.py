@@ -324,8 +324,12 @@ def validated_trades(rows, ticker, start, end):
 
 
 TRADE_SLICES=6
+# Paging stops starting new pages this many seconds after the poll began, leaving room for in-flight pages
+# inside the observation's 20 s validity. A window cut short this way is "incomplete": a logged veto for that
+# poll, never a failed observation (live: 13 s trade fetches at busy times broke the 20 s limit).
+TRADE_FETCH_BUDGET_SECONDS=15
 
-def trade_window(client,ticker,collection_epoch,max_pages=30,slices=TRADE_SLICES):
+def trade_window(client,ticker,collection_epoch,max_pages=30,slices=TRADE_SLICES,deadline=None,clock=None):
     """The 180 s window is fetched as contiguous time slices in parallel, each following its own cursor
     (max_pages/slices pages per slice). Sequential paging took about 8 s live (Acer, 2026-10-12) and broke
     the 5 s snapshot-skew budget. Adjacent slices share their boundary second, so rows are merged by
@@ -339,6 +343,7 @@ def trade_window(client,ticker,collection_epoch,max_pages=30,slices=TRADE_SLICES
         params={'ticker':ticker,'min_ts':bounds[0],'max_ts':bounds[1],'limit':1000}
         rows=[];seen=set();pages=[];cursor=None
         for _ in range(max_pages//slices):
+            if pages and deadline is not None and (clock or time.time)()>=deadline:break  # cursor stays set: truncated
             page=client.get('/markets/trades',dict(params));pages.append(page)
             body=page.get('data')
             if page.get('error') or (isinstance(body,dict) and body.get('error')):raise ReadError('Trade page returned an upstream error')
@@ -486,12 +491,13 @@ class Copilot:
             raise ReadError('Cannot verify exactly one active BTC 15-minute contract')
         candidate=eligible[0];t=candidate['ticker'];e=candidate['event_ticker']
         jobs={
+            # The 50-token benchmark is submitted first so it holds the first pacing ticket (FIFO pacer).
+            'benchmark':lambda:self.client.get('/cfbenchmarks/values',{'id':'BRTI'}),
             'market':lambda:self.client.market(t),
             'event':lambda:self.client.event(e),
             'series':lambda:self.client.get('/series/'+SERIES),
             'book':lambda:self.client.orderbook(t),
-            'benchmark':lambda:self.client.get('/cfbenchmarks/values',{'id':'BRTI'}),
-            'trades':lambda:trade_window(self.client,t,collection_epoch),
+            'trades':lambda:trade_window(self.client,t,collection_epoch,deadline=collection_epoch+TRADE_FETCH_BUDGET_SECONDS),
             'candles':lambda:self.client.get('/series/'+SERIES+'/markets/'+t+'/candlesticks',{'start_ts':int(now)-900,'end_ts':int(now),'period_interval':1}),
             'spot':lambda:spot_get(guard=getattr(self,'transport_guard',None)),
             'exchange':lambda:self.client.get('/exchange/status'),

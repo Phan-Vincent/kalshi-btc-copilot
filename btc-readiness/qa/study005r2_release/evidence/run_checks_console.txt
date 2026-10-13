@@ -4,7 +4,7 @@
 {"name": "candidate_acceptance", "exit_code": 0, "run": 17, "skipped": 0}
 {"name": "candidate_operating_bounds", "exit_code": 0, "run": 14, "skipped": 0}
 {"name": "candidate_ui", "exit_code": 0, "run": null, "skipped": 0}
-{"name": "readiness_added", "exit_code": 0, "run": 244, "skipped": 0}
+{"name": "readiness_added", "exit_code": 0, "run": 247, "skipped": 0}
 {
   "suites": [
     {
@@ -46,11 +46,11 @@
     {
       "name": "readiness_added",
       "exit_code": 0,
-      "run": 244,
+      "run": 247,
       "skipped": 0
     }
   ],
-  "python_methods_run": 385,
+  "python_methods_run": 388,
   "python_skipped": 1,
   "golden_passed": 14,
   "golden_run": 14,
