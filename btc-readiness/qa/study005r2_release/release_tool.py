@@ -9,6 +9,7 @@ result still needs the final review, the user's approval file and `install.sh ac
 Offline only; no network, credentials or account access.
 """
 import argparse, hashlib, importlib.util, json, math, shutil, sqlite3, subprocess, sys, tempfile
+from contextlib import closing
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -90,7 +91,7 @@ def shakedown_summary(runtime=None,now=None):
     path=runtime/'evidence.sqlite3'
     now=now or datetime.now(timezone.utc)
     now_epoch=now.timestamp()
-    with sqlite3.connect('file:'+str(path)+'?mode=ro',uri=True) as db:
+    with closing(sqlite3.connect('file:'+str(path)+'?mode=ro',uri=True)) as db:
         starts=[x[0] for x in db.execute("SELECT epoch FROM runtime_events WHERE kind='COLLECTOR_START' ORDER BY epoch")]
         if not starts:raise SystemExit('Shakedown has no recorded collector start')
         start=starts[0]
@@ -128,7 +129,7 @@ def shakedown_summary(runtime=None,now=None):
     size=sum(p.stat().st_size for p in runtime.iterdir() if p.is_file())
     quota=json.loads((CANDIDATE/'operating_limits.json').read_text())['quota_bytes']
     hours=max(0,(ended-start)/3600)
-    with sqlite3.connect('file:'+str(path)+'?mode=ro',uri=True) as db:
+    with closing(sqlite3.connect('file:'+str(path)+'?mode=ro',uri=True)) as db:
         page_size=db.execute('PRAGMA page_size').fetchone()[0]
     cap=((quota-1024**2)//(3*page_size))*page_size
     measured_per_day=size/max(hours,1)*24

@@ -198,3 +198,21 @@ The 4.3 h soak on round 3c code captured **17/17 checkpoints** (skew p95 2.15 s)
 - All 13 existing `test_pacing` tests are unchanged and pass.
 
 **Results.** Mac: 388 methods (1 skip), 14/14, 24/24. Acer Linux: 247 readiness tests plus every other suite pass. Manifest `ef08e186…`. Pre-fix run archived as `…/runtime_shakedown_round4c_20261013T1838Z`. **Shakedown restarted 2026-10-13 19:38:55 UTC → 72 h at about 2026-10-16 19:39 UTC.** A live 15-minute busy-hour comparison is running.
+
+**Live result (added 2026-10-14).** First 15 busy-hour minutes after the restart (54 observations): skew median 0.92 s, p95 1.21 s, max 1.57 s (was p95 4.71 s, max 7.07 s). Benchmark median 1.15 s, the same as the raw latency, so the starvation is gone. Trades p95 4.26 s at up to 10k trades. 0 skew vetoes, 0 truncations, 0 collection failures, 1 FINAL_CUTOFF (expected); the checkpoint was captured.
+
+## Round 4e (2026-10-14, Claude): independent QA of round 4d, test-only fixes
+
+**Review.** ChatGPT GPT-6 Astra at High effort reviewed the round 4d code and tests plus the `closing()` cleanup and returned **FIX FIRST**. Claude checked every finding against the code and confirmed all of them. Astra judged the `closing()` changes correct.
+
+1. **The trade budget is not a hard bound.** It only stops new pages *starting* after 15 s. A page that starts at +14.9 s can still wait up to 5 s in the pacer, then up to the 20 s urlopen timeout, and finish after `valid_until_epoch`. That poll then fails with "Decision completion outside valid observation window". The first page of each slice is also exempt (`if pages and …`). So the round 4d claim "never a failed observation" holds only for the common case. Live latency makes this a tail risk (P2 in practice).
+2. **Submitting the benchmark first does not guarantee it the first ticket.** The ticket is taken inside `before_read`, after the thread starts, so another worker can arrive first. It is a strong preference, not a guarantee (P3).
+3. **The pacer can grant tokens just after its deadline.** The deadline check and the token debit in `try_acquire` happen under separate lock sections, so the 5 s wait cap is approximate (P3).
+4. **The round 4d pacer tests were weak.** They dropped worker exceptions, used unbounded `join()`, set arrival order with a fixed sleep, and the expiry test never reached the non-head `abandoned.add` path.
+
+**Fixed now (tests only, outside the shakedown digest).** `test_pacer_serves_in_arrival_order…` now orders arrivals by observed ticket allocation, records every worker exception, uses bounded joins with a deadlock assertion, and asserts the full service order and an empty queue. The new test `test_pacer_skips_consecutive_abandoned_waiters_but_not_a_live_ticket` covers two consecutive non-head expiries behind a live head, then shows that the next caller skips both. An in-memory mutant without `abandoned.add` fails this test. Results: Mac 389 methods (1 skip), golden 14/14, UI 24/24. The arrival-order test passed 15 repeat runs. `shakedown_source_digest` is unchanged (`65f34177…`), so the running shakedown stays valid.
+
+**Deferred to the next candidate change (one shakedown restart; user decision 2026-10-14).**
+- Findings 1–3 above. For 1: carry one monotonic observation deadline through pacing, transport and response reading, with a reserve for validation and publication; check the cutoff before *every* page and again after pacing; mark an unstarted slice incomplete explicitly instead of inventing a cursor. For 2: use a handshake, or reword the comments to say it is a preference. For 3: check the deadline in the same locked section that debits tokens.
+- `candidate/acer_ops.py:177` `read_runtime`: wrap in `closing()` (the last 5 ResourceWarnings).
+- `candidate/acer_ops.py` alert signatures (`:311`/`:364`) include live numbers, so the same alert repeats every 5 minutes. Normalize them to stable text and levels.

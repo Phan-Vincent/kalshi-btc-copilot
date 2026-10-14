@@ -1,5 +1,6 @@
 """Revision-2 regressions; synthetic public data and local SQLite only."""
 import copy, json, math, random, sqlite3, tempfile, unittest, zlib
+from contextlib import closing
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from unittest.mock import patch
@@ -106,16 +107,30 @@ class TradesTests(unittest.TestCase):
 
     def test_pacer_serves_in_arrival_order_so_the_benchmark_is_not_starved(self):
         import threading,time as _time
-        pacer=Pacer();order=[];lock=threading.Lock()
+        pacer=Pacer();order=[];errors=[];lock=threading.Lock()
         def ask(name,cost):
-            pacer.acquire(cost)
+            try:pacer.acquire(cost)
+            except Exception as error:
+                with lock:errors.append((name,error))
+                return
             with lock:order.append(name)
-        big=threading.Thread(target=ask,args=('benchmark',50));big.start();_time.sleep(.05)
-        small=[threading.Thread(target=ask,args=('small%d'%i,10)) for i in range(3)]
-        for t in small:t.start()
-        for t in [big]+small:t.join()
+        def holds_ticket(n):
+            # Arrival is established by ticket allocation, not by a fixed sleep.
+            end=_time.monotonic()+2
+            while _time.monotonic()<end:
+                with pacer.lock:
+                    if pacer.next_ticket>=n:return
+                _time.sleep(.001)
+            self.fail('worker never reached the pacer')
+        big=threading.Thread(target=ask,args=('benchmark',50),daemon=True);big.start();holds_ticket(1)
+        small=[threading.Thread(target=ask,args=('small%d'%i,10),daemon=True) for i in range(3)]
+        for i,t in enumerate(small):t.start();holds_ticket(i+2)
+        for t in [big]+small:t.join(timeout=5)
+        self.assertFalse([t for t in [big]+small if t.is_alive()],'pacer deadlocked')
+        self.assertEqual(errors,[])
         # Without FIFO the 10-token requests finished first (at about 0.17, 0.33 and 0.5 s) and the benchmark last.
-        self.assertEqual(order[0],'benchmark')
+        self.assertEqual(order,['benchmark','small0','small1','small2'])
+        self.assertEqual(pacer.serving,pacer.next_ticket)
 
     def test_pacer_head_that_cannot_be_served_in_time_gives_up_its_turn(self):
         now=[0.]
@@ -124,6 +139,19 @@ class TradesTests(unittest.TestCase):
         with self.assertRaises(PaceError):pacer.acquire(60,max_wait=0.5)  # needs 1 s of refill: gives up
         pacer.acquire(10,max_wait=5)  # the abandoned ticket must not block the queue
         self.assertEqual(pacer.serving,pacer.next_ticket)
+
+    def test_pacer_skips_consecutive_abandoned_waiters_but_not_a_live_ticket(self):
+        now=[0.]
+        pacer=Pacer(clock=lambda:now[0],sleep=lambda s:now.__setitem__(0,now[0]+max(s,1e-6)))
+        from request_pacing import PaceError
+        with pacer.lock:live=pacer.next_ticket;pacer.next_ticket+=1  # a live head still waiting for tokens
+        for _ in range(2):  # two waiters behind it expire without ever being the head
+            with self.assertRaises(PaceError):pacer.acquire(10,max_wait=.5)
+        self.assertEqual(pacer.abandoned,{live+1,live+2})
+        self.assertEqual(pacer.serving,live)  # expiring waiters never skip the live head
+        with pacer.lock:pacer.serving+=1  # the live head is served
+        now[0]+=1;pacer.acquire(10,max_wait=5)  # next caller skips both abandoned tickets
+        self.assertEqual((pacer.serving,pacer.next_ticket,pacer.abandoned),(live+4,live+4,set()))
 
     def test_trade_fetch_budget_marks_the_window_incomplete_instead_of_failing(self):
         now=[1000.]
@@ -191,7 +219,7 @@ class PersistenceTests(unittest.TestCase):
             root=Path(td).resolve();now=[s['epoch']]
             with EvidenceStore(root/'runtime',f.protocol_file(root),s['model_version'],{},boot_id='synthetic',wall=lambda:now[0]) as store:
                 c.state=store.state();store.publish(c,s)
-                with sqlite3.connect(store.path) as db:
+                with closing(sqlite3.connect(store.path)) as db, db:
                     audit=json.loads(zlib.decompress(db.execute('SELECT payload FROM observations').fetchone()[0]))
                     checkpoint=db.execute('SELECT payload FROM checkpoints').fetchone()
                 self.assertNotIn('trades',audit['raw']['trades']['data'])
@@ -262,7 +290,7 @@ class PersistenceTests(unittest.TestCase):
             with EvidenceStore(root/'runtime',f.protocol_file(root),s['model_version'],{},boot_id='synthetic',wall=lambda:s['epoch']) as store:
                 store.failure('COLLECTION_FAILED',ValueError('bad synthetic page'))
                 store.event('COLLECTOR_STOP',RuntimeError('operator stop'))
-                with sqlite3.connect(store.path) as db:
+                with closing(sqlite3.connect(store.path)) as db, db:
                     rows=db.execute('SELECT kind,detail FROM runtime_events').fetchall()
                 self.assertEqual(rows,[('COLLECTION_FAILED','ValueError: bad synthetic page'),
                                        ('COLLECTOR_STOP','RuntimeError: operator stop')])
@@ -293,7 +321,7 @@ class CoverageTests(unittest.TestCase):
             runtime=candidate/'runtime_shakedown';runtime.mkdir()
             db=runtime/'evidence.sqlite3'
             (candidate/'operating_limits.json').write_text(json.dumps({'quota_bytes':128*1024**3}))
-            with sqlite3.connect(db) as c:
+            with closing(sqlite3.connect(db)) as c, c:
                 c.executescript('CREATE TABLE runtime_events(epoch REAL,kind TEXT,detail TEXT); '
                                 'CREATE TABLE markets(opened REAL,checkpoint REAL); '
                                 'CREATE TABLE slot_events(opened REAL,reason TEXT); '
@@ -317,7 +345,7 @@ class CoverageTests(unittest.TestCase):
         now=1800000000.;opened=int(now-1800)//900*900
         with tempfile.TemporaryDirectory() as td:
             db=Path(td).resolve()/'evidence.sqlite3'
-            with sqlite3.connect(db) as c:
+            with closing(sqlite3.connect(db)) as c, c:
                 c.executescript('CREATE TABLE generations(epoch REAL); CREATE TABLE markets(opened REAL,checkpoint REAL); '
                                 'CREATE TABLE slot_events(opened REAL,reason TEXT); CREATE TABLE runtime_control(degraded INTEGER,reason TEXT); '
                                 'CREATE TABLE runtime_events(epoch REAL,kind TEXT,detail TEXT);')
@@ -364,7 +392,7 @@ class GateTests(unittest.TestCase):
             candidate=Path(td).resolve()/'candidate';candidate.mkdir()
             runtime=candidate/'runtime_shakedown';runtime.mkdir()
             (candidate/'operating_limits.json').write_text(json.dumps({'quota_bytes':128*1024**3}))
-            with sqlite3.connect(runtime/'evidence.sqlite3') as db:
+            with closing(sqlite3.connect(runtime/'evidence.sqlite3')) as db, db:
                 db.executescript('CREATE TABLE runtime_events(epoch REAL,kind TEXT,detail TEXT); '
                                  'CREATE TABLE markets(opened REAL,checkpoint REAL); '
                                  'CREATE TABLE slot_events(opened REAL,reason TEXT); '
