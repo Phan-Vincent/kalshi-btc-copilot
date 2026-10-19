@@ -102,6 +102,8 @@ def record_problem(row):
             return "bad minute"
         if row.get("captured_at") is None:
             return "bad captured_at"
+    if kind == "settled" and row.get("result") not in ("yes", "no"):
+        return "bad result"
     if kind == "settled_value" and row.get("expiration_value") is None:
         return "bad expiration_value"
     for key in TIME_FIELDS:

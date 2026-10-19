@@ -311,7 +311,7 @@ class RecordSchemaTests(unittest.TestCase):
         good = {"type": "open", "ticker": "T2", "target": 100, "captured_at": "2026-10-07T00:00:00Z",
                 "open_time": "2026-10-07T00:00:00Z", "timeframes": {"1m": {"lean": "bullish"}}}
         rows = [{"type": "open", "ticker": []}, {"type": "minute", "ticker": "T1", "minute": "3"},
-                {"type": "settled", "ticker": "T1", "expiration_value": "NaN"},
+                {"type": "settled", "ticker": "T1", "result": "yes", "expiration_value": "NaN"},
                 {"type": "minute", "ticker": "T1", "minute": 2, "timeframes": []}, good,
                 {"type": "settled", "ticker": "T2", "result": "yes", "expiration_value": "101.5"}]
         with tempfile.TemporaryDirectory() as directory:

@@ -243,5 +243,41 @@ class MergeLateValueTests(unittest.TestCase):
         self.assertIn("1 from primary, 0 from secondary", printed)
 
 
+class SettledResultTests(unittest.TestCase):
+    """A settled row's result is validated, so a bad one can't shadow a good row."""
+
+    def settled(self, **extra):
+        return {"type": "settled", "ticker": "T", "recorded_at": "2026-10-07T00:15:20Z", **extra}
+
+    def test_only_yes_and_no_are_valid_results(self):
+        for result in ("yes", "no"):
+            self.assertIsNone(report.record_problem(self.settled(result=result)))
+        for result in (None, "", "void", 1, True, False, ["yes"]):
+            with self.subTest(result=result):
+                self.assertEqual(report.record_problem(self.settled(result=result)), "bad result")
+        missing = self.settled()
+        self.assertNotIn("result", missing)
+        self.assertEqual(report.record_problem(missing), "bad result")
+
+    def test_a_bad_result_does_not_shadow_a_later_good_row(self):
+        bad = self.settled(result="void")
+        good = self.settled(result="no", expiration_value="84000.5")
+        with tempfile.TemporaryDirectory() as directory:
+            path = write(directory, "tally_log.jsonl", [bad, good])
+            skipped = []
+            _, settled, _ = report.load_rows(path, skipped)
+            self.assertEqual(skipped, [1])
+            self.assertEqual(settled["T"]["result"], "no")
+            self.assertEqual(settled["T"]["expiration_value"], "84000.5")
+
+    def test_read_rows_counts_a_bad_result_as_unreadable(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = write(directory, "tally_log.jsonl",
+                         [self.settled(result="yes"), self.settled(result=""), self.settled()])
+            rows, bad = log_tools.read_rows(path)
+        self.assertEqual(bad, 2)
+        self.assertEqual([(r["type"], r["result"]) for r in rows], [("settled", "yes")])
+
+
 if __name__ == "__main__":
     unittest.main()

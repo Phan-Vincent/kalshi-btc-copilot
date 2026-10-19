@@ -50,7 +50,7 @@ class ReadRowsTests(unittest.TestCase):
         broken = [{"type": "open", "ticker": []},
                   {"type": "open", "ticker": "B", "open_time": "not-a-date"},
                   {"type": "minute", "ticker": "B", "minute": "3"},
-                  {"type": "settled", "ticker": "B", "expiration_value": "NaN"},
+                  {"type": "settled", "ticker": "B", "result": "yes", "expiration_value": "NaN"},
                   []]
         self.assertEqual([report.record_problem(row) for row in broken],
                          ["bad ticker", "bad open_time", "bad minute", "bad expiration_value", "not an object"])

@@ -243,7 +243,7 @@ class LogToolsTests(unittest.TestCase):
 
     def test_check_counts_duplicates_bad_lines_and_gaps(self):
         path = self.write([self.opened(B), self.opened(B + 900), self.opened(B + 900),
-                           self.opened(B + 2700), {"type": "settled", "ticker": f"W{B}"}],
+                           self.opened(B + 2700), {"type": "settled", "ticker": f"W{B}", "result": "yes"}],
                           extra=b'{"type":"minute","tick\n')
         out = StringIO()
         with redirect_stdout(out):
