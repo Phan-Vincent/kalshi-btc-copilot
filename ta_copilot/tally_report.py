@@ -383,14 +383,27 @@ def settlement_section(opened, settled):
 
 
 def minute_section(minutes):
+    def suppressed(row):
+        """A reading the dashboard hides: a stale spot, or a stale 1m history."""
+        return row.get("stale") is True or "1m" in (row.get("history_stale") or [])
+
+    # forward_changes is shared with the primary measure, so it keeps every
+    # row; only this exploratory section drops the readings the UI suppresses.
+    # One observation per (horizon, window, base row): a stale base row is
+    # counted once for each horizon it could have contributed to.
+    groups_by_horizon = {horizon: forward_changes(minutes, horizon) for horizon in HORIZONS}
+    excluded = sum(1 for groups in groups_by_horizon.values() for rows in groups.values()
+                   for row, _, _ in rows if suppressed(row))
     lines = ["", "== Minute horizon: 1m tally vs what happened next " + EXPLORATORY + " ==",
-             f"Windows with minute rows: {len(minutes)}; minute rows: {sum(len(r) for r in minutes.values())}. "
-             "Block bootstrap resamples whole windows."]
+             f"Windows with minute rows: {len(minutes)}; minute rows: {sum(len(r) for r in minutes.values())}; "
+             f"stale observations excluded: {excluded}. Block bootstrap resamples whole windows."]
     for horizon in HORIZONS:
-        groups = forward_changes(minutes, horizon)
+        groups = groups_by_horizon[horizon]
         for name, index, unit in (("composite", 1, "$"), ("YES mid", 2, "c")):
             def obs(row_change):
                 row, value = row_change[0], row_change[index]
+                if suppressed(row):
+                    return None
                 net = family_net(row, "1m")
                 return None if net is None or value is None else (net, value)
             by_window = [[o for o in map(obs, rows) if o is not None] for rows in groups.values()]
@@ -473,7 +486,9 @@ def primary_result(opened, minutes, now):
                  for rows in groups.values()]
     pairs = [o for g in by_window for o in g]
     interval = block_bootstrap(by_window, spearman)
-    return {**status, "evaluated": True, "rows": len(pairs), "rho": spearman(pairs), "ci": interval,
+    return {**status, "evaluated": True, "rows": len(pairs),
+            "contributing_windows": sum(1 for g in by_window if g),
+            "rho": spearman(pairs), "ci": interval,
             "verdict": None if interval is None else
             ("CI excludes 0" if interval[0] > 0 or interval[1] < 0 else "CI includes 0"),
             "tickers": chosen, "selection_sha256": hashlib.sha256("\n".join(chosen).encode()).hexdigest(),
@@ -490,7 +505,8 @@ def primary_section(opened, minutes, now):
                      f"not before {PRIMARY_EVALUATE_AT:%Y-%m-%d %H:%M} UTC)")
     else:
         rho = result["rho"]
-        lines.append(f"rows {result['rows']}, rho {'n/a' if rho is None else f'{rho:+.3f}'}, "
+        lines.append(f"rows {result['rows']} from {result['contributing_windows']} of "
+                     f"{len(result['tickers'])} windows, rho {'n/a' if rho is None else f'{rho:+.3f}'}, "
                      f"{ci_text(result['ci'])} -> {result['verdict'] or 'undetermined'}")
         lines.append(f"selection sha256 {result['selection_sha256'][:16]}, first {result['tickers'][0]}, "
                      f"last {result['tickers'][-1]}, seed {result['seed']}, {result['rounds']} rounds")

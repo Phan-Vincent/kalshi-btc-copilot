@@ -1041,10 +1041,8 @@ class Feed:
         book = book_context(get_json(f"{KALSHI}/markets/{quote(ticker, safe='')}/orderbook",
                                      {"depth": 5}))
         book_observed_at = time.time()
-        trades = kalshi_trades(get_json(f"{KALSHI}/markets/trades",
-                                        {"ticker": ticker, "min_ts": int(opened), "limit": 100}),
-                               ticker, opened, closed)
-        now = time.time()
+        # Store the book before the trades GET: a failed trades call must not
+        # throw away a fresh orderbook, which refreshes on its own 2 s cadence.
         with self.lock:
             if not self.market or self.market["ticker"] != ticker:
                 return
@@ -1052,9 +1050,15 @@ class Feed:
                 self.context_ticker = ticker
                 self.yes_mid_path.clear()
             self.book, self.book_at = book, book_observed_at
-            self.kalshi_recent_trades = trades
             if book["yes_mid"] is not None:
-                self.yes_mid_path.append({"time": int(now), "value": book["yes_mid"]})
+                self.yes_mid_path.append({"time": int(book_observed_at), "value": book["yes_mid"]})
+        trades = kalshi_trades(get_json(f"{KALSHI}/markets/trades",
+                                        {"ticker": ticker, "min_ts": int(opened), "limit": 100}),
+                               ticker, opened, closed)
+        with self.lock:
+            if not self.market or self.market["ticker"] != ticker:
+                return
+            self.kalshi_recent_trades = trades
             self.errors.pop("kalshi_context", None)
 
     def run_market_context(self):
@@ -1194,11 +1198,18 @@ class Feed:
             frame_family(a, name, (flow.get("one_minute") or {}).get("imbalance"), flow_coverage)
             a["history"] = history[name]
             frames[name] = a if name == tf else {k: a[k] for k in ("values", "readings", "tally", "family", "history")}
+        # A derived frame is never fresher than the frame it aggregates.
+        for name, (src, _) in DERIVED.items():
+            own, source = history[name], history[src]
+            own["stale"] = own["stale"] or source["stale"]
+            own["gap"] = own["gap"] or source["gap"]
+            own["lag_seconds"] = (None if own["lag_seconds"] is None or source["lag_seconds"] is None
+                                  else max(own["lag_seconds"], source["lag_seconds"]))
         m1 = bars["1m"]
 
         def ref(minutes):
             target = int(now // 60) * 60 - minutes * 60
-            return next((b["open"] for b in m1 if b["time"] >= target), None)
+            return next((b["open"] for b in m1 if b["time"] == target), None)
 
         grace_left = max(0.0, promoted_at + KALSHI_PROMOTION_GRACE - now) if promoted_at else 0.0
         return {"ready": True, "server_time": iso(now), "timeframe": tf,
@@ -1323,7 +1334,8 @@ def settled_record(ticker, market, now):
         return None
     record = {"type": "settled", "ticker": ticker, "recorded_at": iso(now),
               "result": market["result"]}
-    if market.get("expiration_value") is not None:
+    # Kalshi sends "" for a field it has not populated yet; that is awaited, not a value.
+    if optional_float(market.get("expiration_value")) is not None:
         record["expiration_value"] = market["expiration_value"]
     return record
 
@@ -1435,11 +1447,20 @@ class TallyLogger:
             os.chmod(self.path, 0o600)
         try:
             rows = json.loads(self.pending_path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            rows = None  # corrupt or unreadable: quarantined below, never fatal
+        if isinstance(rows, dict):
             self.pending_open = {ticker: row for ticker, row in rows.items()
-                                 if ticker not in self.opened}
+                                 if ticker not in self.opened and isinstance(row, dict)}
             os.chmod(self.pending_path, 0o600)
-        except FileNotFoundError:
-            pass
+        elif self.pending_path.exists():
+            # A corrupt queue would fail every prepare, so it is set aside, not kept.
+            self.pending_open = {}
+            try:
+                os.replace(self.pending_path, self.pending_path.with_suffix(f".corrupt-{int(time.time())}"))
+            except OSError:
+                pass
+            print("[BTC TA] tally pending unreadable; set aside and reset", file=sys.stderr)
 
     def persist_pending(self):
         payload = json.dumps(self.pending_open, separators=(",", ":"), allow_nan=False).encode()
@@ -1469,6 +1490,7 @@ class TallyLogger:
             self.opened[ticker] = row
 
     def hydrate_pending(self, now):
+        failed = False  # one clear at the end of a clean pass, so a stale alarm can't stick
         for ticker, row in list(self.pending_open.items()):
             try:
                 market = get_json(f"{KALSHI}/markets/{quote(ticker, safe='')}")["market"]
@@ -1480,11 +1502,14 @@ class TallyLogger:
                 self.opened[ticker] = complete
                 del self.pending_open[ticker]
                 self.persist_pending()
-                with self.feed.lock:
-                    self.feed.errors.pop("tally_open", None)
             except Exception as exc:
+                failed = True
                 with self.feed.lock:
                     self.feed._note("tally_open", exc)
+        # A logger built without __init__ (tests) has no alarm store to clear.
+        if not failed and getattr(self, "feed", None):
+            with self.feed.lock:
+                self.feed.errors.pop("tally_open", None)
 
     def append(self, row):
         payload = (json.dumps(row, separators=(",", ":"), allow_nan=False) + "\n").encode()
@@ -1507,6 +1532,7 @@ class TallyLogger:
                 os.close(fd)
 
     def settle_pending(self, now):
+        failed = False  # one clear at the end of a clean pass, so a stale alarm can't stick
         # Windows with only a close row (the server started mid-window) still
         # need their settlement to score the closing-minute proxy.
         for ticker, row in list({**self.closes, **self.opened}.items()):
@@ -1529,9 +1555,8 @@ class TallyLogger:
                     self.value_pending[ticker] = parse_ts(row["close_time"])
                 self.refresh_record()
                 self.refresh_proxy()
-                with self.feed.lock:
-                    self.feed.errors.pop("tally_settle", None)
             except Exception as exc:
+                failed = True
                 with self.feed.lock:
                     self.feed._note("tally_settle", exc)
         for ticker, close in list(self.value_pending.items()):
@@ -1541,16 +1566,22 @@ class TallyLogger:
                 continue
             try:
                 market = get_json(f"{KALSHI}/markets/{quote(ticker, safe='')}")["market"]
-                if market.get("expiration_value") is None:
-                    continue
+                value = market.get("expiration_value")
+                if optional_float(value) is None:
+                    continue  # "" means not populated yet
                 self.append({"type": "settled_value", "ticker": ticker, "recorded_at": iso(now),
-                             "expiration_value": market["expiration_value"]})
-                self.expirations[ticker] = market["expiration_value"]
+                             "expiration_value": value})
+                self.expirations[ticker] = value
                 del self.value_pending[ticker]
                 self.refresh_proxy()
             except Exception as exc:
+                failed = True
                 with self.feed.lock:
                     self.feed._note("tally_settle", exc)
+        # A logger built without __init__ (tests) has no alarm store to clear.
+        if not failed and getattr(self, "feed", None):
+            with self.feed.lock:
+                self.feed.errors.pop("tally_settle", None)
 
     def refresh_record(self):
         """Track record of the legacy 1m lean at open, shown under the lean."""

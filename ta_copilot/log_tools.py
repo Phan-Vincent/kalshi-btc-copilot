@@ -97,11 +97,27 @@ def check(path):
 
 
 def merge(primary, secondary, out):
+    def filled(kept, row, key):
+        """The kept row completed with a secondary row's late ``expiration_value``, or None.
+
+        Kalshi can publish ``result`` before ``expiration_value`` (see
+        ta_copilot.SETTLE_VALUE_WAIT), so both logs can hold the same settled row,
+        the primary one without the value. Only that one field is filled in, on a
+        copy of the kept row: an existing value is never overwritten, and rows
+        that disagree on ``result`` are never merged."""
+        if key[0] != "settled" or kept.get("expiration_value") is not None:
+            return None
+        value = row.get("expiration_value")
+        if value is None or row.get("result") != kept.get("result"):
+            return None
+        completed = {**kept, "expiration_value": value}
+        return None if record_problem(completed) is not None else completed
+
     out = Path(out)
     if out.exists() or out.resolve() in (Path(primary).resolve(), Path(secondary).resolve()):
         print(f"refusing to write {out}: it exists or is an input", file=sys.stderr)
         return 2
-    merged, sources = {}, Counter()
+    merged, sources, completed_count = {}, Counter(), 0
     for label, path in (("primary", primary), ("secondary", secondary)):
         rows, bad = read_rows(path)
         if bad:
@@ -111,6 +127,13 @@ def merge(primary, secondary, out):
             if key not in merged:
                 merged[key] = row
                 sources[label] += 1
+            elif label == "secondary":
+                completed = filled(merged[key], row, key)
+                if completed is not None:
+                    merged[key] = completed
+                    completed_count += 1
+    if completed_count:
+        print(f"filled {completed_count} expiration_value from secondary")
     payload = "".join(json.dumps(row, separators=(",", ":"), allow_nan=False) + "\n"
                       for row in sorted(merged.values(), key=row_time)).encode()
     fd = os.open(out, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)

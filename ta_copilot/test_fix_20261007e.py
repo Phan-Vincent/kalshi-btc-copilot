@@ -89,7 +89,7 @@ def write_log(directory, rows):
 MINUTE = {"type": "minute", "ticker": "W", "captured_at": "2026-10-07T00:01:00Z",
           "timeframes": {"1m": {"bull": 1, "bear": 0, "neutral": 2, "lean": "mixed", "family_net": 1}}}
 OPEN = {"type": "open", "ticker": "W", "open_time": "2026-10-07T00:00:00Z", "close_time": "2026-10-07T00:15:00Z",
-        "captured_at": "2026-10-07T00:00:00.05Z", "target": 100.0,
+        "captured_at": "2026-10-07T00:00:00.050Z", "target": 100.0,
         "timeframes": {"1m": {"bull": 2, "bear": 0, "neutral": 1, "lean": "bullish"}}}
 
 

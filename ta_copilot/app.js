@@ -362,6 +362,10 @@ function tick() {
   if (last && last.window) {
     const left = Math.max(0, new Date(last.window.close_time) - now) / 1000;
     if (left === 0) {
+      // The window is gone for good, so the snapshot freshness reads must agree
+      // with the card: shownAt/ordering are untouched, so the age and the
+      // "No update" path keep working until the next snapshot replaces `shown`.
+      if (shown) shown = {...shown, window: null, kalshi_stale: true};
       render({...last, server_time: now.toISOString(), window: null, kalshi_stale: true});
       if (last.no_update) checkFreshness(); else setStatus(last);  // keep "No update" while silent
       return;
@@ -455,15 +459,19 @@ function expand(s) {
   const f = s.frames && s.frames[s.timeframe];
   if (f && f.chart) {
     if (!f.chart_tail) cache = {tf: s.timeframe, chart: f.chart, window: null};
-    else if (!cache || cache.tf !== s.timeframe) return false;
+    else if (!cache || cache.tf !== s.timeframe || !cache.chart) return false;
     else { for (const k in f.chart) cache.chart[k] = mergeByTime(cache.chart[k], f.chart[k]); f.chart = cache.chart; }
   }
   const w = s.window;
-  if (w && cache) {
+  if (w) {
+    // The window paths need their own cache: a timeframe without a frame chart
+    // still gets paths_tail events, and merging into the tail alone would shrink
+    // the path to its last points.
+    if (!cache || cache.tf !== s.timeframe) cache = {tf: s.timeframe, chart: null, window: null};
     const paths = ['price_path', 'yes_mid_path'];
     if (!w.paths_tail) cache.window = {ticker: w.ticker, ...Object.fromEntries(paths.map(k => [k, w[k] || []]))};
-    else if (cache.window && cache.window.ticker === w.ticker)
-      for (const k of paths) { cache.window[k] = mergeByTime(cache.window[k], w[k]); w[k] = cache.window[k]; }
+    else if (!cache.window || cache.window.ticker !== w.ticker) return false;
+    else for (const k of paths) { cache.window[k] = mergeByTime(cache.window[k], w[k]); w[k] = cache.window[k]; }
   }
   return true;
 }
