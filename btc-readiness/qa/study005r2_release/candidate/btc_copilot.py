@@ -34,6 +34,9 @@ from kalshi_readonly import KalshiReadOnly, ReadError, NoRedirect, dump, summari
 class FinalCutoff(ReadError):
     """The snapshot finished inside final_entry_cutoff_seconds: refused by design, not a collection failure."""
 
+class ExchangeClosed(ReadError):
+    """A scheduled exchange closure left no open contract: an explained pause, not a collection failure."""
+
 ROOT = Path(__file__).resolve().parent
 WORK = ROOT / "runtime"
 from study_policy import launch_guard
@@ -488,6 +491,14 @@ class Copilot:
             raise ReadError('Active contract discovery was truncated')
         eligible=[m for p in discovery['pages'] for m in p['data'].get('markets',[]) if verified_market(m,now)]
         if len(eligible)!=1:
+            if not eligible:
+                # A scheduled weekly closure (Thu 03:00-05:00 ET) lists no open contract; prove it is closed.
+                try:
+                    body=self.client.get('/exchange/status')['data']
+                    flags=(body.get('exchange_active'),body.get('trading_active'))
+                except Exception:flags=(None,None)
+                if all(type(v) is bool for v in flags) and (flags[0] is False or flags[1] is False):
+                    raise ExchangeClosed('Exchange closed: exchange_active=%s trading_active=%s'%(str(flags[0]).lower(),str(flags[1]).lower()))
             raise ReadError('Cannot verify exactly one active BTC 15-minute contract')
         candidate=eligible[0];t=candidate['ticker'];e=candidate['event_ticker']
         jobs={

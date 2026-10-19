@@ -108,7 +108,7 @@ def shakedown_summary(runtime=None,now=None):
     for opened in slots:
         if opened in checkpoints:continue
         reasons=[reason for slot,reason in vetoes if slot==opened]
-        reasons += [detail for epoch,kind,detail in events if kind=='COLLECTION_FAILED' and opened+300<=epoch<=opened+330 and detail]
+        reasons += [detail for epoch,kind,detail in events if kind in ('COLLECTION_FAILED','EXCHANGE_CLOSED') and opened+300<=epoch<=opened+330 and detail]
         for epoch,kind,detail in events:
             if kind!='REBOOT_RESUME':continue
             try:

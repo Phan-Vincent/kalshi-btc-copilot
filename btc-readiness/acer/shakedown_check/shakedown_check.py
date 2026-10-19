@@ -71,7 +71,7 @@ def report(now):
             logged.setdefault(round(opened), []).append(reason)
         miss_reasons = Counter()
         for s in missed[-12:]:  # the most recent misses are enough to name the cause
-            near = [d for e, k, d in events if k == 'COLLECTION_FAILED' and s + BAND[0] - 15 <= e <= s + BAND[1]]
+            near = [d for e, k, d in events if k in ('COLLECTION_FAILED','EXCHANGE_CLOSED') and s + BAND[0] - 15 <= e <= s + BAND[1]]
             ids = [i for (i,) in c.execute('SELECT id FROM observations WHERE epoch BETWEEN ? AND ?', (s + BAND[0], s + BAND[1])).fetchall()]
             vetoes = [v for snap in payloads(c, ids) for v in snap.get('operational_vetoes', [])]
             explained = [r for r in logged.get(s, []) if r]
@@ -157,7 +157,7 @@ def main():
             lines.append('Missed-slot reasons: ' + '; '.join('%s (%d)' % x for x in r['missed_reasons']))
         if r.get('failure_reasons'):
             lines.append('Failure reasons: ' + '; '.join('%s (%d)' % x for x in r['failure_reasons']))
-    if r.get('hours_run', 0) >= TARGET_HOURS and not state.get('target_reached_sent'):
+    if r.get('hours_run', 0) >= TARGET_HOURS and not state.get('target_reached_sent') and r.get('service') == 'active' and not r['problems']:
         lines.append('[R2 SHAKEDOWN] %d h of collection reached (%s/%s checkpoints in the last %s h). '
                      'Ready for release_tool.py shakedown-summary.' % (TARGET_HOURS, r.get('enrolled'), r.get('slots'), r.get('window_hours')))
         state['target_reached_sent'] = True

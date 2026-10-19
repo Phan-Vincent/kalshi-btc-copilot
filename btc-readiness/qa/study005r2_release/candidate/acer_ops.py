@@ -190,7 +190,7 @@ def read_runtime(db_path, now):
         if s in checkpoints:continue
         reasons=[v for opened,v in vetoes if opened==s]
         top.update(reasons)
-        reasons += [detail for epoch,kind,detail in events if kind=='COLLECTION_FAILED' and s+CHECKPOINT[0]<=epoch<=s+CHECKPOINT[1]]
+        reasons += [detail for epoch,kind,detail in events if kind in ('COLLECTION_FAILED','EXCHANGE_CLOSED') and s+CHECKPOINT[0]<=epoch<=s+CHECKPOINT[1]]
         for epoch,kind,detail in events:
             if kind!='REBOOT_RESUME':continue
             try:

@@ -238,3 +238,27 @@ The 4.3 h soak on round 3c code captured **17/17 checkpoints** (skew p95 2.15 s)
 - The candidate copies of the QA-03 stop/restart rule (`btc_copilot_evidence.py`, `acer_ops.py`). Until they change, a late restart keeps its stop reason in the seal summary but not in the candidate's own `missing_slots`.
 - The round 4e deferred items.
 - The Acer's copies of `release_tool.py` and `shakedown_check.py` have not been updated. Sync them before the shakedown summary and seal.
+
+## Round 4g (2026-10-19, Reasonix + Claude): scheduled exchange closure is an explained pause
+
+**Finding.** The round 4d shakedown halted 2026-10-15 07:10:20 UTC after about 35.5 h. From 07:00:35, all 40 consecutive polls failed with "Cannot verify exactly one active BTC 15-minute contract", and `MAX_CONSECUTIVE_FAILURES` stopped the run for review.
+- Kalshi's published standard hours (`GET /exchange/schedule`, times in ET) close the exchange **every Thursday 03:00–05:00 ET**: 07:00–09:00 UTC until 2026-11-01, then 08:00–10:00 UTC. No KXBTC15M contract is listed then.
+- The TA Copilot log shows the same gap on Oct 1, 8 and 15. The study window has 10 Thursdays, so the collector would have halted every week.
+- The collector was not at fault.
+
+**Fix (candidate).**
+1. When discovery lists **no** contract, `collect()` reads `/exchange/status` (already allowlisted). If its boolean `exchange_active` or `trading_active` is false, it raises `ExchangeClosed`. Kalshi documents `trading_active` as "false outside exchange hours".
+2. `Collector.once` records it as a new `EXCHANGE_CLOSED` runtime event, the same way as `FINAL_CUTOFF`. It is neither a failure nor degradation, and the failure count neither resets nor advances.
+3. More than 4 h of continuous closure stops the collector for operator review. The weekly closure is 2 h.
+4. These still count as failures, as before: no contract while status says active, a failed status read, non-boolean flags, or more than one contract.
+5. Missed slots get the `EXCHANGE_CLOSED` detail as their reason in `btc_copilot_evidence.missing_slots`, `acer_ops`, `release_tool.shakedown_summary` and `shakedown_check.py`. None of them counts it as a poll failure.
+
+**Fix (outside the candidate).** `shakedown_check.py` sends the "72 h reached" message only while the service is active and no problems are reported. It had sent it for the run that died after 35 h.
+
+**Unchanged:** the protocol, `PUBLIC_READS`, cadence, `MAX_CONSECUTIVE_FAILURES`, slot and checkpoint definitions, scoring and gate thresholds.
+
+**Tests.** `tests/test_exchange_closed.py` (15 tests). 14 of them fail on the pre-fix code. Results: Mac `run_checks.py` 412 methods (1 skip), golden 14/14, UI 24/24 (run in a temporary copy). `verify_candidate` passes, and so does `make_revision.py --check`. Working manifest `6a196793…`, `shakedown_source_digest` `1d236024…`. The digest changed, so a fresh 72 h shakedown is required.
+
+**Not yet observed live:** `/exchange/status` during a closure. The next one is Thursday 2026-10-22 07:00–09:00 UTC, and the new shakedown should span it.
+
+**Owner decision, not yet raised.** Closure slots count as explained misses against the 2% budget (107/5,376), at 8 slots per Thursday. Whether scheduled closure slots should count as scheduled slots at all is a protocol question.

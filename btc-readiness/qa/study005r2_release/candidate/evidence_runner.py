@@ -10,7 +10,7 @@ from pathlib import Path
 from http.server import BaseHTTPRequestHandler,ThreadingHTTPServer
 import threading
 from decimal import Decimal
-from btc_copilot import Copilot,ROOT,continuity_clock,FinalCutoff
+from btc_copilot import Copilot,ROOT,continuity_clock,FinalCutoff,ExchangeClosed
 from btc_copilot_research import SOURCE_TEXT,load_settings,version
 from coherent_runtime import EvidenceStore,RuntimeBlocked,no_links
 from kalshi_readonly import KalshiReadOnly,ReadError
@@ -24,6 +24,8 @@ PUBLIC_READS=(r'/markets',r'/markets/trades',r'/markets/[A-Za-z0-9_.-]+',
 EXPECTED_SCOPE=['public_market_data','cfbenchmarks_values']
 # Ten minutes of consecutive failed polls stops the collector for operator review.
 MAX_CONSECUTIVE_FAILURES=40
+# The weekly exchange closure is 2 h; closed polls past 4 h need operator review.
+MAX_EXCHANGE_CLOSED_SECONDS=4*3600
 
 def sha(path):return hashlib.sha256(Path(path).read_bytes()).hexdigest()
 
@@ -199,6 +201,10 @@ class Collector:
             # Expected refusal (final entry cutoff): logged as its own event, never degradation or a failure.
             if not self.store.halted:self.store.event('FINAL_CUTOFF',error)
             return {'generation':None,'decision':'NO TRADE','advice_enabled':False,'final_cutoff':True}
+        except ExchangeClosed as error:
+            # Scheduled closure (Kalshi standard hours, Thu 03:00-05:00 ET): logged as its own event, never degradation or a failure.
+            if not self.store.halted:self.store.event('EXCHANGE_CLOSED',error)
+            return {'generation':None,'decision':'NO TRADE','advice_enabled':False,'exchange_closed':True}
         except Exception as error:
             if not self.store.halted:self.store.failure('COLLECTION_FAILED',error)
             raise
@@ -257,7 +263,7 @@ def run_authorized(root,gate,*,client_factory=EvidenceClient,engine_factory=Evid
     store=store_factory(context['runtime_dir'],protocol_file,version(settings),SOURCE_TEXT,
                         quota_bytes=context['quota_bytes'],free_reserve_bytes=context['free_reserve_bytes'],
                         validator=validator)
-    server=None;thread=None;clean=False;cycles=0;failures=0;settle_failures=0;previous=None
+    server=None;thread=None;clean=False;cycles=0;failures=0;settle_failures=0;previous=None;closed_since=None
     def halted():
         root_dir=getattr(store,'root',None)
         return store.halted or (root_dir is not None and (Path(root_dir)/'HALTED').exists())
@@ -289,10 +295,20 @@ def run_authorized(root,gate,*,client_factory=EvidenceClient,engine_factory=Evid
             if now<epoch(protocol['start_utc']):raise RuntimeBlocked('Collection window has not opened')
             if now<epoch(protocol['end_utc']):
                 try:
-                    if not collector.once().get('final_cutoff'):failures=0
+                    result=collector.once()
                 except Exception:
                     # A later fresh poll may recover; missed windows are never backfilled.
+                    closed_since=None
                     failures+=1;tolerate(failures)
+                else:
+                    if result.get('exchange_closed'):
+                        # A closed poll is an explained pause: it neither resets nor advances failures.
+                        if closed_since is None:closed_since=now
+                        elif now-closed_since>MAX_EXCHANGE_CLOSED_SECONDS:
+                            raise RuntimeBlocked('Exchange closed longer than expected; operator review')
+                    else:
+                        closed_since=None
+                        if not result.get('final_cutoff'):failures=0
             if not shakedown:
                 try:collector.reconcile_one();settle_failures=0
                 except Exception:
