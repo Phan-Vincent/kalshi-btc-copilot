@@ -216,3 +216,25 @@ The 4.3 h soak on round 3c code captured **17/17 checkpoints** (skew p95 2.15 s)
 - Findings 1–3 above. For 1: carry one monotonic observation deadline through pacing, transport and response reading, with a reserve for validation and publication; check the cutoff before *every* page and again after pacing; mark an unstarted slice incomplete explicitly instead of inventing a cursor. For 2: use a handshake, or reword the comments to say it is a preference. For 3: check the deadline in the same locked section that debits tokens.
 - `candidate/acer_ops.py:177` `read_runtime`: wrap in `closing()` (the last 5 ResourceWarnings).
 - `candidate/acer_ops.py` alert signatures (`:311`/`:364`) include live numbers, so the same alert repeats every 5 minutes. Normalize them to stable text and levels.
+
+## Round 4f (2026-10-18, Reasonix + Claude): QA fixes outside the candidate
+
+**Review.** An offline adversarial QA pass at `52a07a8` reported seven findings. Codex verified them against the source with synthetic reproductions. A read-only DeepSeek Flash worker (Reasonix) then re-checked the disputed verdicts, and Claude checked those answers against the code. DeepSeek Flash wrote the fixes below in two bounded Reasonix tasks. Claude reviewed every changed line and ran all suites. Only files **outside `candidate/`** changed, so `shakedown_source_digest` is unchanged and the running shakedown stays valid.
+
+**Fixed (release tool and Acer monitor).**
+1. **QA-01: empty hours blocked the seal.** `shakedown_summary` marks each hourly row with `partial_hour` and `inactivity_explained`. `check_shakedown` accepts a zero-attempt hour only if the shakedown window cuts it, or if every slot in it is a miss with a recorded reason. An unexplained empty full hour still fails. A numeric rate must be finite and between 0 and 1%.
+2. **QA-05: the final slot was dropped.** Every slot whose 300–330 s band has fully elapsed now counts, including the last one. This matches `shakedown_check.py`.
+3. **QA-03: a late restart hid the stop reason.** A `COLLECTOR_STOP` is cleared only by a start at or before `opened+300`. A restart at `+329` keeps the reason.
+4. **QA-05: weak schema checks.** The seal gate rejects blank or non-string reasons, a missing, non-integer or nonzero `unexplained_collection_failures`, and NaN or non-numeric `hours_covered`.
+5. **QA-05: monitor labels.** `acer/shakedown_check/shakedown_check.py` explains misses from `slot_events`, `REBOOT_RESUME` (the same test the release tool uses) and collector stops, instead of "NO OBSERVATION OR REASON IN THE BAND". `slot_events` is fetched once, in full, so no lock is held.
+
+**Fixed (TA Copilot, QA-06).** `log_tools.read_rows` no longer counts unknown-type rows as unreadable, matching `tally_report.load_rows`. They are still not returned, as before. `tally_report.primary_result` orders windows by parsed UTC time instead of ISO text. **The predeclared cohort is unchanged:** it is still the first 800 windows with minute rows.
+
+**Tests.** `tests/test_shakedown_qa.py` (8 tests) and `ta_copilot/test_qa_20261018.py` (7 tests). All 8 shakedown tests fail on the pre-fix code, and so do 6 of the 7 TA tests. The seventh guards that the cohort is unchanged. Results: Mac 397 methods (1 skip), golden 14/14, UI 24/24, from `run_checks.py` in a temporary copy. `make_revision.py --check` passes, and TA Copilot passes 235 tests.
+
+**Not changed (held for the next candidate change, or a decision).**
+- QA-02: `impute_holdout` gives zero penalty when every fill won. This matches the predeclared formula (`readiness_protocol.json:121`), so changing it is a protocol decision.
+- QA-04: `Study.record` returns early for outside-study observations. No normal collector path reaches it.
+- The candidate copies of the QA-03 stop/restart rule (`btc_copilot_evidence.py`, `acer_ops.py`). Until they change, a late restart keeps its stop reason in the seal summary but not in the candidate's own `missing_slots`.
+- The round 4e deferred items.
+- The Acer's copies of `release_tool.py` and `shakedown_check.py` have not been updated. Sync them before the shakedown summary and seal.

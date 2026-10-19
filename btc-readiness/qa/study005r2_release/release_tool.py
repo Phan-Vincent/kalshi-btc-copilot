@@ -100,9 +100,11 @@ def shakedown_summary(runtime=None,now=None):
         events=list(db.execute('SELECT epoch,kind,detail FROM runtime_events ORDER BY epoch'))
         generations=[x[0] for x in db.execute('SELECT epoch FROM generations ORDER BY epoch')]
     ended=min(now_epoch,max([start]+generations+[x[0] for x in events]))
-    first=math.ceil(start/900)*900;last=math.floor(ended/900)*900
-    slots=list(range(first,last,900))
-    missed=[]
+    first=math.ceil(start/900)*900
+    # Every slot whose 330 s checkpoint band has elapsed counts (matches shakedown_check.py); the old
+    # floor(ended/900) bound silently dropped the final slot even when its band had completed.
+    slots=[s for s in range(first,math.floor((ended-330)/900)*900+1,900)]
+    missed={}
     for opened in slots:
         if opened in checkpoints:continue
         reasons=[reason for slot,reason in vetoes if slot==opened]
@@ -118,14 +120,21 @@ def shakedown_summary(runtime=None,now=None):
         stops=[(epoch,detail) for epoch,kind,detail in events if kind=='COLLECTOR_STOP' and epoch<=opened+330]
         if stops:
             stopped,detail=stops[-1]
-            if not any(epoch>stopped and epoch<=opened+330 and kind=='COLLECTOR_START' for epoch,kind,_ in events):reasons.append(detail or 'Collector stopped')
-        missed.append({'slot_opened_utc':datetime.fromtimestamp(opened,timezone.utc).isoformat(),'reasons':sorted(set(reasons))})
+            # Only a start that had the collector up for the whole band clears the miss; a restart at
+            # opened+329 still leaves the band unobserved, so the stop reason survives.
+            if not any(epoch>stopped and epoch<=opened+300 and kind=='COLLECTOR_START' for epoch,kind,_ in events):reasons.append(detail or 'Collector stopped')
+        missed[opened]=sorted(set(reasons))
     hourly=[]
     for hour in range(math.floor(start/3600)*3600,math.ceil(ended/3600)*3600,3600):
         fail=sum(hour<=epoch<hour+3600 and kind=='COLLECTION_FAILED' for epoch,kind,_ in events)
         good=sum(hour<=epoch<hour+3600 for epoch in generations)
+        inside=[s for s in slots if hour<=s<hour+3600]
         hourly.append({'hour_utc':datetime.fromtimestamp(hour,timezone.utc).isoformat(),'failed':fail,'successful':good,
-                       'failure_rate':fail/(fail+good) if fail+good else None})
+                       'failure_rate':fail/(fail+good) if fail+good else None,
+                       'partial_hour':hour<start or hour+3600>ended,
+                       # An empty hour is excused only when every slot in it is a named miss: an
+                       # unexplained empty full hour is still a seal failure.
+                       'inactivity_explained':fail+good==0 and bool(inside) and all(missed.get(s) for s in inside)})
     size=sum(p.stat().st_size for p in runtime.iterdir() if p.is_file())
     quota=json.loads((CANDIDATE/'operating_limits.json').read_text())['quota_bytes']
     hours=max(0,(ended-start)/3600)
@@ -138,8 +147,10 @@ def shakedown_summary(runtime=None,now=None):
              'collection_ended_at_utc':datetime.fromtimestamp(ended,timezone.utc).isoformat(),'source_runtime':str(runtime),
              'source_database_sha256':sha(path),'candidate_source_sha256':shakedown_source_digest(CANDIDATE),
              'hours_covered':hours,'slots':len(slots),
-             'enrolled_checkpoints':len(slots)-len(missed),'missed_slots':missed,
-             'all_misses_have_reasons':all(x['reasons'] for x in missed),
+             'enrolled_checkpoints':len(slots)-len(missed),
+             'missed_slots':[{'slot_opened_utc':datetime.fromtimestamp(opened,timezone.utc).isoformat(),'reasons':reasons}
+                             for opened,reasons in missed.items()],
+             'all_misses_have_reasons':all(missed.values()),
              'poll_failure_rate_by_hour':hourly,
              'unexplained_collection_failures':sum(kind=='COLLECTION_FAILED' and not detail for _,kind,detail in events),
              'storage_growth':{'observed_bytes':size,'measured_bytes_per_day':measured_per_day,
@@ -149,6 +160,12 @@ def shakedown_summary(runtime=None,now=None):
                                'projected_fraction_of_main_database_cap':projected/cap}}
     (CANDIDATE/'shakedown_summary.json').write_text(json.dumps(summary,indent=2)+'\n')
     return summary
+
+def shakedown_rate_ok(row):
+    """A zero-attempt hour has no rate; it passes only when the window edge cut it or every slot in it is a named miss."""
+    rate=row.get('failure_rate')
+    if rate is None:return row.get('partial_hour') is True or row.get('inactivity_explained') is True
+    return type(rate) in (int,float) and math.isfinite(rate) and 0<=rate<=.01
 
 def check_shakedown(root,now=None):
     path=Path(root)/'shakedown_summary.json'
@@ -167,13 +184,15 @@ def check_shakedown(root,now=None):
                    type(projected) is int and projected>=0 and
                    abs(projected-measured*72*2)<2 and growth.get('uncertainty_multiplier')==2)
     cap=((quota-1024**2)//(3*page_size))*page_size if storage_valid else 0
+    hours=summary.get('hours_covered')
+    reasons_valid=all(type(r) is str and r.strip() for x in missed for r in x.get('reasons') or [])
     if (summary.get('status')!='QA_SHAKEDOWN_NOT_STUDY_EVIDENCE' or
         summary.get('candidate_source_sha256')!=shakedown_source_digest(root) or
-        summary.get('hours_covered',0)<72 or slots<1 or
+        type(hours) not in (int,float) or not math.isfinite(hours) or hours<72 or slots<1 or
         summary.get('enrolled_checkpoints')!=slots-len(missed) or summary.get('all_misses_have_reasons',True) is not True or
-        (slots-len(missed))/slots<.95 or not all(x.get('reasons') for x in missed) or
-        summary.get('unexplained_collection_failures') or len(rates)<72 or
-        any(row.get('failure_rate') is None or row['failure_rate']>.01 for row in rates) or
+        (slots-len(missed))/slots<.95 or not all(x.get('reasons') for x in missed) or not reasons_valid or
+        type(summary.get('unexplained_collection_failures')) is not int or summary['unexplained_collection_failures']!=0 or
+        len(rates)<72 or not all(shakedown_rate_ok(row) for row in rates) or
         not storage_valid or growth.get('main_database_cap_bytes')!=cap or projected>cap):
         raise SystemExit('Shakedown coverage, reasons, failure rate or storage gate failed')
     return summary

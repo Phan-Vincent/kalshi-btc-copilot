@@ -65,12 +65,33 @@ def report(now):
         first = math.ceil((since - BAND[0]) / 900) * 900
         slots = [s for s in range(first, int(now), 900) if s + BAND[0] >= since and s + BAND[1] <= now]
         missed = [s for s in slots if s not in enrolled]
+        # Reasons the collector itself logged per slot, fetched once in full before the loop below.
+        logged = {}
+        for opened, reason in c.execute('SELECT opened,reason FROM slot_events WHERE opened>=?', (since - 900,)).fetchall():
+            logged.setdefault(round(opened), []).append(reason)
         miss_reasons = Counter()
         for s in missed[-12:]:  # the most recent misses are enough to name the cause
             near = [d for e, k, d in events if k == 'COLLECTION_FAILED' and s + BAND[0] - 15 <= e <= s + BAND[1]]
             ids = [i for (i,) in c.execute('SELECT id FROM observations WHERE epoch BETWEEN ? AND ?', (s + BAND[0], s + BAND[1])).fetchall()]
             vetoes = [v for snap in payloads(c, ids) for v in snap.get('operational_vetoes', [])]
-            miss_reasons.update(set(near + vetoes) or {'NO OBSERVATION OR REASON IN THE BAND'})
+            explained = [r for r in logged.get(s, []) if r]
+            # A reboot that resumed after this band opened explains it; the release tool applies the same test.
+            for e, k, d in events:
+                if k != 'REBOOT_RESUME':
+                    continue
+                try:
+                    previous = json.loads(d)['last_observation_epoch']
+                    if type(previous) in (int, float) and math.isfinite(previous) and previous < e and s + BAND[0] < e and s + BAND[1] > previous:
+                        explained.append('reboot')
+                except (TypeError, ValueError, KeyError):
+                    pass
+            stops = [(e, d) for e, k, d in events if k == 'COLLECTOR_STOP' and e <= s + BAND[1]]
+            if stops:
+                stopped, detail = stops[-1]
+                # Cleared only by a restart that had the collector up for the whole band (release tool rule).
+                if not any(e > stopped and e <= s + BAND[0] and k == 'COLLECTOR_START' for e, k, _ in events):
+                    explained.append(detail or 'Collector stopped')
+            miss_reasons.update(set(near + vetoes + explained) or {'NO OBSERVATION OR REASON IN THE BAND'})
         # Poll failure rate per full clock hour.
         hours = []
         for h in range(math.ceil(since / 3600) * 3600, int(now) - 3599, 3600):

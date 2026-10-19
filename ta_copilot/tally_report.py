@@ -449,8 +449,17 @@ def market_section(opened, settled, minutes):
 
 def primary_result(opened, minutes, now):
     """The pre-declared primary measure, or a not-yet-evaluated status."""
-    eligible = sorted((opened.get(t, {}).get("open_time") or min(r["captured_at"] for r in rows.values()), t)
-                      for t, rows in minutes.items() if rows)
+    # Windows are ordered by parsed UTC time, not by the raw ISO string: as
+    # text, '...T00:00:00.500000Z' sorts before '...T00:00:00Z', which would put
+    # a later window first. The ticker breaks ties as before.
+    def opened_at(ticker, rows):
+        open_time = opened.get(ticker, {}).get("open_time")
+        if not open_time:
+            open_time = min((r["captured_at"] for r in rows.values()),
+                            key=lambda text: datetime.fromisoformat(text.replace("Z", "+00:00")).timestamp())
+        return datetime.fromisoformat(open_time.replace("Z", "+00:00")).timestamp()
+
+    eligible = sorted((opened_at(t, rows), t) for t, rows in minutes.items() if rows)
     status = {"windows": len(eligible), "needed": PRIMARY_MIN_WINDOWS,
               "evaluate_at": PRIMARY_EVALUATE_AT.isoformat()}
     if now < PRIMARY_EVALUATE_AT or len(eligible) < PRIMARY_MIN_WINDOWS:

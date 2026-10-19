@@ -34,7 +34,12 @@ def row_time(row):
 
 
 def read_rows(path):
-    """(rows in file order, unreadable line count). Blank lines are ignored."""
+    """(rows in file order, unreadable line count). Blank lines are ignored.
+
+    A line that is not JSON, or that parses but fails record_problem(), is
+    unreadable. Rows of a type that is not a research record ("unknown type")
+    are not damage: like tally_report.load_rows(), they are not counted, and
+    they are also not returned."""
     rows, bad = [], 0
     with Path(path).open("rb") as handle:
         for line in handle:
@@ -45,7 +50,14 @@ def read_rows(path):
             except (ValueError, UnicodeDecodeError):
                 bad += 1
                 continue
-            if record_problem(row) is None:
+            problem = record_problem(row)
+            if problem == "unknown type":
+                # Dropped instead of returned, and not counted as bad: check()
+                # reads r["type"] directly, so a dict without one would raise
+                # KeyError, and merge() keys rows with row_key(), which is None
+                # for every unknown type, so all of them would fold into one row.
+                continue
+            if problem is None:
                 rows.append(row)
             else:
                 bad += 1
