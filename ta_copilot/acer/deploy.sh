@@ -23,7 +23,7 @@ case "${1:-deploy}" in
   deploy)
     (cd "$SRC" && python3 -m unittest discover -q -p 'test_*.py')
     remote 'mkdir -p ~/btc-ta/state ~/.config/systemd/user && chmod 700 ~/btc-ta ~/btc-ta/state'
-    scp -q "$SRC/ta_copilot.py" "$SRC/stream_flow.py" "$SRC/ta_watch.py" "$SRC/tally_report.py" "$SRC/log_tools.py" "$SRC/acer_watch.py" "$SRC/index.html" "$SRC/app.js" "$SRC/README.md" "$SRC"/test_*.py "$HOST:btc-ta/"
+    scp -q "$SRC/ta_copilot.py" "$SRC/stream_flow.py" "$SRC/sr_levels.py" "$SRC/ta_watch.py" "$SRC/tally_report.py" "$SRC/log_tools.py" "$SRC/acer_watch.py" "$SRC/index.html" "$SRC/app.js" "$SRC/README.md" "$SRC"/test_*.py "$HOST:btc-ta/"
     scp -q "$HERE/btc-ta-copilot.service" "$HERE/btc-ta-watch.service" "$HERE/btc-ta-watch.timer" "$HOST:.config/systemd/user/"
     remote "set -e
             cd ~/btc-ta && python3 -m unittest discover -q -p 'test_*.py'

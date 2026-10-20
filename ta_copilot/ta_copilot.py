@@ -24,6 +24,8 @@ from pathlib import Path
 from urllib.parse import parse_qs, quote, urlencode, urlparse
 from urllib.request import Request, urlopen
 
+import sr_levels
+
 from tally_report import record_problem
 from stream_flow import OrderFlow, parse_coinbase, parse_coinbase_spot, parse_kraken, MalformedMessage
 
@@ -396,15 +398,9 @@ def anchored_vwap(bars, anchor):
 
 def pivots(bars, k=2):
     """Fractal swing highs/lows on closed bars (the forming bar is excluded)."""
-    highs, lows = [], []
-    closed = bars[:-1]
-    for i in range(k, len(closed) - k):
-        window = closed[i - k:i + k + 1]
-        if closed[i]["high"] == max(b["high"] for b in window):
-            highs.append(closed[i]["high"])
-        if closed[i]["low"] == min(b["low"] for b in window):
-            lows.append(closed[i]["low"])
-    return highs, lows
+    points = sr_levels.pivot_points(bars, k)
+    return ([p for _, p, side in points if side == "high"],
+            [p for _, p, side in points if side == "low"])
 
 
 def realized_sigma(closes, lookback=60):
@@ -1188,6 +1184,14 @@ class Feed:
         frames, history = {}, {}
         for name, b in bars.items():
             history[name] = history_quality(b, TIMEFRAMES[name], fetched_last[name], now)
+        # A derived frame is never fresher than the frame it aggregates.
+        for name, (src, _) in DERIVED.items():
+            own, source = history[name], history[src]
+            own["stale"] = own["stale"] or source["stale"]
+            own["gap"] = own["gap"] or source["gap"]
+            own["lag_seconds"] = (None if own["lag_seconds"] is None or source["lag_seconds"] is None
+                                  else max(own["lag_seconds"], source["lag_seconds"]))
+        for name, b in bars.items():
             if len(b) < 30:
                 continue
             a = (analyze(b, price, anchor, "VWAP (window)") if name == "1m"
@@ -1196,15 +1200,12 @@ class Feed:
                 a["values"]["close"] = b[-1]["close"]
                 a["values"]["close_prev"] = b[-2]["close"] if len(b) > 1 else None
             frame_family(a, name, (flow.get("one_minute") or {}).get("imbalance"), flow_coverage)
+            a["levels"] = sr_levels.levels(name, bars, history, price, a["values"]["atr"],
+                                          vwap=a["values"]["vwap"], target=window["strike"] if window else None,
+                                          target_price=composite, window_open=window["open_price"] if window else None,
+                                          now=now)
             a["history"] = history[name]
-            frames[name] = a if name == tf else {k: a[k] for k in ("values", "readings", "tally", "family", "history")}
-        # A derived frame is never fresher than the frame it aggregates.
-        for name, (src, _) in DERIVED.items():
-            own, source = history[name], history[src]
-            own["stale"] = own["stale"] or source["stale"]
-            own["gap"] = own["gap"] or source["gap"]
-            own["lag_seconds"] = (None if own["lag_seconds"] is None or source["lag_seconds"] is None
-                                  else max(own["lag_seconds"], source["lag_seconds"]))
+            frames[name] = a if name == tf else {k: a[k] for k in ("values", "readings", "tally", "family", "history", "levels")}
         m1 = bars["1m"]
 
         def ref(minutes):
@@ -1302,13 +1303,27 @@ def minute_record(state, now):
         price = optional_float(q["price"])  # book levels arrive as decimal strings
         return None if price is None else {"price": price, "age": round(q["age"], 2), "source": q["source"]}
 
+    def compact_levels(data):
+        if data is None:
+            return None
+        support = next(iter(data.get("support") or []), {})
+        resistance = next(iter(data.get("resistance") or []), {})
+        target = data.get("target")
+        out = {"support": support.get("mid"), "support_touches": support.get("touches"),
+               "support_dist_atr": support.get("distance_atr"), "resistance": resistance.get("mid"),
+               "resistance_touches": resistance.get("touches"),
+               "resistance_dist_atr": resistance.get("distance_atr"), "at_price": bool(data.get("at_price")),
+               "zones_to_target": target.get("count") if target is not None else None,
+               "target_in_zone": bool(target.get("in_zone")) if target is not None else None}
+        return {k: v if isinstance(v, (int, float)) and math.isfinite(v) else None for k, v in out.items()}
+
     frames = {}
     for tf, frame in (state.get("frames") or {}).items():
         family = frame.get("family") or {}
         frames[tf] = {**frame["tally"], "rsi": frame["values"].get("rsi"),
                       "macd_hist": frame["values"].get("macd_hist"),
                       "family": family.get("votes"), "family_net": family.get("net"),
-                      "family_lean": family.get("lean")}
+                      "family_lean": family.get("lean"), "levels": compact_levels(frame.get("levels"))}
     return {"type": "minute", "ticker": window["ticker"], "minute": minute,
             "captured_at": iso(now), "seconds_left": round(window["seconds_left"], 2),
             "composite": state.get("composite"), "average_60s": state.get("average_60s"),

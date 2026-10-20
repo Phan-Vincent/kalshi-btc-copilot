@@ -5,7 +5,7 @@ const sgn = (x, d = 2) => x == null ? '—' : (x >= 0 ? '+' : '−') + usd(Math.
 const cents = x => x == null ? '—' : (Number(x) * 100).toFixed(2) + '¢';
 const TZ = -new Date().getTimezoneOffset() * 60;  // chart shows local time
 const shift = arr => arr.map(p => ({...p, time: p.time + TZ}));
-let tf = localStorageGet('ta_tf') || '1m', fitNext = true, last = null, strikeLine = null;
+let tf = localStorageGet('ta_tf') || '1m', fitNext = true, last = null, strikeLine = null, zoneLines = [];
 let serverOffsetMs = 0;
 // Freshness is judged on this page's own monotonic clock, from when a snapshot
 // was last accepted: an open stream that stops sending must not stay "Live".
@@ -128,7 +128,7 @@ function render(s) {
   last = s;
   serverOffsetMs = Date.parse(s.server_time) - Date.now();
   const f = s.frames[s.timeframe];
-  if (f) renderFrame(s, f); else clearFrame();
+  if (f) renderFrame(s, f); else clearFrame(s);
   $('frameNote').textContent = frameNote(s, f);
   renderShared(s, f);
 }
@@ -160,11 +160,13 @@ function compositeQuality(s) {
     `venue range ${usd(Math.max(...prices) - Math.min(...prices))}`);
 }
 
-function clearFrame() {
+function clearFrame(s) {
   [candles, vol, rsiS, macdL, macdSig, macdH, ...Object.values(L)].forEach(x => x.setData([]));
   candles.setMarkers([]);
   if (strikeLine) { candles.removePriceLine(strikeLine); strikeLine = null; }
+  zoneLines.forEach(x => candles.removePriceLine(x)); zoneLines = [];
   $('readings').innerHTML = ''; $('levels').innerHTML = '';
+  renderZones(s, null, readingProblem(s, s.timeframe));
   $('rsiNow').textContent = ''; $('macdNow').textContent = '';
 }
 
@@ -199,13 +201,39 @@ function renderFrame(s, f) {
     : r.family === 'context'
     ? `<tr class="context"><td>${r.name}</td><td>${r.detail} · context, not counted in families</td><td>${badge(r.state)}</td></tr>`
     : `<tr><td>${r.name}</td><td class="muted">${r.detail}</td><td>${badge(r.state)}</td></tr>`).join('');
-  const lv = [['Resistance (swing)', usd(v.resistance)], ['Support (swing)', usd(v.support)],
-    ['ATR 14', usd(v.atr)], ['BB upper / lower', `${usd(v.bb_upper, 0)} / ${usd(v.bb_lower, 0)}`],
+  renderZones(s, f.levels, problem);
+  const lv = [['ATR 14', usd(v.atr)], ['BB upper / lower', `${usd(v.bb_upper, 0)} / ${usd(v.bb_lower, 0)}`],
     ['BB width', v.bb_width_pct == null ? '—' : v.bb_width_pct.toFixed(2) + '%'], ['VWAP', usd(v.vwap)],
     ['EMA 200', usd(v.ema200)]];
-  $('levels').innerHTML = lv.map(([a, b]) => `<tr><td class="muted">${a}</td><td>${b}</td></tr>`).join('');
+  $('levels').innerHTML = lv.map(([a, b]) => `<tr><td class="muted">${esc(a)}</td><td>${esc(b)}</td></tr>`).join('');
   $('rsiNow').textContent = v.rsi == null ? '' : '· ' + v.rsi.toFixed(1);
   $('macdNow').textContent = v.macd_hist == null ? '' : `· hist ${v.macd_hist >= 0 ? '+' : ''}${v.macd_hist.toFixed(2)}`;
+}
+
+function renderZones(s, levels, problem) {
+  zoneLines.forEach(x => candles.removePriceLine(x)); zoneLines = [];
+  const support = levels?.support || [], resistance = levels?.resistance || [];
+  const rows = [...resistance].reverse().concat(levels?.at_price ? [levels.at_price] : [], support);
+  const range = z => `${usd(z.low)}–${usd(z.high)}`;
+  $('zones').innerHTML = problem ? `<tr><td colspan="7" class="muted">${esc(problem)}</td></tr>` :
+    rows.map(z => `<tr>${[z.role, range(z), `${sgn(z.distance_usd)} · ${z.distance_atr == null ? '—' : (z.distance_atr >= 0 ? '+' : '−') + Math.abs(z.distance_atr).toFixed(2)} ATR`,
+      z.touches, z.timeframes.join(', ') || '—', [...(z.sources || []).filter(x => x !== 'swing').map(x => x.replace(/_/g, ' ')), ...z.tags].join(' · ') || '—', z.strength].map(x => `<td>${esc(x)}</td>`).join('')}</tr>`).join('');
+  const target = !problem && levels?.target;
+  let note = '';
+  if (target) {
+    if (target.in_zone) note = `Target ${usd(target.strike)} is inside a zone (${range(target.in_zone)})`;
+    else if (!target.count) note = `Target ${usd(target.strike)}: No zones between price and target`;
+    else note = `Target ${usd(target.strike)}: ${target.count} zone${target.count === 1 ? '' : 's'} between price and target (` +
+      target.between.map(z => `${z.role} ${range(z)}, ${z.touches} ${z.touches === 1 ? 'touch' : 'touches'}`).join('; ') + ')';
+  }
+  $('zoneTarget').textContent = note;
+  $('zoneExcluded').textContent = levels?.excluded_timeframes?.length ?
+    ` Excluded (stale or gapped): ${levels.excluded_timeframes.join(', ')}` : '';
+  if (!problem) for (const [role, zones] of [['S', support], ['R', resistance]]) {
+    for (const z of zones.slice(0, 2)) zoneLines.push(candles.createPriceLine({price: z.mid,
+      color: css('--neutral'), lineStyle: 2, lineWidth: 1, axisLabelVisible: false,
+      title: `${role} ×${z.touches} ${z.timeframes[z.timeframes.length - 1] || ''}`}));
+  }
 }
 
 function renderShared(s, f) {

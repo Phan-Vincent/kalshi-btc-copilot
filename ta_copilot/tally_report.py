@@ -50,6 +50,7 @@ EXPLORATORY_NOTE = ("Sections marked [exploratory] make many comparisons; expect
 # * timestamps must parse as ISO 8601;
 # * per-timeframe counts (bull/bear/neutral, family_net) must be integers and
 #   lean a string, with bull and bear present together.
+# * optional levels contain finite numbers, nonnegative integer counts and boolean flags.
 RECORD_TYPES = ("open", "settled", "close", "minute", "settled_value")
 NUMERIC_FIELDS = ("composite", "composite_spot", "average_60s", "target", "sigma_1m_usd", "seconds_left",
                   "proxy_avg_60s", "flow_imbalance_1m", "capture_delay_seconds", "flow_coverage_seconds")
@@ -127,6 +128,20 @@ def record_problem(row):
         if not isinstance(frames, dict) or not all(isinstance(f, dict) for f in frames.values()):
             return "bad timeframes"
         for frame in frames.values():
+            levels = frame.get("levels")
+            if levels is not None:
+                if not isinstance(levels, dict):
+                    return "bad levels"
+                if any(not finite_or_none(levels.get(k)) for k in
+                       ("support", "resistance", "support_dist_atr", "resistance_dist_atr")):
+                    return "bad levels"
+                if any(levels.get(k) is not None and
+                       (not is_count(levels[k]) or levels[k] < 0) for k in
+                       ("support_touches", "resistance_touches", "zones_to_target")):
+                    return "bad levels"
+                if any(levels.get(k) is not None and not isinstance(levels[k], bool)
+                       for k in ("at_price", "target_in_zone")):
+                    return "bad levels"
             for key in COUNT_FIELDS:
                 if frame.get(key) is not None and not is_count(frame[key]):
                     return f"bad {key}"
@@ -384,11 +399,12 @@ def settlement_section(opened, settled):
     return lines
 
 
-def minute_section(minutes):
-    def suppressed(row):
-        """A reading the dashboard hides: a stale spot, or a stale 1m history."""
-        return row.get("stale") is True or "1m" in (row.get("history_stale") or [])
+def suppressed(row):
+    """A reading the dashboard hides: a stale spot, or a stale 1m history."""
+    return row.get("stale") is True or "1m" in (row.get("history_stale") or [])
 
+
+def minute_section(minutes):
     # forward_changes is shared with the primary measure, so it keeps every
     # row; only this exploratory section drops the readings the UI suppresses.
     # One observation per (horizon, window, base row): a stale base row is
@@ -459,6 +475,62 @@ def market_section(opened, settled, minutes):
         lines.append(f"hit rate, {label}: " + (
             f"{hits}/{n} ({hits / n:.1%}); Wilson 95% [{interval[0]:.1%}, {interval[1]:.1%}]"
             if interval else "0/0"))
+    return lines
+
+
+def levels_section(opened, settled, minutes):
+    lines = ["", "== Support/resistance zones (1m, descriptive) " + EXPLORATORY + " ==",
+             "Next 3 minutes vs the nearest zone; crossed means beyond its midpoint."]
+    labels = ("<0.5", "0.5–1", "1–2", "≥2")
+    buckets = {(side, label): [0, 0] for side in ("support", "resistance") for label in labels}
+    targets = {label: [0, 0] for label in ("0 zones", "≥1 zones", "target in zone")}
+    skipped = 0
+
+    def summary(label, counts, outcome):
+        hits, n = counts
+        interval = wilson95(hits, n)
+        return label + (f": n {n}, {outcome} {hits} ({hits / n:.1%}); "
+                        f"Wilson 95% [{interval[0]:.1%}, {interval[1]:.1%}]"
+                        if interval else ": no data yet")
+
+    for ticker, rows in minutes.items():
+        for minute, row in sorted(rows.items()):
+            later = rows.get(minute + 3)
+            if later is None or suppressed(row) or suppressed(later):
+                continue
+            levels = ((row.get("timeframes") or {}).get("1m") or {}).get("levels")
+            if levels is None or row.get("composite") is None or later.get("composite") is None:
+                continue
+            for side in ("support", "resistance"):
+                zone, dist = levels.get(side), levels.get(side + "_dist_atr")
+                if zone is None or dist is None:
+                    continue
+                distance = abs(dist)
+                label = labels[sum(distance >= edge for edge in (0.5, 1, 2))]
+                counts = buckets[side, label]
+                counts[1] += 1
+                counts[0] += later["composite"] < zone if side == "support" else later["composite"] > zone
+        row = rows.get(1) or (rows[min(rows)] if rows else {})
+        levels = ((row.get("timeframes") or {}).get("1m") or {}).get("levels")
+        value = settled.get(ticker, {}).get("expiration_value")
+        price, target = row.get("composite"), row.get("target")
+        if (suppressed(row) or levels is None or levels.get("zones_to_target") is None
+                or price is None or target is None or value is None):
+            skipped += 1
+            continue
+        value = float(value)
+        reached = value >= target if price < target else value <= target if price > target else value == target
+        groups = ["0 zones" if levels["zones_to_target"] == 0 else "≥1 zones"]
+        if levels.get("target_in_zone") is True:
+            groups.append("target in zone")
+        for label in groups:
+            targets[label][0] += reached
+            targets[label][1] += 1
+    for (side, label), counts in buckets.items():
+        lines.append(summary(f"{side}, {label} ATR", counts, "crossed"))
+    lines.append(f"Zones between price and target at minute 1 (earliest row if absent); windows skipped: {skipped}.")
+    for label, counts in targets.items():
+        lines.append(summary(label, counts, "reached"))
     return lines
 
 
@@ -578,6 +650,7 @@ def report(opened, settled, minutes=None, now=None, closes=None):
         lines += proxy_section(closes, settled)
     lines += minute_section(minutes)
     lines += market_section(opened, settled, minutes)
+    lines += levels_section(opened, settled, minutes)
     lines += primary_section(opened, minutes, now)
     return "\n".join(lines)
 
