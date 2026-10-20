@@ -1,6 +1,10 @@
 """Descriptive zones, storage and unchanged indicator votes."""
 import json
 import math
+import os
+from pathlib import Path
+import shutil
+import subprocess
 import unittest
 from unittest.mock import patch
 
@@ -128,15 +132,15 @@ class ZonesTests(unittest.TestCase):
 
     def test_utc_sessions_and_window(self):
         now = 3 * 86400 + 2 * 3600 + 30
-        minute = swings([], start=now // 3600 * 3600 - 3600, step=60)
-        hourly = swings([], start=86400, step=3600) + swings([], start=3 * 86400, step=3600)[:3]
+        minute = history_tests.frame(now // 3600 * 3600 - 60, 60, n=60)
+        hourly = history_tests.frame(now // 3600 * 3600, 3600, n=51)
         result = sr.levels('1h', {'1m': minute, '1h': hourly}, {}, 100, 20,
                            window_open=300, target=400, now=now)
         zones = result['target']['between'] + result['support']
         sources = {src for z in zones for src in z['sources']}
         self.assertTrue({'prior_hour_high', 'prior_hour_low', 'day_high', 'day_low',
                          'prior_day_high', 'prior_day_low', 'window_open'} <= sources)
-        window = next(z for z in result['resistance'] if 'window_open' in z['sources'])
+        window = next(z for z in zones if 'window_open' in z['sources'])
         self.assertIsNone(window['last_touch'])
         self.assertEqual(window['strength_parts']['session'], 1)
         blocked = sr.levels('1h', {'1m': minute, '1h': hourly},
@@ -185,6 +189,113 @@ class ZonesTests(unittest.TestCase):
         self.assertIn('10m', state['frames']['10m']['levels']['excluded_timeframes'])
         self.assertIn('5m', state['frames']['1m']['levels']['excluded_timeframes'])
         self.assertNotIn('10m', state['frames']['1m']['levels']['excluded_timeframes'])
+
+
+    def test_s01_feed_reference_and_s03_partial_open(self):
+        now = history_tests.NOW
+        for composite in (180, None):
+            for partial in (False, True):
+                feed = history_tests.ready(ta.Feed(), now)
+                feed.composite = composite
+                feed.bars['1m'] = history_tests.frame(98940, 60)
+                feed.market = {'ticker': 'T', 'open_time': ta.iso(98100),
+                               'close_time': ta.iso(99900), 'floor_strike': 200}
+                feed.market_at = now
+                feed.window_path.append({'time': 98103 if partial else 98100, 'value': 150})
+                with patch.object(ta.time, 'time', return_value=now), patch.object(sr, 'levels', wraps=sr.levels) as call:
+                    state = feed.state('1m')
+                args, kwargs = call.call_args
+                self.assertEqual(args[3], 180 if composite is not None else 100)
+                self.assertEqual(kwargs['target_price'], args[3])
+                self.assertEqual(kwargs['price_basis'], 'composite' if composite is not None else 'spot')
+                self.assertEqual(kwargs['window_open'], None if partial else 150)
+                self.assertEqual(state['window']['open_price'], 150)
+                self.assertEqual(state['frames']['1m']['levels']['price_basis'], kwargs['price_basis'])
+
+    def test_s02_whole_unrounded_zone_between(self):
+        for base, target in ((200, 220), (220, 200)):
+            for prices, count in (([199, 203], 0), ([217, 221], 0), ([200, 204], 0),
+                                  ([216, 220], 0), ([201, 205], 1), ([200.001, 204], 1)):
+                with self.subTest(base=base, prices=prices):
+                    result = self.levels(prices, price=base, target=target)
+                    self.assertEqual(result['target']['count'], count)
+
+    def test_s03_complete_sessions_and_missing_bars(self):
+        now = 3 * 86400 + 2 * 3600 + 30
+        hour = now // 3600 * 3600
+        minute = history_tests.frame(hour - 60, 60, n=60)
+        hourly = history_tests.frame(hour, 3600, n=51)
+        with patch.object(sr, 'pivot_points', return_value=[]):
+            full = sr.levels('1h', {'1m': minute, '1h': hourly}, {}, 180, 20, now=now)
+            self.assertEqual(full['skipped_sessions'], [])
+            for prefix, tf, stamp in (('prior_hour', '1m', hour - 1800),
+                                      ('prior_day', '1h', 2 * 86400 + 3600),
+                                      ('day', '1h', hour)):
+                bars = {'1m': minute, '1h': hourly}
+                bars[tf] = [b for b in bars[tf] if b['time'] != stamp]
+                result = sr.levels('1h', bars, {}, 180, 20, now=now)
+                self.assertEqual(result['skipped_sessions'], [prefix])
+                zones = result['support'] + result['resistance'] + ([result['at_price']] if result['at_price'] else [])
+                self.assertFalse(any(src.startswith(prefix + '_') for z in zones for src in z['sources']))
+
+    def test_s04_expired_cache_copies_targets(self):
+        original = {'ready': True, 'spot_age': 0, 'stale': False,
+                    'window': {'close_time': ta.iso(100)}, 'frames': {
+                        tf: {'levels': {'target': {'strike': 200}}} for tf in ('1m', '5m')}}
+        snapshot = json.loads(json.dumps(original))
+        with patch.dict(ta.STATE_CACHE, {'1m': (100, original)}, clear=True), patch.object(ta.time, 'time', return_value=100.5):
+            state = ta.cached_state('1m')
+        self.assertIsNone(state['window'])
+        for tf in original['frames']:
+            self.assertIsNone(state['frames'][tf]['levels']['target'])
+        self.assertEqual(original, snapshot)
+
+    def test_s06_cent_roles_distances_and_containing(self):
+        for price in (199.999, 204.004):
+            result = self.levels([200.001, 204.001], price=price, target=price)
+            self.assertEqual(result['at_price']['role'], 'at price')
+            self.assertEqual(result['target']['in_zone'], result['at_price'])
+            self.assertEqual(result['at_price']['distance_usd'], round(result['at_price']['mid'], 2) - round(price, 2))
+        zone = self.levels([82970.28], price=82930.47)['resistance'][0]
+        self.assertEqual(zone['distance_usd'], 39.81)
+        self.assertEqual(zone['distance_usd'], round(zone['distance_usd'], 2))
+        self.assertEqual(zone['distance_atr'], round(zone['distance_usd'] / 20, 3))
+
+    @unittest.skipUnless(shutil.which('node'), 'node not installed')
+    def test_s04_page_target_gate_and_s06_titles(self):
+        from test_fix_20261007b import APP_HARNESS
+        script = APP_HARNESS[:APP_HARNESS.index('const out = {};')].replace(
+            "get: (t, k) => k ===", "get: (t, k) => Object.hasOwn(t, k) ? t[k] : k ===") + r"""
+vm.createContext(context); vm.runInContext(code, context);
+const titles = [];
+vm.runInContext("candles.createPriceLine = x => x; candles.removePriceLine = () => {}", context);
+const z = {low: 200, high: 200, mid: 200, touches: 0, timeframes: [], sources: ['window_open'], tags: [], role: 'resistance', strength: 1};
+const levels = {support: [], resistance: [z], target: {strike: 220, count: 0}, price_basis: 'composite', skipped_sessions: ['prior_hour'], excluded_timeframes: ['5m']};
+const good = {window: {strike: 220}, kalshi_stale: false};
+context.levelsTest = levels;
+for (const [s, problem] of [[good, null], [{window: null}, null], [{...good, kalshi_stale: true}, null], [{window: {strike: null}}, null], [good, 'bad']]) {
+  context.renderZones(s, levels, problem); titles.push(el('zoneTarget').textContent);
+}
+context.renderZones(good, levels, null);
+const foot = el('zoneExcluded').textContent;
+const names = [];
+for (const [touches, timeframes, sources] of [[3, ['1m','1h'], ['swing']], [0, [], ['prior_day_low']], [0, [], ['window_open']]]) {
+  Object.assign(z, {touches, timeframes, sources});
+  context.renderZones(good, levels, null);
+  names.push(vm.runInContext('zoneLines[0].title', context));
+}
+console.log(JSON.stringify({titles, names, foot}));
+"""
+        done = subprocess.run(['node', '-'], input=script, text=True, capture_output=True,
+                              env={**os.environ, 'APP_JS': str(Path('app.js').resolve())}, timeout=60)
+        self.assertEqual(done.returncode, 0, done.stderr)
+        out = json.loads(done.stdout)
+        self.assertTrue(out['titles'][0])
+        self.assertEqual(out['titles'][1:], ['', '', '', ''])
+        self.assertEqual(out['names'], ['R ×3 1h', 'R prior day low', 'R window open'])
+        self.assertIn('Distances from the composite', out['foot'])
+        self.assertIn('prior hour', out['foot'])
+        self.assertIn('5m', out['foot'])
 
 
 if __name__ == '__main__':

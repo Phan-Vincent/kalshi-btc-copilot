@@ -1191,6 +1191,7 @@ class Feed:
             own["gap"] = own["gap"] or source["gap"]
             own["lag_seconds"] = (None if own["lag_seconds"] is None or source["lag_seconds"] is None
                                   else max(own["lag_seconds"], source["lag_seconds"]))
+        ref = composite if composite is not None else price
         for name, b in bars.items():
             if len(b) < 30:
                 continue
@@ -1200,10 +1201,10 @@ class Feed:
                 a["values"]["close"] = b[-1]["close"]
                 a["values"]["close_prev"] = b[-2]["close"] if len(b) > 1 else None
             frame_family(a, name, (flow.get("one_minute") or {}).get("imbalance"), flow_coverage)
-            a["levels"] = sr_levels.levels(name, bars, history, price, a["values"]["atr"],
+            a["levels"] = sr_levels.levels(name, bars, history, ref, a["values"]["atr"],
                                           vwap=a["values"]["vwap"], target=window["strike"] if window else None,
-                                          target_price=composite, window_open=window["open_price"] if window else None,
-                                          now=now)
+                                          target_price=ref, window_open=window["open_price"] if window and not window["path_partial"] else None,
+                                          now=now, price_basis="composite" if composite is not None else "spot")
             a["history"] = history[name]
             frames[name] = a if name == tf else {k: a[k] for k in ("values", "readings", "tally", "family", "history", "levels")}
         m1 = bars["1m"]
@@ -1772,6 +1773,10 @@ def cached_state(tf):
                     window = dict(state["window"])
                     if current >= parse_ts(window["close_time"]):
                         state["window"] = None
+                        state["frames"] = dict(state.get("frames", {}))
+                        for name, frame in state["frames"].items():
+                            if frame.get("levels") is not None:
+                                state["frames"][name] = {**frame, "levels": {**frame["levels"], "target": None}}
                         state["kalshi_stale"] = True
                     else:
                         window["age"] += elapsed

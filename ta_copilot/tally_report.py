@@ -480,20 +480,25 @@ def market_section(opened, settled, minutes):
 
 def levels_section(opened, settled, minutes):
     lines = ["", "== Support/resistance zones (1m, descriptive) " + EXPLORATORY + " ==",
-             "Next 3 minutes vs the nearest zone; crossed means beyond its midpoint."]
+             "Next 3 minutes vs the nearest zone; crossed means beyond its midpoint after 3 minutes."]
     labels = ("<0.5", "0.5–1", "1–2", "≥2")
-    buckets = {(side, label): [0, 0] for side in ("support", "resistance") for label in labels}
+    buckets = {(side, label): [] for side in ("support", "resistance") for label in labels}
     targets = {label: [0, 0] for label in ("0 zones", "≥1 zones", "target in zone")}
-    skipped = 0
+    reasons = dict.fromkeys(("used", "no minute-1 row", "suppressed", "no levels",
+                             "missing fields", "awaiting settlement"), 0)
 
-    def summary(label, counts, outcome):
+    def proportion(sample):
+        return sum(sample) / len(sample) if sample else None
+
+    def summary(label, counts):
         hits, n = counts
         interval = wilson95(hits, n)
-        return label + (f": n {n}, {outcome} {hits} ({hits / n:.1%}); "
+        return label + (f": n {n}, reached {hits} ({hits / n:.1%}); "
                         f"Wilson 95% [{interval[0]:.1%}, {interval[1]:.1%}]"
                         if interval else ": no data yet")
 
-    for ticker, rows in minutes.items():
+    for ticker, rows in sorted(minutes.items()):
+        window = {key: [] for key in buckets}
         for minute, row in sorted(rows.items()):
             later = rows.get(minute + 3)
             if later is None or suppressed(row) or suppressed(later):
@@ -505,19 +510,36 @@ def levels_section(opened, settled, minutes):
                 zone, dist = levels.get(side), levels.get(side + "_dist_atr")
                 if zone is None or dist is None:
                     continue
+                if row["composite"] < zone if side == "support" else row["composite"] > zone:
+                    continue
                 distance = abs(dist)
                 label = labels[sum(distance >= edge for edge in (0.5, 1, 2))]
-                counts = buckets[side, label]
-                counts[1] += 1
-                counts[0] += later["composite"] < zone if side == "support" else later["composite"] > zone
-        row = rows.get(1) or (rows[min(rows)] if rows else {})
-        levels = ((row.get("timeframes") or {}).get("1m") or {}).get("levels")
+                crossed = later["composite"] < zone if side == "support" else later["composite"] > zone
+                window[side, label].append(crossed)
+        for key, observations in window.items():
+            if observations:
+                buckets[key].append(observations)
+    universe = set(opened) | set(minutes)
+    for ticker in sorted(universe):
+        row = minutes.get(ticker, {}).get(1)
+        levels = ((row.get("timeframes") or {}).get("1m") or {}).get("levels") if row is not None else None
         value = settled.get(ticker, {}).get("expiration_value")
-        price, target = row.get("composite"), row.get("target")
-        if (suppressed(row) or levels is None or levels.get("zones_to_target") is None
-                or price is None or target is None or value is None):
-            skipped += 1
+        if row is None:
+            reason = "no minute-1 row"
+        elif suppressed(row):
+            reason = "suppressed"
+        elif levels is None:
+            reason = "no levels"
+        elif row.get("composite") is None or row.get("target") is None or levels.get("zones_to_target") is None:
+            reason = "missing fields"
+        elif value is None:
+            reason = "awaiting settlement"
+        else:
+            reason = "used"
+        reasons[reason] += 1
+        if reason != "used":
             continue
+        price, target = row["composite"], row["target"]
         value = float(value)
         reached = value >= target if price < target else value <= target if price > target else value == target
         groups = ["0 zones" if levels["zones_to_target"] == 0 else "≥1 zones"]
@@ -526,11 +548,18 @@ def levels_section(opened, settled, minutes):
         for label in groups:
             targets[label][0] += reached
             targets[label][1] += 1
-    for (side, label), counts in buckets.items():
-        lines.append(summary(f"{side}, {label} ATR", counts, "crossed"))
-    lines.append(f"Zones between price and target at minute 1 (earliest row if absent); windows skipped: {skipped}.")
+    for (side, label), groups in buckets.items():
+        sample = [obs for group in groups for obs in group]
+        n, hits = len(sample), sum(sample)
+        interval = block_bootstrap(groups, proportion)
+        uncertainty = (f"block bootstrap 95% [{interval[0]:.1%}, {interval[1]:.1%}]"
+                       if interval is not None else "too few windows for an interval")
+        rate = f"{hits / n:.1%}" if n else "no data yet"
+        lines.append(f"{side}, {label} ATR: {n} obs, {len(groups)} windows, crossed {hits} ({rate}); {uncertainty}")
+    lines.append("Zones between price and target at minute 1.")
+    lines.append(f"Windows: {len(universe)} total · " + " · ".join(f"{n} {reason}" for reason, n in reasons.items()))
     for label, counts in targets.items():
-        lines.append(summary(label, counts, "reached"))
+        lines.append(summary(label, counts))
     return lines
 
 

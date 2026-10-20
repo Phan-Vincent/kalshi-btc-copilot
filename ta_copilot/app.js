@@ -218,7 +218,7 @@ function renderZones(s, levels, problem) {
   $('zones').innerHTML = problem ? `<tr><td colspan="7" class="muted">${esc(problem)}</td></tr>` :
     rows.map(z => `<tr>${[z.role, range(z), `${sgn(z.distance_usd)} · ${z.distance_atr == null ? '—' : (z.distance_atr >= 0 ? '+' : '−') + Math.abs(z.distance_atr).toFixed(2)} ATR`,
       z.touches, z.timeframes.join(', ') || '—', [...(z.sources || []).filter(x => x !== 'swing').map(x => x.replace(/_/g, ' ')), ...z.tags].join(' · ') || '—', z.strength].map(x => `<td>${esc(x)}</td>`).join('')}</tr>`).join('');
-  const target = !problem && levels?.target;
+  const target = !problem && s.window && !s.kalshi_stale && s.window.strike != null && levels?.target;
   let note = '';
   if (target) {
     if (target.in_zone) note = `Target ${usd(target.strike)} is inside a zone (${range(target.in_zone)})`;
@@ -227,12 +227,14 @@ function renderZones(s, levels, problem) {
       target.between.map(z => `${z.role} ${range(z)}, ${z.touches} ${z.touches === 1 ? 'touch' : 'touches'}`).join('; ') + ')';
   }
   $('zoneTarget').textContent = note;
-  $('zoneExcluded').textContent = levels?.excluded_timeframes?.length ?
-    ` Excluded (stale or gapped): ${levels.excluded_timeframes.join(', ')}` : '';
+  $('zoneExcluded').textContent = [` Distances from the ${levels?.price_basis === 'composite' ? 'composite' : 'spot'}.`,
+    levels?.excluded_timeframes?.length ? `Excluded (stale or gapped): ${levels.excluded_timeframes.join(', ')}` : '',
+    levels?.skipped_sessions?.length ? `Skipped sessions: ${levels.skipped_sessions.map(x => x.replace(/_/g, ' ')).join(', ')}` : ''].filter(Boolean).join(' ');
   if (!problem) for (const [role, zones] of [['S', support], ['R', resistance]]) {
     for (const z of zones.slice(0, 2)) zoneLines.push(candles.createPriceLine({price: z.mid,
       color: css('--neutral'), lineStyle: 2, lineWidth: 1, axisLabelVisible: false,
-      title: `${role} ×${z.touches} ${z.timeframes[z.timeframes.length - 1] || ''}`}));
+      title: [role, z.touches > 0 ? `×${z.touches}` : '', z.timeframes[z.timeframes.length - 1] ||
+        (z.sources || []).find(x => x !== 'swing')?.replace(/_/g, ' ')].filter(Boolean).join(' ')}));
   }
 }
 
