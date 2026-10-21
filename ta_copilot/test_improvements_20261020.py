@@ -1,4 +1,5 @@
 """Verification suite for TA Copilot improvements (2026-10-20)."""
+import hashlib
 import io
 import json
 import os
@@ -368,11 +369,11 @@ class ReviewRegressionTests(unittest.TestCase):
         self.assertEqual(feed.exchange_status_at, 20060)
 
     def test_r4_primary_exact_head_and_unused_zone_field_removed(self):
-        head = subprocess.check_output(["git", "show", "HEAD:ta_copilot/tally_report.py"], text=True)
         current = (HERE / "tally_report.py").read_text()
-        def primary(text):
-            return text[text.index("def primary_result("):text.index("def primary_section(")]
-        self.assertEqual(primary(current), primary(head))
+        primary = current[current.index("def primary_result("):current.index("def primary_section(")]
+        # Pins the pre-declared PRIMARY code; change only with a deliberate protocol decision.
+        self.assertEqual(hashlib.sha256(primary.encode("utf-8")).hexdigest(),
+                         "0ee39f0ea8c97779607720e75872c17c7ee70e3f10c5639e29a2d56aea1485f3")
         self.assertNotIn('"age_minutes"', (HERE / "sr_levels.py").read_text())
 
 
