@@ -74,11 +74,37 @@ def finite_or_none(value, strings=False):
         return False
 
 
+def normalize_iso(value):
+    """Normalize an ISO-8601 string so Python 3.9+ fromisoformat accepts any fractional length."""
+    text = value.strip()
+    if text.endswith(("Z", "z")):
+        text = text[:-1] + "+00:00"
+    t_pos = max(text.find("T"), text.find("t"), text.find(" "))
+    dot = text.find(".", t_pos if t_pos != -1 else 0)
+    if dot != -1:
+        end = dot + 1
+        while end < len(text) and text[end].isdigit():
+            end += 1
+        frac = text[dot + 1:end]
+        if frac and len(frac) not in (3, 6):
+            text = text[:dot + 1] + frac.ljust(6, "0")[:6] + text[end:]
+    return text
+
+
+def parse_iso_ts(value):
+    parsed = datetime.fromisoformat(normalize_iso(value))
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed.timestamp()
+
+
 def is_timestamp(value):
     try:
-        datetime.fromisoformat(value.replace("Z", "+00:00"))
+        if not isinstance(value, str):
+            return False
+        parse_iso_ts(value)
         return True
-    except (AttributeError, ValueError):
+    except (AttributeError, ValueError, TypeError):
         return False
 
 

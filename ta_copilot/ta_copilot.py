@@ -26,7 +26,7 @@ from urllib.request import Request, urlopen
 
 import sr_levels
 
-from tally_report import record_problem
+from tally_report import parse_iso_ts, record_problem
 from stream_flow import OrderFlow, parse_coinbase, parse_coinbase_spot, parse_kraken, MalformedMessage
 
 HERE = Path(__file__).resolve().parent
@@ -77,8 +77,10 @@ FLOW_MIN_COVERAGE_SECONDS = 60  # flow votes only on a full 60 s of the current 
 FAMILY_LEAN_MARGIN = 2        # family_lean needs |family_net| >= 2
 PROXY_RECORD_WINDOWS = 200    # proxy-vs-settlement readout uses the latest 200 windows
 PROXY_RECORD_MIN = 20         # below this, the readout says "too few to judge"
+MAX_MEMORY_WINDOWS = 500      # settled windows kept in memory before archiving into running counters
 MINUTE_CAPTURE_SLACK = 2.0    # a minute row is written only within 2 s of :00
 KALSHI_PROMOTION_GRACE = 5
+EXCHANGE_STATUS_REFRESH = 30  # seconds between /exchange/status probes when no market is listed
 # Served on every response. The page needs the unpkg chart script, its inline
 # stylesheet, the data-URL favicon and same-origin fetch/EventSource only.
 CSP = ("default-src 'none'; script-src 'self' https://unpkg.com; "
@@ -106,7 +108,7 @@ def iso(epoch):
 
 
 def parse_ts(text):
-    return datetime.fromisoformat(text.replace("Z", "+00:00")).timestamp()
+    return parse_iso_ts(text)
 
 
 def validate_candles(bars, sec, now):
@@ -191,10 +193,16 @@ def composite_quote(venues, now):
                   else None)
         details[name] = {"price": v["price"] if v else None, "age": age,
                          "age_basis": v["age_basis"] if v else None,
-                         "included": reason is None, "excluded_reason": reason}
+                         "included": reason is None, "excluded_reason": reason,
+                         "basis_usd": None}
         if reason is None:
             included.append(v["price"])
-    return (statistics.median(included) if included else None), details
+    composite = statistics.median(included) if included else None
+    if composite is not None:
+        for item in details.values():
+            if item["price"] is not None:
+                item["basis_usd"] = round(item["price"] - composite, 2)
+    return composite, details
 
 
 def rolling_average(samples, now):
@@ -212,7 +220,9 @@ def window_distance(strike, composite, seconds_left, sigma_1m, close_ts, samples
     result = {"distance_source": source, "distance": None, "distance_sigmas": None,
               "distance_sd_usd": None, "sigma_1m_usd": None,
               "sigma_model": "brownian settlement-average proxy",
-              "observed_seconds": 0, "missing_seconds": 0}
+              "observed_seconds": 0, "missing_seconds": 0,
+              "observed_mean": None, "required_remaining_avg": None,
+              "required_remaining_move": None, "required_remaining_seconds": None}
     if composite is None or strike is None:
         return result
     strike = finite_float(strike)
@@ -227,9 +237,19 @@ def window_distance(strike, composite, seconds_left, sigma_1m, close_ts, samples
         # after t begins, so the second in progress is never "missing", and an
         # early sample of it can't hide an older gap.
         expected = min(60, max(0, math.floor(now - start)))
+        obs_sum = sum(observed.values())
+        rem = 60 - len(observed)
         result["observed_seconds"] = len(observed)
         result["missing_seconds"] = sum(int(start + k) not in observed for k in range(expected))
-        reference = (sum(observed.values()) + composite * (60 - len(observed))) / 60
+        result["observed_mean"] = obs_sum / len(observed) if observed else None
+        remaining = 60 - expected
+        known_sum = sum(v for t, v in observed.items() if t < start + expected) + composite * result["missing_seconds"]
+        if remaining >= 5:
+            req = (60 * strike - known_sum) / remaining
+            result["required_remaining_avg"] = req
+            result["required_remaining_move"] = req - composite
+            result["required_remaining_seconds"] = remaining
+        reference = (obs_sum + composite * rem) / 60
         factor = (seconds_left / 60) ** 3 / 3
     sigma_usd = sigma_1m * reference if sigma_1m is not None else None
     sd = sigma_usd * math.sqrt(factor) if sigma_usd is not None else None
@@ -247,10 +267,19 @@ def positive_decimal(value):
     return result if result.is_finite() and result > 0 else None
 
 
+def is_exchange_closed(status):
+    """True when Kalshi's /exchange/status explicitly reports an inactive exchange or trading pause."""
+    if not isinstance(status, dict):
+        return False
+    body = status.get("data") if isinstance(status.get("data"), dict) else status
+    ea, ta_flag = body.get("exchange_active"), body.get("trading_active")
+    return type(ea) is bool and type(ta_flag) is bool and (not ea or not ta_flag)
+
+
 def book_context(data):
     """Kalshi publishes YES and NO bids; the opposite bid is the ask."""
     book = data["orderbook_fp"]
-    def top(side):
+    def ladder(side):
         levels = []
         for row in book.get(side, []):
             if len(row) != 2:
@@ -258,15 +287,26 @@ def book_context(data):
             price, count = positive_decimal(row[0]), positive_decimal(row[1])
             if price is not None and count is not None and price < 1:
                 levels.append((price, count))
-        return max(levels, default=None)
-    yes, no = top("yes_dollars"), top("no_dollars")
-    yes_ask = (Decimal(1) - no[0], no[1]) if no else None
-    no_ask = (Decimal(1) - yes[0], yes[1]) if yes else None
+        levels.sort(key=lambda item: item[0], reverse=True)
+        return levels[:5]
+    yes_levels, no_levels = ladder("yes_dollars"), ladder("no_dollars")
+    yes = yes_levels[0] if yes_levels else None
+    no = no_levels[0] if no_levels else None
+    yes_asks = [(Decimal(1) - p, c) for p, c in no_levels]
+    no_asks = [(Decimal(1) - p, c) for p, c in yes_levels]
+    yes_ask = yes_asks[0] if yes_asks else None
+    no_ask = no_asks[0] if no_asks else None
     def show(level):
         return {"price": str(level[0]), "count": str(level[1])} if level else None
     mid = (yes[0] + yes_ask[0]) / 2 if yes and yes_ask else None
+    spread = yes_ask[0] - yes[0] if yes and yes_ask else None
     return {"yes_bid": show(yes), "yes_ask": show(yes_ask),
             "no_bid": show(no), "no_ask": show(no_ask),
+            "yes_bids": [show(l) for l in yes_levels],
+            "yes_asks": [show(l) for l in yes_asks],
+            "no_bids": [show(l) for l in no_levels],
+            "no_asks": [show(l) for l in no_asks],
+            "yes_spread": float(spread) if spread is not None else None,
             "yes_mid": float(mid) if mid is not None else None}
 
 
@@ -609,6 +649,9 @@ class Feed:
         self.market_wake = threading.Event()
         self.direct_ticker = None
         self.direct_at = 0.0
+        self.exchange_closed = False
+        self.exchange_status_at = 0.0
+        self.exchange_closed_probe = None
         self.upcoming_markets = {}
         self.upcoming_at = 0.0
         self.captured_tickers = set()
@@ -988,9 +1031,26 @@ class Feed:
                     from_prefetch = False
             except Exception as exc:
                 direct_error = exc
+        closed = False
+        if not selected and not listing_error:
+            with self.lock:
+                cached_closed = self.exchange_closed_probe
+                status_age = now - self.exchange_status_at if self.exchange_status_at else float("inf")
+            if status_age < EXCHANGE_STATUS_REFRESH:
+                closed = cached_closed is True
+            else:
+                try:
+                    status = get_json(f"{KALSHI}/exchange/status")
+                    closed = is_exchange_closed(status)
+                except Exception:
+                    closed = False
+                with self.lock:
+                    self.exchange_status_at = now
+                    self.exchange_closed_probe = closed
         with self.lock:
             old_ticker = self.last_market_ticker
             self.market, self.market_at = selected, selected_at
+            self.exchange_closed = bool(not self.market and closed)
             if self.market and self.market["ticker"] != old_ticker:
                 if from_prefetch:
                     if not (current and current["ticker"] == selected["ticker"]
@@ -1000,7 +1060,7 @@ class Feed:
                     self.market_promoted_at = 0.0
             if direct_error or listing_error:
                 self._note("kalshi", direct_error or listing_error)
-            elif refreshed:
+            elif refreshed or self.exchange_closed:
                 self.errors.pop("kalshi", None)
             if self.market:
                 self.last_market_ticker = self.market["ticker"]
@@ -1112,6 +1172,7 @@ class Feed:
             spot, spot_at = dict(self.spot) if self.spot else None, self.spot_at
             market, market_at = self.market, self.market_at
             promoted_at = self.market_promoted_at
+            exchange_closed = self.exchange_closed
             errors = dict(self.errors)
             composite, composite_at = self.composite, self.composite_at
             average_60s = self.average_60s
@@ -1139,7 +1200,7 @@ class Feed:
             mid_path = list(self.yes_mid_path)
         if not spot or not bars["1m"]:
             return {"ready": False, "stale": True, "kalshi_stale": True,
-                    "errors": errors, "server_time": iso(now)}
+                    "exchange_closed": False, "errors": errors, "server_time": iso(now)}
         price = spot["price"]
         if not composite_at or now - composite_at > 2:
             composite = fresh_composite
@@ -1233,8 +1294,9 @@ class Feed:
                 # successful Kalshi fetch that carried it, with a short grace
                 # for a just-promoted window whose only data is the prefetch.
                 # `window["age"]` stays the age of that metadata.
-                "kalshi_stale": window is None or (window["age"] > KALSHI_STALE_AFTER
-                                                   and grace_left <= 0),
+                "exchange_closed": bool(window is None and exchange_closed),
+                "kalshi_stale": False if (window is None and exchange_closed) else (
+                    window is None or (window["age"] > KALSHI_STALE_AFTER and grace_left <= 0)),
                 "kalshi_grace_left": grace_left,
                 "window": window, "frames": frames,
                 "tally_record": self.tally_logger.record if self.tally_logger else None,
@@ -1397,6 +1459,9 @@ class TallyLogger:
         self.closes = {}
         self.expirations = {}
         self.value_pending = {}  # settled without expiration_value: ticker -> close epoch
+        self._archived_record = {"hits": 0, "scored": 0}
+        self._archived_coverage = {"total_closes": 0, "scored": 0, "incomplete_samples": 0,
+                                   "missing_settlement": 0, "invalid_proxy": 0}
         # Replaced, never mutated, so request threads can read them lock-free.
         self.record = None
         self.proxy = None
@@ -1414,6 +1479,9 @@ class TallyLogger:
         os.chmod(self.path.parent, 0o700)
         skipped, late_values = [], {}
         self.skipped_lines = 0
+        self._archived_record = {"hits": 0, "scored": 0}
+        self._archived_coverage = {"total_closes": 0, "scored": 0, "incomplete_samples": 0,
+                                   "missing_settlement": 0, "invalid_proxy": 0}
         try:
             with self.path.open("rb") as handle:
                 for number, line in enumerate(handle, 1):
@@ -1459,6 +1527,7 @@ class TallyLogger:
                   f"(first line numbers: {', '.join(map(str, skipped[:5]))}).", file=sys.stderr)
         self.refresh_record()
         self.refresh_proxy()
+        self.prune_memory()
         if self.path.exists():
             os.chmod(self.path, 0o600)
         try:
@@ -1594,14 +1663,72 @@ class TallyLogger:
                 failed = True
                 with self.feed.lock:
                     self.feed._note("tally_settle", exc)
+        self.prune_memory()
         # A logger built without __init__ (tests) has no alarm store to clear.
         if not failed and getattr(self, "feed", None):
             with self.feed.lock:
                 self.feed.errors.pop("tally_settle", None)
 
+    def prune_memory(self):
+        """Archive settled windows beyond MAX_MEMORY_WINDOWS so in-memory dicts stay O(1)."""
+        arch_rec = getattr(self, "_archived_record", None)
+        arch_cov = getattr(self, "_archived_coverage", None)
+        if arch_rec is None:
+            arch_rec = self._archived_record = {"hits": 0, "scored": 0}
+        if arch_cov is None:
+            arch_cov = self._archived_coverage = {"total_closes": 0, "scored": 0, "incomplete_samples": 0,
+                                                  "missing_settlement": 0, "invalid_proxy": 0}
+        limit = max(MAX_MEMORY_WINDOWS, PROXY_RECORD_WINDOWS)
+        if len(self.opened) <= limit and len(self.closes) <= limit:
+            return
+        def win_ts(ticker):
+            row = self.closes.get(ticker) or self.opened.get(ticker) or {}
+            for key in ("close_time", "open_time", "captured_at"):
+                if row.get(key):
+                    try:
+                        return parse_ts(row[key])
+                    except Exception:
+                        pass
+            return float("inf")
+        all_tickers = sorted(set(self.opened) | set(self.closes), key=lambda t: (win_ts(t), t))
+        if len(all_tickers) <= limit:
+            return
+        scored_closes = [
+            t for t, row in sorted(self.closes.items(), key=lambda item: item[1].get("close_time") or "")
+            if (row.get("samples") == 60
+                and optional_float(self.expirations.get(t)) is not None
+                and optional_float(row.get("proxy_avg_60s")) is not None)
+        ]
+        protected = set(scored_closes[-PROXY_RECORD_WINDOWS:]) | set(getattr(self, "pending_open", {})) | set(self.value_pending)
+        for ticker in all_tickers[:-limit]:
+            if ticker not in self.settled or ticker in protected:
+                continue
+            open_row = self.opened.pop(ticker, None)
+            outcome = getattr(self, "results", {}).pop(ticker, None)
+            if open_row is not None:
+                lean = (open_row.get("timeframes") or {}).get("1m", {}).get("lean")
+                if lean in ("bullish", "bearish") and outcome in ("yes", "no"):
+                    arch_rec["scored"] += 1
+                    arch_rec["hits"] += (lean == "bullish") == (outcome == "yes")
+            close_row = self.closes.pop(ticker, None)
+            settled_val = optional_float(self.expirations.pop(ticker, None))
+            if close_row is not None:
+                arch_cov["total_closes"] += 1
+                proxy = optional_float(close_row.get("proxy_avg_60s"))
+                if close_row.get("samples") != 60:
+                    arch_cov["incomplete_samples"] += 1
+                elif settled_val is None:
+                    arch_cov["missing_settlement"] += 1
+                elif proxy is None:
+                    arch_cov["invalid_proxy"] += 1
+                else:
+                    arch_cov["scored"] += 1
+            self.settled.discard(ticker)
+
     def refresh_record(self):
         """Track record of the legacy 1m lean at open, shown under the lean."""
-        hits = scored = 0
+        arch = getattr(self, "_archived_record", {"hits": 0, "scored": 0})
+        hits, scored = arch["hits"], arch["scored"]
         for ticker, row in self.opened.items():
             lean = (row.get("timeframes") or {}).get("1m", {}).get("lean")
             outcome = self.results.get(ticker)
@@ -1628,8 +1755,11 @@ class TallyLogger:
     def refresh_proxy(self):
         """Our closing-minute composite mean vs Kalshi's settlement value."""
         errors = []
-        coverage = {"total_closes": len(self.closes), "scored": 0, "incomplete_samples": 0,
-                    "awaiting_settlement": 0, "missing_settlement": 0, "invalid_proxy": 0}
+        arch = getattr(self, "_archived_coverage", {"total_closes": 0, "scored": 0, "incomplete_samples": 0,
+                                                    "missing_settlement": 0, "invalid_proxy": 0})
+        coverage = {"total_closes": arch["total_closes"] + len(self.closes), "scored": arch["scored"],
+                    "incomplete_samples": arch["incomplete_samples"], "awaiting_settlement": 0,
+                    "missing_settlement": arch["missing_settlement"], "invalid_proxy": arch["invalid_proxy"]}
         for ticker, row in sorted(self.closes.items(), key=lambda item: item[1].get("close_time") or ""):
             settled = optional_float(self.expirations.get(ticker))
             proxy = optional_float(row.get("proxy_avg_60s"))
@@ -1773,6 +1903,7 @@ def cached_state(tf):
                     window = dict(state["window"])
                     if current >= parse_ts(window["close_time"]):
                         state["window"] = None
+                        state["exchange_closed"] = False
                         state["frames"] = dict(state.get("frames", {}))
                         for name, frame in state["frames"].items():
                             if frame.get("levels") is not None:

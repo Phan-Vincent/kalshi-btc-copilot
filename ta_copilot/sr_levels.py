@@ -61,6 +61,7 @@ def levels(view_tf, bars_by_tf, history, price, atr, vwap=None, target=None,
                 candidate[0] - groups[-1][0][0] > max_width):
             groups.append([])
         groups[-1].append(candidate)
+    closed_view = (bars_by_tf.get(view_tf) or [])[:-1] if view_tf not in excluded else []
     zones = []
     for group in groups:
         low, high = group[0][0], group[-1][0]
@@ -74,12 +75,29 @@ def levels(view_tf, bars_by_tf, history, price, atr, vwap=None, target=None,
                  "session": len(set(sources) - {"swing"}), "confluence": len(tags)}
         lo, hi, center, ref = round(low, 2), round(high, 2), round(mid, 2), round(price, 2)
         distance = round(center - ref, 2)
+        first_touch = min((t for _, _, _, t in group if t is not None), default=None)
+        last_touch = max((t for _, _, _, t in group if t is not None), default=None)
+        crossings = (sum((a["close"] < mid <= b["close"]) or (a["close"] > mid >= b["close"])
+                         for a, b in zip(closed_view, closed_view[1:])
+                         if b["time"] > first_touch)
+                     if first_touch is not None else 0)
+        inside = lo <= ref <= hi
+        prior_role = None
+        if inside:
+            outside_close = next((round(b["close"], 2) for b in reversed(closed_view)
+                                  if not lo <= round(b["close"], 2) <= hi), None)
+            if outside_close is not None:
+                prior_role = "resistance" if outside_close < lo else "support"
         zone = {"low": round(low, 2), "high": round(high, 2), "mid": round(mid, 2),
                 "touches": sum(src == "swing" for _, _, src, _ in group),
                 "timeframes": [tf for tf in FRAMES if any(c[1] == tf for c in group)],
-                "sources": sources, "last_touch": max((t for _, _, _, t in group if t is not None), default=None),
+                "sources": sources, "last_touch": last_touch,
+                "crossings": crossings,
                 "tags": tags, "strength": sum(parts.values()), "strength_parts": parts,
-                "role": "at price" if lo <= ref <= hi else "support" if center < ref else "resistance",
+                "role": "at price" if inside else "support" if center < ref else "resistance",
+                "prior_role": prior_role,
+                "to_upper_usd": round(hi - ref, 2) if inside else None,
+                "to_lower_usd": round(ref - lo, 2) if inside else None,
                 "distance_usd": distance, "distance_atr": round(distance / atr, 3) if atr else None}
         zones.append((zone, low, high, mid))
 

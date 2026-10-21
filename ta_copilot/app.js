@@ -117,7 +117,13 @@ function contextSpark(id, candles, path, w, timeframe) {
   svg.innerHTML = out;
 }
 
-function depth(level) { return level ? `${cents(level.price)} · ${Number(level.count).toLocaleString()} contracts` : '—'; }
+function depth(level, levels) {
+  if (!level) return '—';
+  const top = `${cents(level.price)} · ${Number(level.count).toLocaleString()} contracts`;
+  if (!levels || levels.length <= 1) return top;
+  const total = levels.reduce((acc, l) => acc + Number(l.count || 0), 0);
+  return `${top} (${levels.length} lvl: ${total.toLocaleString()})`;
+}
 function quoteLabel(q) { return q ? `${q.source} ${q.age.toFixed(1)}s` : 'unavailable'; }
 function quoteSources(bid, ask) {
   if (bid && ask && bid.source === ask.source && bid.age === ask.age) return quoteLabel(bid);
@@ -215,9 +221,14 @@ function renderZones(s, levels, problem) {
   const support = levels?.support || [], resistance = levels?.resistance || [];
   const rows = [...resistance].reverse().concat(levels?.at_price ? [levels.at_price] : [], support);
   const range = z => `${usd(z.low)}–${usd(z.high)}`;
+  const roleText = z => z.role === 'at price' && z.prior_role ? `at price (${z.prior_role})` : z.role;
+  const distText = z => z.role === 'at price' && z.to_lower_usd != null && z.to_upper_usd != null
+    ? `−${usd(z.to_lower_usd)} / +${usd(z.to_upper_usd)}`
+    : `${sgn(z.distance_usd)} · ${z.distance_atr == null ? '—' : (z.distance_atr >= 0 ? '+' : '−') + Math.abs(z.distance_atr).toFixed(2)} ATR`;
+  const touchText = z => z.crossings ? `${z.touches} (${z.crossings}× crossed)` : z.touches;
   $('zones').innerHTML = problem ? `<tr><td colspan="7" class="muted">${esc(problem)}</td></tr>` :
-    rows.map(z => `<tr>${[z.role, range(z), `${sgn(z.distance_usd)} · ${z.distance_atr == null ? '—' : (z.distance_atr >= 0 ? '+' : '−') + Math.abs(z.distance_atr).toFixed(2)} ATR`,
-      z.touches, z.timeframes.join(', ') || '—', [...(z.sources || []).filter(x => x !== 'swing').map(x => x.replace(/_/g, ' ')), ...z.tags].join(' · ') || '—', z.strength].map(x => `<td>${esc(x)}</td>`).join('')}</tr>`).join('');
+    rows.map(z => `<tr>${[roleText(z), range(z), distText(z),
+      touchText(z), z.timeframes.join(', ') || '—', [...(z.sources || []).filter(x => x !== 'swing').map(x => x.replace(/_/g, ' ')), ...z.tags].join(' · ') || '—', z.strength].map(x => `<td>${esc(x)}</td>`).join('')}</tr>`).join('');
   const target = !problem && s.window && !s.kalshi_stale && s.window.strike != null && levels?.target;
   let note = '';
   if (target) {
@@ -256,7 +267,7 @@ function renderShared(s, f) {
     `${coverage.awaiting_settlement || 0} awaiting settlement · ${coverage.missing_settlement} settlement value unavailable · ` +
     `${coverage.invalid_proxy} invalid proxy (each close counted once, in this order).` : '';
   $('venues').innerHTML = Object.entries(s.venues || {}).map(([name, q]) =>
-    `<tr><td>${name} ${s.feed_modes?.[name] ? '(' + s.feed_modes[name] + ')' : ''}</td><td>${usd(q.price)}</td><td>${q.age == null ? '—' : q.age.toFixed(1) + 's'} (${q.age_basis === 'fetch' ? 'fetch age' : q.age_basis === 'trade' ? 'trade age' : q.age_basis === 'ticker' ? 'exchange timestamp age' : 'age basis unavailable'}) · ${q.included ? 'included' : 'excluded: ' + q.excluded_reason}</td></tr>`).join('');
+    `<tr><td>${name} ${s.feed_modes?.[name] ? '(' + s.feed_modes[name] + ')' : ''}</td><td>${usd(q.price)}${q.basis_usd == null ? '' : ' (' + sgn(q.basis_usd) + ')'}</td><td>${q.age == null ? '—' : q.age.toFixed(1) + 's'} (${q.age_basis === 'fetch' ? 'fetch age' : q.age_basis === 'trade' ? 'trade age' : q.age_basis === 'ticker' ? 'exchange timestamp age' : 'age basis unavailable'}) · ${q.included ? 'included' : 'excluded: ' + q.excluded_reason}</td></tr>`).join('');
   $('bidask').textContent = `${usd(s.spot.bid)} / ${usd(s.spot.ask)}`;
   $('chg').innerHTML = `${pct(px, s.ref_15m)} / ${pct(px, s.ref_1h)}`;
 
@@ -275,7 +286,9 @@ function renderShared(s, f) {
     // Without a composite or target the server makes no projection and counts no samples.
     $('settlementCoverage').textContent = w.distance_source === 'projected 60s average' && w.distance != null ?
       `${w.observed_seconds || 0}/60 s observed · ${60 - (w.observed_seconds || 0)} s projected ` +
-      `(${w.missing_seconds || 0} missing elapsed seconds; remainder still ahead). Historical proxy error is separate.` : '';
+      `(${w.missing_seconds || 0} missing elapsed seconds; remainder still ahead).` +
+      (w.required_remaining_avg != null ? ` Proxy: the remaining ${w.required_remaining_seconds} s need to average ${usd(w.required_remaining_avg)} (${sgn(w.required_remaining_move)} vs composite) to land on the target; missed seconds are filled with the composite.` : '') +
+      ` Historical proxy error is separate.` : '';
     const book = w.orderbook_age != null && w.orderbook_age <= 10 ? w.orderbook || {} : {};
     const q = w.display_quotes || {};
     $('yesLabel').textContent = 'YES bid / ask';
@@ -290,18 +303,18 @@ function renderShared(s, f) {
     $('pathNote').textContent = w.path_partial ? 'Observed path is partial for this window.' : '';
     contextSpark('windowPath', f ? f.chart.candles : [], w.price_path, w, s.timeframe);
     $('bookAge').textContent = w.orderbook_age == null ? '' : `· book ${w.orderbook_age.toFixed(1)}s old`;
-    $('yesDepth').textContent = `${depth(book.yes_bid)} / ${depth(book.yes_ask)}`;
-    $('noDepth').textContent = `${depth(book.no_bid)} / ${depth(book.no_ask)}`;
+    $('yesDepth').textContent = `${depth(book.yes_bid, book.yes_bids)} / ${depth(book.yes_ask, book.yes_asks)}`;
+    $('noDepth').textContent = `${depth(book.no_bid, book.no_bids)} / ${depth(book.no_ask, book.no_asks)}`;
     spark('yesMid', w.yes_mid_path);
     $('kalshiTrades').innerHTML = (w.recent_trades || []).slice(0, 8).map(t =>
       `<tr><td>${t.time.slice(11, 19)}</td><td>${cents(t.yes_price)}</td><td>${Number(t.count).toLocaleString()}</td></tr>`).join('');
   } else {
-    $('kalshiAge').textContent = 'Kalshi window unavailable';
+    $('kalshiAge').textContent = s.exchange_closed ? 'Kalshi exchange closed (scheduled maintenance)' : 'Kalshi window unavailable';
     ['ticker', 'strike', 'dist', 'sig', 'yes', 'no'].forEach(id => $(id).textContent = id === 'ticker' ? '' : '—');
     $('distanceLabel').textContent = 'Composite vs target';
     $('settlementCoverage').textContent = '';
     $('distBlock').className = 'dist-block';
-    $('countdown').textContent = 'No open window';
+    $('countdown').textContent = s.exchange_closed ? 'Exchange closed' : 'No open window';
     $('yesLabel').textContent = 'YES bid / ask'; $('noLabel').textContent = 'NO bid / ask';
     $('yesSource').textContent = ''; $('noSource').textContent = '';
     ['stripTime', 'stripAvg', 'stripHigh', 'stripLow', 'yesDepth', 'noDepth'].forEach(id => $(id).textContent = '—');
@@ -313,9 +326,12 @@ function renderShared(s, f) {
 
   $('flowCvd').textContent = flow.cvd == null ? '—' : `${flow.cvd >= 0 ? '+' : ''}${flow.cvd.toFixed(4)} BTC`;
   $('cvdNow').textContent = $('flowCvd').textContent;
-  const one = flow.one_minute || {};
+  const one = flow.one_minute || {}, three = flow.three_minute || {};
   $('flowOne').textContent = one.buy_volume == null ? '—' : `${one.buy_volume.toFixed(4)} / ${one.sell_volume.toFixed(4)} BTC`;
   $('flowImbalance').textContent = one.imbalance == null ? '—' : `${(one.imbalance * 100).toFixed(1)}%`;
+  $('flowThree').textContent = three.buy_volume == null ? '—' : `${three.buy_volume.toFixed(4)} / ${three.sell_volume.toFixed(4)} BTC`;
+  $('flowThreeImbalance').textContent = three.imbalance == null ? '—' : `${(three.imbalance * 100).toFixed(1)}%` +
+    (three.coverage_seconds < three.seconds ? ` (first ${Math.floor(three.coverage_seconds)} s of window)` : '');
   $('flowThreshold').textContent = usd(flow.config?.large_trade_usd, 0) + ' notional';
   $('flowCoverage').textContent = flow.partial_window ? 'Flow observed since connection; earlier window trades may be missing.' : 'Flow observed from window open.';
 
@@ -467,6 +483,7 @@ function setLive(ok, text) { $('live').className = 'live ' + (ok ? 'ok' : 'bad')
 function setStatus(s, aged = 0) {
   if (failure) setLive(false, failure[0].toUpperCase() + failure.slice(1));
   else if (s.stale) setLive(false, 'STALE · spot or composite unavailable');
+  else if (s.exchange_closed) { $('live').className = 'live warn'; $('liveText').textContent = 'Live · Kalshi exchange closed'; }
   else if (s.kalshi_stale) { $('live').className = 'live warn'; $('liveText').textContent = 'Live · Kalshi stale'; }
   else if (staleShown(s).length) { $('live').className = 'live warn'; $('liveText').textContent = `Live · ${staleShown(s).join(' & ')} history stale`; }
   else setLive(true, `Live · spot ${(s.spot_age + aged).toFixed(1)}s`);

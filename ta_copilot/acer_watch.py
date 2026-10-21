@@ -48,7 +48,7 @@ def dashboard_problem():
         return "dashboard not ready"
     if state.get("stale"):
         return "dashboard stale"
-    if state.get("kalshi_stale"):
+    if state.get("kalshi_stale") and not state.get("exchange_closed"):
         # Two consecutive checks (5+ min) are needed to alert, so a rollover won't.
         return "dashboard Kalshi window missing or stale"
     age = state.get("watcher_age")

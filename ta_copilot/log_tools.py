@@ -15,7 +15,7 @@ import os
 from pathlib import Path
 import sys
 
-from tally_report import record_problem
+from tally_report import parse_iso_ts, record_problem
 
 WINDOW = 900
 
@@ -65,7 +65,7 @@ def read_rows(path):
 
 
 def parse_time(text):
-    return datetime.fromisoformat(text.replace("Z", "+00:00")).timestamp()
+    return parse_iso_ts(text)
 
 
 def window_gaps(rows):

@@ -231,7 +231,16 @@ def _epoch(value: Any, field: str = "time") -> float:
         try:
             seconds = float(text)
         except ValueError:
-            iso_text = text[:-1] + "+00:00" if text.endswith("Z") else text
+            iso_text = text[:-1] + "+00:00" if text.endswith(("Z", "z")) else text
+            t_pos = max(iso_text.find("T"), iso_text.find("t"), iso_text.find(" "))
+            dot = iso_text.find(".", t_pos if t_pos != -1 else 0)
+            if dot != -1:
+                end = dot + 1
+                while end < len(iso_text) and iso_text[end].isdigit():
+                    end += 1
+                frac = iso_text[dot + 1:end]
+                if frac and len(frac) not in (3, 6):
+                    iso_text = iso_text[:dot + 1] + frac.ljust(6, "0")[:6] + iso_text[end:]
             try:
                 parsed = datetime.fromisoformat(iso_text)
             except ValueError as exc:
@@ -789,7 +798,7 @@ class OrderFlow:
 
     # ------------------------------------------------------------ reads
 
-    def rolling(self, now: float) -> dict:
+    def rolling(self, now: float, seconds: Optional[float] = None) -> dict:
         """Taker buy/sell volume and imbalance over the trailing window.
 
         Scans the retained trades (bounded by ``max_trades``), so it stays
@@ -798,8 +807,9 @@ class OrderFlow:
         ``imbalance`` is ``(buy - sell) / (buy + sell)`` in ``[-1, 1]``, and
         ``None`` while the trailing window holds no volume at all.
         """
-        cutoff = now - self.rolling_seconds
-        previous_cutoff = cutoff - self.rolling_seconds
+        span = self.rolling_seconds if seconds is None else float(seconds)
+        cutoff = now - span
+        previous_cutoff = cutoff - span
         buy = sell = 0.0
         previous_buy = previous_sell = 0.0
         buy_count = sell_count = 0
@@ -820,7 +830,7 @@ class OrderFlow:
         total = buy + sell
         previous_total = previous_buy + previous_sell
         return {
-            "seconds": self.rolling_seconds,
+            "seconds": span,
             "buy_volume": buy,
             "sell_volume": sell,
             "volume": total,
@@ -841,6 +851,11 @@ class OrderFlow:
         if advance:
             self.advance(now)
         one_minute = self.rolling(now)
+        three_minute = self.rolling(now, min(180.0, self.window_seconds))
+        three_minute["coverage_seconds"] = (
+            0.0 if self.window_open is None or self.coverage_start is None
+            else max(0.0, min(three_minute["seconds"], now - max(self.window_open, self.coverage_start)))
+        )
         window_volume = self.buy_volume + self.sell_volume
         running = 0.0
         chart_points = ([{"time": self.window_open, "value": 0.0}]
@@ -872,6 +887,7 @@ class OrderFlow:
             "imbalance": ((self.buy_volume - self.sell_volume) / window_volume
                           if window_volume > 0 else None),
             "one_minute": one_minute,
+            "three_minute": three_minute,
             "cvd_points": chart_points,
             "coverage_start": _iso(self.coverage_start),
             "partial_window": self.coverage_start is None or self.coverage_start > self.window_open + 5,
