@@ -226,7 +226,7 @@ class EvidenceStore:
     @single_writer
     def event(self,kind,error=None):
         self._owned()
-        if kind not in {'COLLECTOR_START','COLLECTOR_STOP','FINAL_CUTOFF','EXCHANGE_CLOSED','REBOOT_RESUME'}:raise RuntimeBlocked('Unknown runtime event')
+        if kind not in {'COLLECTOR_START','COLLECTOR_STOP','FINAL_CUTOFF','EXCHANGE_CLOSED','CLOSURE_STATUS_UNAVAILABLE','REBOOT_RESUME'}:raise RuntimeBlocked('Unknown runtime event')
         with self._connect() as c:
             c.execute('INSERT INTO runtime_events(epoch,kind,detail) VALUES (?,?,?)',
                       (self.wall(),kind,scrub_detail(error or RuntimeBlocked(kind))))

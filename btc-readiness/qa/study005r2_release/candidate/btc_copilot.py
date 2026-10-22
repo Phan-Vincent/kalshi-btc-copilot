@@ -37,6 +37,14 @@ class FinalCutoff(ReadError):
 class ExchangeClosed(ReadError):
     """A scheduled exchange closure left no open contract: an explained pause, not a collection failure."""
 
+def scheduled_closure_window(now):
+    # Kalshi /exchange/schedule standard hours: Thu 03:00-05:00 America/New_York (CHANGES.md).
+    local=datetime.fromtimestamp(now,ZoneInfo('America/New_York'))
+    if local.weekday()!=3 or not 3<=local.hour<5:return None
+    return (local.replace(hour=3,minute=0,second=0,microsecond=0).timestamp(),
+            local.replace(hour=5,minute=0,second=0,microsecond=0).timestamp())
+
+
 ROOT = Path(__file__).resolve().parent
 WORK = ROOT / "runtime"
 from study_policy import launch_guard
@@ -489,17 +497,25 @@ class Copilot:
         discovery=self.client.pages('/markets',{'series_ticker':SERIES,'status':'open','limit':100},max_pages=3)
         if not discovery['complete']:
             raise ReadError('Active contract discovery was truncated')
-        eligible=[m for p in discovery['pages'] for m in p['data'].get('markets',[]) if verified_market(m,now)]
+        listed=[m for p in discovery['pages'] for m in p['data'].get('markets',[])]
+        eligible=[m for m in listed if verified_market(m,now)]
         if len(eligible)!=1:
+            status_error=None
             if not eligible:
                 # A scheduled weekly closure (Thu 03:00-05:00 ET) lists no open contract; prove it is closed.
                 try:
                     body=self.client.get('/exchange/status')['data']
                     flags=(body.get('exchange_active'),body.get('trading_active'))
-                except Exception:flags=(None,None)
+                # A failed status read remains a failure unless Collector can infer this window's closure.
+                except Exception as error:flags=(None,None);status_error=error
                 if all(type(v) is bool for v in flags) and (flags[0] is False or flags[1] is False):
                     raise ExchangeClosed('Exchange closed: exchange_active=%s trading_active=%s'%(str(flags[0]).lower(),str(flags[1]).lower()))
-            raise ReadError('Cannot verify exactly one active BTC 15-minute contract')
+                detail='0 eligible of %d listed (%s)'%(len(listed),'exchange active' if all(type(v) is bool and v for v in flags) else 'status unreadable')
+            elif len({m['ticker'] for m in eligible})==1:
+                detail='duplicate ticker '+eligible[0]['ticker']
+            else:
+                detail='%d eligible: '%len(eligible)+', '.join(m['ticker']+' '+dt(m['open_time']).astimezone(timezone.utc).strftime('%H:%M:%S')+'..'+dt(m['close_time']).astimezone(timezone.utc).strftime('%H:%M:%S') for m in eligible)
+            raise ReadError(('Cannot verify exactly one active BTC 15-minute contract: '+detail)[:189]) from status_error
         candidate=eligible[0];t=candidate['ticker'];e=candidate['event_ticker']
         jobs={
             # The 50-token benchmark is submitted first so it holds the first pacing ticket (FIFO pacer).
@@ -516,7 +532,7 @@ class Copilot:
         if self.positions:
             jobs['position']=lambda:self.client.get('/portfolio/positions',{'ticker':t,'count_filter':'position','limit':100})
             jobs['fills']=lambda:self.client.pages('/portfolio/fills',{'ticker':t,'limit':1000},max_pages=3)
-        errors={};raw={};timing={}
+        errors={};job_errors={};raw={};timing={}
         def measured(name,fn):
             start=time.time();mono=continuity_clock()
             try:return fn()
@@ -525,19 +541,21 @@ class Copilot:
             futures={k:pool.submit(measured,k,f) for k,f in jobs.items() if k!='trades'}
             for k,f in futures.items():
                 try:raw[k]=f.result()
-                except Exception as error:errors[k]=failure_note(error)
+                except Exception as error:errors[k]=failure_note(error);job_errors[k]=error
         # The trade window is a fixed past interval anchored at collection_epoch, so it is fetched after the
         # point-in-time snapshots. Fetched alongside them, its pages starved the 50-token benchmark of pacing
         # tokens and pushed snapshot skew past 5 s at busy times (live shakedown, 2026-10-12).
         try:raw['trades']=measured('trades',jobs['trades'])
-        except Exception as error:errors['trades']=failure_note(error)
+        except Exception as error:errors['trades']=failure_note(error);job_errors['trades']=error
         self.raw=raw
         essential=('market','event','series','book','benchmark','trades','candles','spot','exchange')
         if any(k not in raw for k in essential):
             # Keep the first underlying cause (a fixed client message such as 'Kalshi GET failed with HTTP 429'),
             # so the runtime log can tell rate limits from network or data faults.
             missing=[k for k in essential if k not in raw]
-            raise ReadError('Required data unavailable: '+', '.join(missing)+' ('+errors.get(missing[0],'no detail')+')')
+            error=ReadError('Required data unavailable: '+', '.join(missing)+' ('+errors.get(missing[0],'no detail')+')')
+            error.job_errors=tuple(job_errors[k] for k in missing if k in job_errors)
+            raise error
         for key in essential:
             envelope=raw[key];body=envelope.get('data')
             if envelope.get('error') or (isinstance(body,dict) and (body.get('error') or (isinstance(body.get('data'),dict) and body['data'].get('error')))):

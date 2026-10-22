@@ -10,7 +10,7 @@ from pathlib import Path
 from http.server import BaseHTTPRequestHandler,ThreadingHTTPServer
 import threading
 from decimal import Decimal
-from btc_copilot import Copilot,ROOT,continuity_clock,FinalCutoff,ExchangeClosed
+from btc_copilot import Copilot,ROOT,continuity_clock,FinalCutoff,ExchangeClosed,scheduled_closure_window
 from btc_copilot_research import SOURCE_TEXT,load_settings,version
 from coherent_runtime import EvidenceStore,RuntimeBlocked,no_links
 from kalshi_readonly import KalshiReadOnly,ReadError
@@ -181,6 +181,17 @@ class EvidenceCopilot(Copilot):
         self.state={'contracts':{},'previous':None}
     def record(self,*args):raise RuntimeBlocked('Legacy file persistence forbidden in evidence collector')
 
+def http_503(error):
+    pending=[error];seen=set()
+    while pending:
+        current=pending.pop()
+        if current is None or id(current) in seen:continue
+        seen.add(id(current))
+        if getattr(current,'status',None)==503:return True
+        pending.extend((current.__cause__,current.__context__))
+        pending.extend(getattr(current,'job_errors',()))
+    return False
+
 class Collector:
     """Testable serial pipeline; caller must supply a checked activation gate.
 
@@ -188,12 +199,15 @@ class Collector:
     CandidateGate, which currently blocks. Synthetic tests inject fake clients,
     clocks and gates; these seams are not exposed as command-line overrides.
     """
-    def __init__(self,engine,store,gate):self.engine=engine;self.store=store;self.gate=gate
-    def once(self):
+    def __init__(self,engine,store,gate):self.engine=engine;self.store=store;self.gate=gate;self.observed_closure=None
+    def once(self,now=None):
+        now=time.time() if now is None else now
         self.gate()
         self.engine.state=self.store.state()
+        collected=False
         try:
             snapshot=self.engine.collect(persist=False)
+            collected=True
             self.gate()
             generation=self.store.publish(self.engine,snapshot)
             return {'generation':generation,'decision':'NO TRADE','advice_enabled':False}
@@ -202,10 +216,17 @@ class Collector:
             if not self.store.halted:self.store.event('FINAL_CUTOFF',error)
             return {'generation':None,'decision':'NO TRADE','advice_enabled':False,'final_cutoff':True}
         except ExchangeClosed as error:
+            self.observed_closure=now
             # Scheduled closure (Kalshi standard hours, Thu 03:00-05:00 ET): logged as its own event, never degradation or a failure.
             if not self.store.halted:self.store.event('EXCHANGE_CLOSED',error)
             return {'generation':None,'decision':'NO TRADE','advice_enabled':False,'exchange_closed':True}
         except Exception as error:
+            window=scheduled_closure_window(now)
+            if (not collected and isinstance(error,ReadError) and http_503(error) and window and self.observed_closure is not None and
+                window[0]<=self.observed_closure<=now<window[1]):
+                detail='%s; window=%d..%d observed=%d'%(str(error)[:90],*window,self.observed_closure)
+                if not self.store.halted:self.store.event('CLOSURE_STATUS_UNAVAILABLE',ReadError(detail))
+                return {'generation':None,'decision':'NO TRADE','advice_enabled':False,'exchange_closed':True,'closure_inferred':True}
             if not self.store.halted:self.store.failure('COLLECTION_FAILED',error)
             raise
     def reconcile_one(self):
@@ -295,7 +316,7 @@ def run_authorized(root,gate,*,client_factory=EvidenceClient,engine_factory=Evid
             if now<epoch(protocol['start_utc']):raise RuntimeBlocked('Collection window has not opened')
             if now<epoch(protocol['end_utc']):
                 try:
-                    result=collector.once()
+                    result=collector.once(now)
                 except Exception:
                     # A later fresh poll may recover; missed windows are never backfilled.
                     closed_since=None

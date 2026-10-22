@@ -262,3 +262,14 @@ The 4.3 h soak on round 3c code captured **17/17 checkpoints** (skew p95 2.15 s)
 **Not yet observed live:** `/exchange/status` during a closure. The next one is Thursday 2026-10-22 07:00–09:00 UTC, and the new shakedown should span it.
 
 **Owner decision, not yet raised.** Closure slots count as explained misses against the 2% budget (107/5,376), at 8 slots per Thursday. Whether scheduled closure slots should count as scheduled slots at all is a protocol question.
+
+
+## Round 4h (2026-10-22, Codex): closure 503s and specific discovery errors
+
+**Finding.** The r2 shakedown halted at 07:22:50 UTC on October 22. Directly observed closure from 07:00:35 was followed by discovery HTTP 503s from 07:11:05, counted as consecutive failures until operator review stopped collection.
+
+**Fix (candidate).** After a directly observed closure in the same Thursday 03:00–05:00 America/New_York window, HTTP 503s from discovery, fallback status or required snapshot jobs record `CLOSURE_STATUS_UNAVAILABLE`. These inferred pauses preserve the failure count and continuous four-hour closure cap. The window follows DST. Memory is process-local: restart, a different window, non-503 errors or no prior observation still fail closed. All four readers explain missed slots with the new event and exclude it from poll failures.
+
+**Diagnostics.** Discovery failures retain their existing prefix and distinguish zero eligible contracts (active or unreadable status), duplicate tickers and distinct eligible contracts with UTC opening/closing times. No deduplication or eligibility policy changes.
+
+**Tests.** Synthetic offline regressions cover DST boundaries, wrapped 503s, restart and non-503 failures, pause counts and cap, reader reasons and failure rates, and exact discovery messages. Protocols and production trees are unchanged.

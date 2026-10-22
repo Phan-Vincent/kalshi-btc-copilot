@@ -340,7 +340,7 @@ def missing_slots(protocol,markets,slot_events,runtime_events):
         if opened in enrolled:continue
         reasons=[x['reason'] for x in slot_events if x['opened']==opened]
         band_start,band_end=opened+300,opened+330
-        reasons += [x['detail'] for x in runtime_events if x['kind'] in ('COLLECTION_FAILED','EXCHANGE_CLOSED') and band_start<=x['epoch']<=band_end and x['detail']]
+        reasons += [x['detail'] for x in runtime_events if x['kind'] in ('COLLECTION_FAILED','EXCHANGE_CLOSED','CLOSURE_STATUS_UNAVAILABLE') and band_start<=x['epoch']<=band_end and x['detail']]
         for event in runtime_events:
             if event['kind']!='REBOOT_RESUME':continue
             try:

@@ -71,7 +71,7 @@ def report(now):
             logged.setdefault(round(opened), []).append(reason)
         miss_reasons = Counter()
         for s in missed[-12:]:  # the most recent misses are enough to name the cause
-            near = [d for e, k, d in events if k in ('COLLECTION_FAILED','EXCHANGE_CLOSED') and s + BAND[0] - 15 <= e <= s + BAND[1]]
+            near = [d for e, k, d in events if k in ('COLLECTION_FAILED','EXCHANGE_CLOSED','CLOSURE_STATUS_UNAVAILABLE') and s + BAND[0] - 15 <= e <= s + BAND[1]]
             ids = [i for (i,) in c.execute('SELECT id FROM observations WHERE epoch BETWEEN ? AND ?', (s + BAND[0], s + BAND[1])).fetchall()]
             vetoes = [v for snap in payloads(c, ids) for v in snap.get('operational_vetoes', [])]
             explained = [r for r in logged.get(s, []) if r]
