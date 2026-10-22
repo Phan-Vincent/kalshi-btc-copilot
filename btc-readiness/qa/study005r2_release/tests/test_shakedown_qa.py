@@ -36,13 +36,17 @@ def build(runtime,events,markets,generations,vetoes=()):
         db.executemany('INSERT INTO generations VALUES (?)',[(epoch,) for epoch in generations])
         db.executemany('INSERT INTO slot_events VALUES (?,?)',vetoes)
 
-def summarize(runtime,now):
+def summarize(runtime,now,wan_log=None):
     with patch.object(release_tool,'CANDIDATE',runtime.parent):
-        return release_tool.shakedown_summary(runtime,datetime.fromtimestamp(now,timezone.utc))
+        return release_tool.shakedown_summary(runtime,datetime.fromtimestamp(now,timezone.utc),wan_log)
 
-def sealed(runtime,now):
+def sealed(runtime,now,wan_log=None):
     with patch.object(release_tool,'CANDIDATE',runtime.parent):
-        return release_tool.check_shakedown(runtime.parent,datetime.fromtimestamp(now,timezone.utc))
+        return release_tool.check_shakedown(runtime.parent,datetime.fromtimestamp(now,timezone.utc),wan_log)
+
+def wan_log(path,*outages):
+    """A dashboard home_internet.json holding only the given outage records."""
+    path.write_text(json.dumps({'outages':list(outages)}));return path
 
 def stamps(epoch):
     return datetime.fromtimestamp(epoch,timezone.utc).isoformat()
@@ -200,6 +204,91 @@ class MonitorTests(unittest.TestCase):
         self.assertIn('Recent trade window incomplete',labels)
         self.assertIn('reboot',labels)
         self.assertNotIn('NO OBSERVATION OR REASON IN THE BAND',labels)
+
+
+# The 2026-10-21 shape: a modem drop at 10:48:45 for 94 s, two network failures and one knock-on failure,
+# and the 10:45 slot's 10:50:00-10:50:30 band unobserved.
+MISS=START+10*3600+45*60;DROP=MISS+225;BACK=DROP+94
+NET='ReadError: Required data unavailable: event (ReadError: Network or TLS failure during Kalshi GET)'
+FAILS=[(DROP+45,'COLLECTION_FAILED',NET),(BACK+16,'COLLECTION_FAILED','ReadError: Decision completion outside valid observation window'),
+       (BACK+50,'COLLECTION_FAILED',NET)]
+OUTAGE={'start':DROP,'end':BACK,'seconds':94,'confirmed':True,'where':'modem','where_samples':{'modem':4}}
+
+
+def wan_run(runtime,fails=FAILS):
+    ended=START+72*3600
+    build(runtime,[(START,'COLLECTOR_START','start'),*fails,(ended,'COLLECTOR_STOP','orderly stop')],
+          [(START+n*900,START+n*900+315) for n in range(288) if START+n*900!=MISS],
+          [START+h*3600+300 for h in range(72)])
+    return ended
+
+
+class WanOutageTests(unittest.TestCase):
+    def test_confirmed_outage_excuses_its_failures_and_miss(self):
+        with tempfile.TemporaryDirectory() as td:
+            root,runtime=candidate(td);ended=wan_run(runtime);log=wan_log(Path(td)/'home_internet.json',OUTAGE)
+            out=summarize(runtime,ended)
+            self.assertEqual([x['reasons'] for x in out['missed_slots']],[[]])
+            with self.assertRaises(SystemExit):sealed(runtime,ended)
+            out=summarize(runtime,ended,log)
+            reason=release_tool.WAN_REASON+stamps(DROP)+'..'+stamps(BACK)+' (modem)'
+            self.assertEqual([x['reasons'] for x in out['missed_slots']],[[reason]])
+            row=next(row for row in out['poll_failure_rate_by_hour'] if row['hour_utc']==stamps(START+10*3600))
+            self.assertEqual((row['failed'],row['failed_during_wan_outage'],row['failure_rate']),(3,3,0.0))
+            self.assertEqual([o['reason'] for o in out['wan_outages']['windows']],[reason])
+            self.assertEqual(sealed(runtime,ended,log)['enrolled_checkpoints'],287)
+            # Seal confirms each excused window against this Mac's dashboard log.
+            with self.assertRaises(SystemExit):sealed(runtime,ended)
+            with self.assertRaises(SystemExit):sealed(runtime,ended,wan_log(Path(td)/'other.json',dict(OUTAGE,end=BACK+1)))
+
+    def test_outage_excuses_nothing_unless_confirmed_short_and_corroborated(self):
+        http=[(e,k,'ReadError: Required data unavailable: benchmark (ReadError: Kalshi GET failed with HTTP 503)') for e,k,_ in FAILS]
+        for fails,outage in ((http,OUTAGE),(FAILS,dict(OUTAGE,confirmed=False)),
+                             (FAILS,dict(OUTAGE,start=BACK-901)),(FAILS,dict(OUTAGE,start=DROP+3600,end=BACK+3600))):
+            with tempfile.TemporaryDirectory() as td:
+                root,runtime=candidate(td);ended=wan_run(runtime,fails)
+                out=summarize(runtime,ended,wan_log(Path(td)/'home_internet.json',outage))
+                self.assertEqual((out['wan_outages']['windows'],[x['reasons'] for x in out['missed_slots']]),([],[[]]))
+                with self.assertRaises(SystemExit):sealed(runtime,ended,Path(td)/'home_internet.json')
+
+    def test_seal_gate_rejects_forged_or_inconsistent_wan_excuses(self):
+        now=datetime(2026,10,24,tzinfo=timezone.utc)
+        with tempfile.TemporaryDirectory() as td:
+            root=Path(td).resolve();(root/'source.py').write_text('v1')
+            good=gate_summary(root,now);path=root/'shakedown_summary.json'
+            hour={'failed':3,'successful':200,'failed_during_wan_outage':3,'failure_rate':0.0}
+            for bad in (dict(good,missed_slots=[{'reasons':['recorded veto']}]*9+[{'reasons':[release_tool.WAN_REASON+'made up']}]),
+                        dict(good,poll_failure_rate_by_hour=[{'failure_rate':.01}]*71+[hour]),
+                        dict(good,poll_failure_rate_by_hour=[{'failure_rate':.01}]*71+[dict(hour,failed_during_wan_outage=0)]),
+                        dict(good,wan_outages={'lead_seconds':0,'tail_seconds':3600,'max_seconds':86400,'windows':[]})):
+                path.write_text(json.dumps(bad))
+                with self.assertRaises(SystemExit):release_tool.check_shakedown(root,now)
+
+    def test_monitor_applies_the_same_excuse(self):
+        now=START+12*3600
+        with tempfile.TemporaryDirectory() as td:
+            root=Path(td).resolve();db=root/'evidence.sqlite3';limits=root/'operating_limits.json'
+            limits.write_text(json.dumps({'quota_bytes':128*1024**3}))
+            payload=zlib.compress(json.dumps({'snapshot':{'retrieval_health':{'snapshot_skew_seconds':1.5}}}).encode())
+            with closing(sqlite3.connect(db)) as c, c:
+                c.executescript('CREATE TABLE observations(id INTEGER PRIMARY KEY,epoch REAL,payload BLOB); '
+                                'CREATE TABLE markets(opened REAL,checkpoint REAL); '
+                                'CREATE TABLE slot_events(opened REAL,reason TEXT); '
+                                'CREATE TABLE runtime_events(epoch REAL,kind TEXT,detail TEXT);')
+                c.executemany('INSERT INTO observations(epoch,payload) VALUES (?,?)',[(START+h*3600+300,payload) for h in range(12)])
+                c.executemany('INSERT INTO runtime_events VALUES (?,?,?)',[(START,'COLLECTOR_START','start')]+FAILS)
+                c.executemany('INSERT INTO markets VALUES (?,?)',[(START+n*900,START+n*900+315) for n in range(48) if START+n*900!=MISS])
+            active=SimpleNamespace(stdout='active\n',stderr='',returncode=0)
+            runs={}
+            for name,log in (('absent',root/'missing.json'),('logged',wan_log(root/'wan_outages.json',OUTAGE))):
+                with patch.object(shakedown_check,'DB',db),patch.object(shakedown_check,'LIMITS',limits), \
+                     patch.object(shakedown_check,'WAN_LOG',log),patch.object(shakedown_check.subprocess,'run',return_value=active):
+                    runs[name]=shakedown_check.report(now)
+        self.assertTrue(any(p.startswith('Poll failures above 1%') for p in runs['absent']['problems']))
+        self.assertTrue(any('missed slot(s) with no reason' in p for p in runs['absent']['problems']))
+        self.assertEqual(runs['logged']['problems'],[])
+        self.assertEqual(runs['logged']['failures_during_wan_outage'],3)
+        self.assertEqual([label for label,_ in runs['logged']['missed_reasons']],['home WAN outage 10-20 10:48:45 (modem)'])
 
 
 if __name__=='__main__':
