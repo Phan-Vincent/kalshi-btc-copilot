@@ -19,6 +19,13 @@ WORKING_STATUS = 'WORKING_INVENTORY_NOT_AN_ACTIVATABLE_RELEASE'
 SEALED_STATUS = 'SEALED_EVIDENCE_ONLY_RELEASE'
 MAX_EVIDENCE_AGE = timedelta(hours=72)
 SKIP = {'release_manifest.json', 'activation_approval.json', 'runtime', 'runtime_shakedown', '__pycache__', '.DS_Store'}
+# Home-internet outages from the command-center dashboard log (data/home_internet.json). The dashboard samples
+# every ~15 s, so a window is padded by a lead for the unseen start and a tail for the poll that completes just
+# after reconnect. Only short drops are excused; a longer outage still needs a human decision.
+WAN_LOG = Path.home() / 'command-center/data/home_internet.json'
+WAN_LEAD, WAN_TAIL, WAN_MAX = 30, 60, 900
+WAN_NETWORK_FAILURE = 'Network or TLS failure'
+WAN_REASON = 'home WAN outage '
 
 
 def sha(path):
@@ -84,8 +91,31 @@ def check_candidate_tree(root):
     if bad:
         raise SystemExit('Refusing to seal links or non-regular entries: ' + ', '.join(sorted(bad)))
 
-def shakedown_summary(runtime=None,now=None):
-    """Read only timing, checkpoint and reason tables; never read outcomes or results."""
+def wan_outages(log):
+    """Confirmed outages up to WAN_MAX long from a dashboard log, as {start,end,where} (an absent log gives none)."""
+    if log is None:return []
+    out=[]
+    for o in json.loads(Path(log).read_text()).get('outages') or []:
+        start,end=o.get('start'),o.get('end')
+        if (o.get('confirmed') is True and type(start) in (int,float) and type(end) in (int,float) and
+            math.isfinite(start) and math.isfinite(end) and 0<=end-start<=WAN_MAX):
+            out.append({'start':start,'end':end,'where':o.get('where') if type(o.get('where')) is str else None})
+    return out
+
+def wan_windows(outages,events):
+    """The outages the collector corroborates: it logged a network failure inside the padded window itself."""
+    return [o for o in outages if any(kind=='COLLECTION_FAILED' and WAN_NETWORK_FAILURE in (detail or '') and
+                                      o['start']-WAN_LEAD<=epoch<=o['end']+WAN_TAIL for epoch,kind,detail in events)]
+
+def wan_reason(o):
+    iso=lambda e:datetime.fromtimestamp(e,timezone.utc).isoformat()
+    return WAN_REASON+iso(o['start'])+'..'+iso(o['end'])+(' (%s)'%o['where'] if o['where'] else '')
+
+def shakedown_summary(runtime=None,now=None,wan_log=None):
+    """Read only timing, checkpoint and reason tables; never read outcomes or results.
+
+    wan_log (a copy of the dashboard's home_internet.json) excuses failures and missed slots inside a confirmed,
+    collector-corroborated home-internet outage: they leave the hourly rate and become named misses."""
     runtime=Path(runtime or CANDIDATE/'runtime_shakedown').absolute()
     if (runtime/'RUNNING').exists():raise SystemExit('Stop the shakedown collector cleanly before summarizing')
     path=runtime/'evidence.sqlite3'
@@ -100,6 +130,9 @@ def shakedown_summary(runtime=None,now=None):
         events=list(db.execute('SELECT epoch,kind,detail FROM runtime_events ORDER BY epoch'))
         generations=[x[0] for x in db.execute('SELECT epoch FROM generations ORDER BY epoch')]
     ended=min(now_epoch,max([start]+generations+[x[0] for x in events]))
+    outages=wan_outages(wan_log)
+    windows=wan_windows(outages,events)
+    in_window=lambda epoch:any(o['start']-WAN_LEAD<=epoch<=o['end']+WAN_TAIL for o in windows)
     first=math.ceil(start/900)*900
     # Every slot whose 330 s checkpoint band has elapsed counts (matches shakedown_check.py); the old
     # floor(ended/900) bound silently dropped the final slot even when its band had completed.
@@ -123,18 +156,22 @@ def shakedown_summary(runtime=None,now=None):
             # Only a start that had the collector up for the whole band clears the miss; a restart at
             # opened+329 still leaves the band unobserved, so the stop reason survives.
             if not any(epoch>stopped and epoch<=opened+300 and kind=='COLLECTOR_START' for epoch,kind,_ in events):reasons.append(detail or 'Collector stopped')
+        reasons += [wan_reason(o) for o in windows if opened+300<=o['end']+WAN_TAIL and opened+330>=o['start']-WAN_LEAD]
         missed[opened]=sorted(set(reasons))
     hourly=[]
     for hour in range(math.floor(start/3600)*3600,math.ceil(ended/3600)*3600,3600):
         fail=sum(hour<=epoch<hour+3600 and kind=='COLLECTION_FAILED' for epoch,kind,_ in events)
+        wan=sum(hour<=epoch<hour+3600 and kind=='COLLECTION_FAILED' and in_window(epoch) for epoch,kind,_ in events)
         good=sum(hour<=epoch<hour+3600 for epoch in generations)
+        counted=fail-wan
         inside=[s for s in slots if hour<=s<hour+3600]
         hourly.append({'hour_utc':datetime.fromtimestamp(hour,timezone.utc).isoformat(),'failed':fail,'successful':good,
-                       'failure_rate':fail/(fail+good) if fail+good else None,
+                       'failed_during_wan_outage':wan,
+                       'failure_rate':counted/(counted+good) if counted+good else None,
                        'partial_hour':hour<start or hour+3600>ended,
                        # An empty hour is excused only when every slot in it is a named miss: an
                        # unexplained empty full hour is still a seal failure.
-                       'inactivity_explained':fail+good==0 and bool(inside) and all(missed.get(s) for s in inside)})
+                       'inactivity_explained':counted+good==0 and bool(inside) and all(missed.get(s) for s in inside)})
     size=sum(p.stat().st_size for p in runtime.iterdir() if p.is_file())
     quota=json.loads((CANDIDATE/'operating_limits.json').read_text())['quota_bytes']
     hours=max(0,(ended-start)/3600)
@@ -153,6 +190,9 @@ def shakedown_summary(runtime=None,now=None):
              'all_misses_have_reasons':all(missed.values()),
              'poll_failure_rate_by_hour':hourly,
              'unexplained_collection_failures':sum(kind=='COLLECTION_FAILED' and not detail for _,kind,detail in events),
+             'wan_outages':{'source_sha256':sha(wan_log) if wan_log is not None else None,
+                            'lead_seconds':WAN_LEAD,'tail_seconds':WAN_TAIL,'max_seconds':WAN_MAX,
+                            'windows':[dict(o,reason=wan_reason(o)) for o in windows]},
              'storage_growth':{'observed_bytes':size,'measured_bytes_per_day':measured_per_day,
                                'uncertainty_multiplier':2,'projected_72_day_bytes':projected,
                                'quota_bytes':quota,'sqlite_page_size':page_size,'main_database_cap_bytes':cap,
@@ -167,7 +207,36 @@ def shakedown_rate_ok(row):
     if rate is None:return row.get('partial_hour') is True or row.get('inactivity_explained') is True
     return type(rate) in (int,float) and math.isfinite(rate) and 0<=rate<=.01
 
-def check_shakedown(root,now=None):
+def check_wan_outages(summary,wan_log=None):
+    """Every outage excuse must be well formed, consistent with the hourly counts, and present in this Mac's log."""
+    wan=summary.get('wan_outages')
+    if wan is None:wan={'lead_seconds':WAN_LEAD,'tail_seconds':WAN_TAIL,'max_seconds':WAN_MAX,'windows':[]}
+    finite=lambda x:type(x) in (int,float) and math.isfinite(x)
+    windows=wan.get('windows') if type(wan) is dict else None
+    if (type(windows) is not list or (wan.get('lead_seconds'),wan.get('tail_seconds'),wan.get('max_seconds'))!=(WAN_LEAD,WAN_TAIL,WAN_MAX) or
+        not all(type(o) is dict and finite(o.get('start')) and finite(o.get('end')) and 0<=o['end']-o['start']<=WAN_MAX and
+                o.get('where') in (None,'router','modem','upstream') and o.get('reason')==wan_reason(o) for o in windows)):
+        raise SystemExit('Shakedown WAN outage windows are malformed')
+    named={o['reason'] for o in windows}
+    for x in summary.get('missed_slots',[]):
+        if any(type(r) is str and r.startswith(WAN_REASON) and r not in named for r in x.get('reasons') or []):
+            raise SystemExit('A missed slot names a WAN outage the summary does not list')
+    for row in summary.get('poll_failure_rate_by_hour',[]):
+        wan_fail=row.get('failed_during_wan_outage',0)
+        if type(wan_fail) is not int or wan_fail<0 or (wan_fail and not windows):
+            raise SystemExit('Shakedown WAN-excused failure count is invalid')
+        if 'failed' in row or 'successful' in row:
+            fail,good=row.get('failed'),row.get('successful')
+            counted=fail-wan_fail if type(fail) is int else -1
+            if type(good) is not int or counted<0 or row.get('failure_rate')!=(counted/(counted+good) if counted+good else None):
+                raise SystemExit('Shakedown hourly failure rate does not match its counts')
+    if windows:
+        if wan_log is None or not Path(wan_log).is_file():raise SystemExit('The summary excuses WAN outages; seal needs the dashboard outage log to confirm them')
+        logged={(o['start'],o['end']) for o in wan_outages(wan_log)}
+        if not all((o['start'],o['end']) in logged for o in windows):
+            raise SystemExit('A WAN outage in the summary is not a confirmed outage in '+str(wan_log))
+
+def check_shakedown(root,now=None,wan_log=None):
     path=Path(root)/'shakedown_summary.json'
     if not path.is_file():raise SystemExit('Shakedown summary missing')
     summary=json.loads(path.read_text());now=now or datetime.now(timezone.utc)
@@ -195,6 +264,7 @@ def check_shakedown(root,now=None):
         len(rates)<72 or not all(shakedown_rate_ok(row) for row in rates) or
         not storage_valid or growth.get('main_database_cap_bytes')!=cap or projected>cap):
         raise SystemExit('Shakedown coverage, reasons, failure rate or storage gate failed')
+    check_wan_outages(summary,wan_log)
     return summary
 
 
@@ -207,11 +277,11 @@ VERIFY_IN_FRESH_PROCESS = (
     "print('SEALED_COPY_VERIFIED_BY', pathlib.Path(evidence_runner.__file__).resolve())\n")
 
 
-def seal(out_dir, now=None, raw_check=True):
+def seal(out_dir, now=None, raw_check=True, wan_log=WAN_LOG):
     # raw_check=False exists only for in-process tests (the raw records never leave this Mac);
     # the command line always re-derives the summary from them.
     out = Path(out_dir).absolute()
-    check_shakedown(CANDIDATE,now)
+    check_shakedown(CANDIDATE,now,wan_log)
     check_fee_evidence(CANDIDATE, now)
     if raw_check:
         check_raw_evidence(CANDIDATE)
@@ -281,8 +351,8 @@ def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     sub = ap.add_subparsers(dest='command', required=True)
     sub.add_parser('inventory')
-    sub.add_parser('shakedown-summary')
-    s = sub.add_parser('seal'); s.add_argument('out_dir')
+    d = sub.add_parser('shakedown-summary'); d.add_argument('--wan-outages', help='a copy of the dashboard home_internet.json; excuses confirmed outages')
+    s = sub.add_parser('seal'); s.add_argument('out_dir'); s.add_argument('--wan-outages', default=str(WAN_LOG), help='dashboard log that confirms excused outages')
     r = sub.add_parser('post-study-report', help='after 2026-12-23: verify the fee summary, then run the release report on the host')
     r.add_argument('summary', nargs='?', default=str(HERE.parents[1] / 'fee_evidence_refresh_summary.json')); r.add_argument('--host', default='acer')
     args = ap.parse_args(argv)
@@ -291,9 +361,9 @@ def main(argv=None):
     if args.command == 'inventory':
         m = write_manifest(CANDIDATE, sealed=False)
     elif args.command == 'shakedown-summary':
-        print(json.dumps(shakedown_summary(),indent=2));return
+        print(json.dumps(shakedown_summary(wan_log=args.wan_outages),indent=2));return
     else:
-        m = seal(args.out_dir)
+        m = seal(args.out_dir, wan_log=args.wan_outages)
     print(json.dumps({k: v for k, v in m.items() if k != 'files'} | {'files': len(m['files']),
                       'manifest_sha256': sha((CANDIDATE if args.command == 'inventory' else Path(args.out_dir)) / 'release_manifest.json')}, indent=2))
 

@@ -26,6 +26,11 @@ UNIT = 'btc-r2-shakedown.service'
 LOOKBACK = 12 * 3600
 BAND = (300, 330)  # checkpoint band: seconds after a slot opens
 MIN_COVERAGE, MAX_FAIL_RATE, SKEW_WARN, TARGET_HOURS = 0.95, 0.01, 4.0, 72
+# A copy of the dashboard's home_internet.json, pushed from the Mac; optional. The same rules as release_tool:
+# a confirmed outage up to WAN_MAX long, padded, excuses failures and misses once the collector logged a
+# network failure inside it.
+WAN_LOG = Path.home() / 'btc-study-qa/wan_outages.json'
+WAN_LEAD, WAN_TAIL, WAN_MAX = 30, 60, 900
 
 
 SKEW_SAMPLE, BATCH = 240, 20
@@ -49,6 +54,23 @@ def payloads(c, ids):
     return out
 
 
+def wan_windows(events):
+    """Confirmed outages from WAN_LOG that the collector corroborates with a network failure inside the padded window."""
+    if not WAN_LOG.exists():
+        return []
+    out = []
+    for o in json.loads(WAN_LOG.read_text()).get('outages') or []:
+        start, end = o.get('start'), o.get('end')
+        if not (o.get('confirmed') is True and type(start) in (int, float) and type(end) in (int, float)
+                and math.isfinite(start) and math.isfinite(end) and 0 <= end - start <= WAN_MAX):
+            continue
+        if any(k == 'COLLECTION_FAILED' and 'Network or TLS failure' in (d or '') and start - WAN_LEAD <= e <= end + WAN_TAIL
+               for e, k, d in events):
+            out.append((start - WAN_LEAD, end + WAN_TAIL, 'home WAN outage %s (%s)' % (
+                time.strftime('%m-%d %H:%M:%S', time.gmtime(start)), o.get('where') or 'cause unknown')))
+    return out
+
+
 def report(now):
     c = connect()
     try:
@@ -57,6 +79,8 @@ def report(now):
             return {'problems': ['No COLLECTOR_START event: the shakedown has not started']}
         since = max(start, now - LOOKBACK)
         events = c.execute('SELECT epoch,kind,detail FROM runtime_events WHERE epoch>=?', (since,)).fetchall()
+        windows = wan_windows(events)
+        in_window = lambda e: any(lo <= e <= hi for lo, hi, _ in windows)
         obs = [e for (e,) in c.execute('SELECT epoch FROM observations WHERE epoch>=?', (since,)).fetchall()]
         enrolled = {round(o) for (o,) in c.execute('SELECT opened FROM markets WHERE checkpoint IS NOT NULL AND opened>=?', (since - 900,)).fetchall()}
         recent = [i for (i,) in c.execute('SELECT id FROM observations WHERE epoch>=? ORDER BY id DESC LIMIT ?', (since, SKEW_SAMPLE)).fetchall()]
@@ -70,6 +94,7 @@ def report(now):
         for opened, reason in c.execute('SELECT opened,reason FROM slot_events WHERE opened>=?', (since - 900,)).fetchall():
             logged.setdefault(round(opened), []).append(reason)
         miss_reasons = Counter()
+        unnamed = 0
         for s in missed[-12:]:  # the most recent misses are enough to name the cause
             near = [d for e, k, d in events if k in ('COLLECTION_FAILED','EXCHANGE_CLOSED') and s + BAND[0] - 15 <= e <= s + BAND[1]]
             ids = [i for (i,) in c.execute('SELECT id FROM observations WHERE epoch BETWEEN ? AND ?', (s + BAND[0], s + BAND[1])).fetchall()]
@@ -91,13 +116,18 @@ def report(now):
                 # Cleared only by a restart that had the collector up for the whole band (release tool rule).
                 if not any(e > stopped and e <= s + BAND[0] and k == 'COLLECTOR_START' for e, k, _ in events):
                     explained.append(detail or 'Collector stopped')
+            explained += [why for lo, hi, why in windows if s + BAND[0] <= hi and s + BAND[1] >= lo]
+            unnamed += not (near + vetoes + explained)
             miss_reasons.update(set(near + vetoes + explained) or {'NO OBSERVATION OR REASON IN THE BAND'})
-        # Poll failure rate per full clock hour.
+        # Poll failure rate per full clock hour; failures inside a WAN outage window leave the rate (release tool rule).
         hours = []
+        wan_failures = 0
         for h in range(math.ceil(since / 3600) * 3600, int(now) - 3599, 3600):
             fail = sum(1 for e, k, _ in events if k == 'COLLECTION_FAILED' and h <= e < h + 3600)
+            wan = sum(1 for e, k, _ in events if k == 'COLLECTION_FAILED' and h <= e < h + 3600 and in_window(e))
             ok = sum(1 for e in obs if h <= e < h + 3600)
-            hours.append((h, fail, ok + fail))
+            hours.append((h, fail - wan, ok + fail - wan))
+            wan_failures += wan
         bad_hours = [(time.strftime('%m-%d %H:00', time.gmtime(h)), f, n) for h, f, n in hours if n and f / n > MAX_FAIL_RATE]
         fail_reasons = Counter((d or 'NO DETAIL')[:90] for e, k, d in events if k == 'COLLECTION_FAILED')
         unexplained = sum(1 for e, k, d in events if k == 'COLLECTION_FAILED' and not d)
@@ -119,6 +149,8 @@ def report(now):
         problems.append('Checkpoint coverage %d/%d (%.1f%%) is below 95%%' % (len(slots) - len(missed), len(slots), 100 * (1 - len(missed) / len(slots))))
     if bad_hours:
         problems.append('Poll failures above 1%% in %d hour(s): %s' % (len(bad_hours), ', '.join('%s %d/%d' % x for x in bad_hours[:4])))
+    if unnamed:
+        problems.append('%d missed slot(s) with no reason (the seal gate needs one for every miss)' % unnamed)
     if unexplained:
         problems.append('%d collection failure(s) with no logged reason' % unexplained)
     if p95 is not None and p95 > SKEW_WARN:
@@ -129,6 +161,8 @@ def report(now):
             'service': active, 'slots': len(slots), 'enrolled': len(slots) - len(missed),
             'missed_reasons': miss_reasons.most_common(4), 'failures': sum(f for _, f, _ in hours),
             'polls': sum(n for _, _, n in hours), 'failure_reasons': fail_reasons.most_common(4),
+            'wan_log': str(WAN_LOG) if WAN_LOG.exists() else 'absent', 'wan_outages': [why for _, _, why in windows],
+            'failures_during_wan_outage': wan_failures,
             'final_cutoff_events': cutoffs, 'skew_p95': p95, 'skew_max': skews[-1] if skews else None,
             'db_bytes': grown, 'storage_projection_x2_bytes': int(projected), 'main_db_cap_bytes': cap}
 
@@ -157,6 +191,8 @@ def main():
             lines.append('Missed-slot reasons: ' + '; '.join('%s (%d)' % x for x in r['missed_reasons']))
         if r.get('failure_reasons'):
             lines.append('Failure reasons: ' + '; '.join('%s (%d)' % x for x in r['failure_reasons']))
+        if r.get('wan_outages'):
+            lines.append('Excused by home WAN outages (%d failure(s)): %s' % (r['failures_during_wan_outage'], '; '.join(r['wan_outages'])))
     if r.get('hours_run', 0) >= TARGET_HOURS and not state.get('target_reached_sent') and r.get('service') == 'active' and not r['problems']:
         lines.append('[R2 SHAKEDOWN] %d h of collection reached (%s/%s checkpoints in the last %s h). '
                      'Ready for release_tool.py shakedown-summary.' % (TARGET_HOURS, r.get('enrolled'), r.get('slots'), r.get('window_hours')))
