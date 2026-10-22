@@ -16,7 +16,7 @@ from datetime import datetime, timedelta, timezone
 from study_policy import validate_protocol
 
 # DRAFT start date. The freeze sets the real one; a different date is a new review.
-START = datetime(2026, 10, 26, tzinfo=timezone.utc)
+START = datetime(2026, 11, 2, tzinfo=timezone.utc)
 STUDY_ID = 'btc-prospective-005r2-' + START.strftime('%Y%m%d')
 CANDIDATE_RELEASE = '5.5.0-study005r2'
 PRESERVED_POLICY_SHA256 = 'a09496770e4ad2df00e889ece6925ef9e82dab03f13a7758acd8bedba6952c44'

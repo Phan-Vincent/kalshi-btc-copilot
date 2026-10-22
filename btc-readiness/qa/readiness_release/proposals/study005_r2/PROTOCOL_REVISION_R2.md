@@ -1,6 +1,6 @@
 # Study 005 revision 2: DRAFT, not adopted (2026-10-12)
 
-**Proposed START: 2026-10-26 00:00 UTC** (a Monday). The schedule is 7 + 7 + 56 + 2 days: validation Nov 2, holdout Nov 9 → **2027-01-04**, release **2027-01-06**. The approval deadline is START − 1 day, **2026-10-25 00:00 UTC** (Sat Oct 24, 5 pm PT). Oct 19 is possible only if a 48 h shakedown (below) passes by Oct 16 and the owner signs by Oct 17. Oct 26 leaves room for a 72 h+ shakedown that includes a weekend.
+**Proposed START: 2026-11-02 00:00 UTC** (a Monday; moved from 2026-10-26 on 2026-10-22, after the r2 shakedown failed its gate and halted in the Thursday closure). The schedule is 7 + 7 + 56 + 2 days: validation Nov 9, holdout Nov 16 → **2027-01-11**, release **2027-01-13**. The approval deadline is START − 1 day, **2026-11-01 00:00 UTC** (Sat Oct 31, 5 pm PDT). The original Oct 26 plan follows. Oct 19 is possible only if a 48 h shakedown (below) passes by Oct 16 and the owner signs by Oct 17. Oct 26 leaves room for a 72 h+ shakedown that includes a weekend.
 
 ## Why r1 is void
 
@@ -21,7 +21,7 @@ r1 keeps running, GET-only, until r2 is staged; `stage` stops it fail-closed. It
 4. **Storage** (revised 2026-10-12 after Codex round 1). Only **checkpoint** records keep the raw trade window (96/day × about 395 KB is about 38 MB/day). Observation and signal/decision records keep the aggregates, the trade count, the first/last trade_id and the SHA-256 of the canonical trade set. The flow veto only uses the yes/no taker totals, and the checkpoint's model features don't use trades at all. Round 1 kept raw windows in every signal arm, which projected to 135 GB over 72 days (45 GB of that from arm copies). Re-run `tests/measure_storage.py` with 9k-trade windows. **Round 2 result:** quota raised 128 → 256 GiB in `operating_limits.json` (the Acer has about 1.5 TB free); the ×2 planning projection is 50.1 GB, 55% of the 85.3 GiB main-database cap.
 5. **Record why polls fail.** `runtime_events` stores only `COLLECTION_FAILED`. Add the exception class and a short, scrubbed message. The cause of the r1 failures (2 at startup, 7 in a row from 08:43:38 to 08:45:06, then 08:52:23 and 08:54:23) is still unknown; diagnose it during the shakedown.
 5b. **Make the health check count real checkpoints.** `acer_ops.py` counts a slot as "covered" when *any* observation falls in the 570–600 s band, even if it was vetoed. On 2026-10-12 at 16:39 UTC, the Telegram status said 31/95 slots covered, while `checkpoints` held 0 rows across 33 markets. Status, the watcher and the shakedown summary must count enrolled checkpoints (`markets.checkpoint IS NOT NULL`) and report the reason for each veto. They should also alert when the poll failure rate is above 5% per hour. r1 ran at about 15%: 293 `COLLECTION_FAILED` between 08:40 and 16:39 UTC, 35–42 an hour, steady.
-6. **Identity and dates.** `readiness_policy.START = 2026-10-26`, `STUDY_ID = btc-prospective-005r2-20261026`, `CANDIDATE_RELEASE = 5.5.0-study005r2`. Build the protocol with an r2 `make_revision.py` from the sealed r1 protocol (sha256 `52ee6ab0…75f6`). The changed fields are the identity, the dates, the deadline, the release label and the new `trade_window_policy` text below; nothing else changes.
+6. **Identity and dates.** `readiness_policy.START = 2026-11-02` (was 2026-10-26), `STUDY_ID = btc-prospective-005r2-20261102`, `CANDIDATE_RELEASE = 5.5.0-study005r2`. Build the protocol with an r2 `make_revision.py` from the sealed r1 protocol (sha256 `52ee6ab0…75f6`). The changed fields are the identity, the dates, the deadline, the release label and the new `trade_window_policy` text below; nothing else changes.
 7. **Tests.** Volume fixtures above 1,000 trades, a cursor across pages, the window edge (item 2), the cap, the pacing budget and the storage size.
 
 ## Protocol change (new field `trade_window_policy`)
@@ -64,7 +64,7 @@ r1 required all 96 slots every day for 56 days, with "no restart budget". One ou
 
 ## Built 2026-10-12
 
-`make_revision.py --start 2026-10-26` builds `readiness_protocol.r2.draft.json` from the sealed r1 protocol (pinned sha256). These fields differ:
+`make_revision.py --start 2026-11-02` (originally `--start 2026-10-26`) builds `readiness_protocol.r2.draft.json` from the sealed r1 protocol (pinned sha256). These fields differ:
 
 - the identity, the five dates, `candidate_release` and `approval_policy.deadline_utc`;
 - `forecast_checkpoint`, `missing_policy` and `primary_acceptance.holdout_coverage` (0.98);
@@ -86,4 +86,4 @@ The implementation brief is `CODEX_TASK_R2.md`.
 2. Codex review rounds on the changes.
 3. Shakedown of at least 72 h; it should be running by Oct 20.
 4. Fee refresh within 72 h of sealing → seal → `install.sh stage`.
-5. The owner signs `activation_approval.json` before 2026-10-25 00:00 UTC → `install.sh activate`.
+5. The owner signs `activation_approval.json` before 2026-11-01 00:00 UTC (was 2026-10-25) → `install.sh activate`.

@@ -256,21 +256,27 @@ class RunLoopTests(unittest.TestCase):
         with self.assertRaisesRegex(run.RuntimeBlocked,'Persistent failure requires operator review'):
             self.loop([run.ReadError('synthetic outage')]*40,100)
 
+    def closure(self):
+        # 30 min into the first scheduled closure after the protocol start, so the loop is inside the study window.
+        start=run.epoch(run.validate_readiness_protocol(json.loads((f.ROOT/'readiness_protocol.json').read_text()))['start_utc'])
+        at=next(t for t in range(int(start),int(start)+8*86400,900) if b.scheduled_closure_window(t))+1800
+        self.assertTrue(b.scheduled_closure_window(at));return at
+
     def test_fifty_inferred_polls_do_not_stop_the_loop(self):
         side=[run.ExchangeClosed(CLOSED_DETAIL)]+[run.ReadError('503',503)]*50
-        _,store,result=self.loop(side,51,start_at=THURSDAY+7*86400)
+        _,store,result=self.loop(side,51,start_at=self.closure())
         self.assertEqual(result['cycles'],51);store.failure.assert_not_called()
         self.assertEqual(sum(call.args[0]=='CLOSURE_STATUS_UNAVAILABLE' for call in store.event.call_args_list),50)
 
     def test_inferred_polls_do_not_reset_prior_failures(self):
         side=[run.ReadError('network'),run.ExchangeClosed(CLOSED_DETAIL)]+[run.ReadError('503',503)]*50+[run.ReadError('network')]*39
         with self.assertRaisesRegex(run.RuntimeBlocked,'Persistent failure requires operator review'):
-            self.loop(side,91,start_at=THURSDAY+7*86400)
+            self.loop(side,91,start_at=self.closure())
 
     def test_mixed_pauses_preserve_four_hour_cap(self):
         side=[run.ExchangeClosed(CLOSED_DETAIL)]+[run.ReadError('503',503)]*50+[run.ExchangeClosed(CLOSED_DETAIL)]*1000
         with self.assertRaisesRegex(run.RuntimeBlocked,'Exchange closed longer than expected; operator review'):
-            self.loop(side,962,start_at=THURSDAY+7*86400)
+            self.loop(side,962,start_at=self.closure())
 
 
 

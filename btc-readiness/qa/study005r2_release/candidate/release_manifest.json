@@ -1,6 +1,6 @@
 {
   "status": "WORKING_INVENTORY_NOT_AN_ACTIVATABLE_RELEASE",
-  "study_id": "btc-prospective-005r2-20261026",
+  "study_id": "btc-prospective-005r2-20261102",
   "candidate_release": "5.5.0-study005r2",
   "activation_allowed": false,
   "advice_allowed": false,
@@ -31,8 +31,8 @@
     "kalshi_readonly.py": "1c4a034a3ee139ebeca44948560f28f8b4ddf7da588f7611c345c616d7b1f8cd",
     "launch.py": "0d34f1736c869aaaaa0511a92645008a57ec76f89ee8b01ed183eb49bd273aa2",
     "operating_limits.json": "0f786b6e409d02ebf52908762c45fbc91e9d8d0df4e4cfc1889f3efd3ecea7da",
-    "readiness_policy.py": "14306877b83288ca0b8b498a41b9ea258f6c52e0628311a41680570c2aaa541f",
-    "readiness_protocol.json": "d6921132fe90f82cdfc259ea70d9d2458903ebbe470ca09c6359b096f9a69715",
+    "readiness_policy.py": "6eded702fdd80e02632a056906482283581ad4adf9da507b2a4064c24c64abac",
+    "readiness_protocol.json": "99f8a5cfed072e15f456faeef32d0476601c567344710f3732a36ff22aa27ae1",
     "release_gate.py": "214d31c34e39b67740cfe614e100836810af985be4e9cf5314f8e7813944f83d",
     "request_pacing.py": "22649345cd521bbd15f82c922bff0a3ad5f4e329a6983e9f195436f740022a6a",
     "risk_limits.json": "631a21cd290d82bf717289a841574f818337e8996843899f353a418572bf48df",

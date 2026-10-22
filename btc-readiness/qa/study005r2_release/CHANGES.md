@@ -273,3 +273,9 @@ The 4.3 h soak on round 3c code captured **17/17 checkpoints** (skew p95 2.15 s)
 **Diagnostics.** Discovery failures retain their existing prefix and distinguish zero eligible contracts (active or unreadable status), duplicate tickers and distinct eligible contracts with UTC opening/closing times. No deduplication or eligibility policy changes.
 
 **Tests.** Synthetic offline regressions cover DST boundaries, wrapped 503s, restart and non-503 failures, pause counts and cap, reader reasons and failure rates, and exact discovery messages. Protocols and production trees are unchanged.
+
+## Round 4i (2026-10-22): start moved to 2026-11-02
+
+**Why.** A passing 72 h shakedown could not finish before the 2026-10-25 approval deadline, and the next one should span the Thursday 2026-10-29 07:00–09:00 UTC closure to exercise round 4h live.
+
+**Change.** `readiness_policy.START` is 2026-11-02; `make_revision.py --start 2026-11-02` regenerated the draft, copied byte for byte into `candidate/readiness_protocol.json`. Study ID `btc-prospective-005r2-20261102`; validation Nov 9, holdout Nov 16 → 2027-01-11, release 2027-01-13; approval deadline 2026-11-01 00:00 UTC. The inherited- and revised-policy digests exclude dates and are unchanged. The working manifest is regenerated. Still `PROPOSED_NOT_APPROVED`; a different date remains a separate review.

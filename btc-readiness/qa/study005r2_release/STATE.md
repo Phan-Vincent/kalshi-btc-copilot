@@ -1,6 +1,6 @@
 # Study 005 revision 2: QA working copy (2026-10-12)
 
-**Current tree:** `study005r2_release/` is an isolated, unsealed QA candidate for `5.5.0-study005r2`. `candidate/QA_ONLY` is present; the r2 protocol is `PROPOSED_NOT_APPROVED` with activation, advice and execution disabled. No r2 collection or live shakedown has been run. The start proposed by the draft is 2026-10-26 00:00 UTC, with approval deadline 2026-10-25 00:00 UTC. The protocol and work order are in `../readiness_release/proposals/study005_r2/`; implementation and offline evidence are summarized in `CHANGES.md`. No r2 seal, stage or activation has occurred.
+**Current tree:** `study005r2_release/` is an isolated, unsealed QA candidate for `5.5.0-study005r2`. `candidate/QA_ONLY` is present; the r2 protocol is `PROPOSED_NOT_APPROVED` with activation, advice and execution disabled. No r2 collection has been run. The 2026-10-19 → 10-22 shakedown failed its gate and halted in the Thursday closure (CHANGES.md rounds 4h–4i). The start proposed by the draft is now **2026-11-02 00:00 UTC**, with approval deadline **2026-11-01 00:00 UTC** (moved from Oct 26 / Oct 25). The protocol and work order are in `../readiness_release/proposals/study005_r2/`; implementation and offline evidence are summarized in `CHANGES.md`. No r2 seal, stage or activation has occurred.
 
 ## Copied r1 history (historical, not the status of this r2 tree)
 
