@@ -279,3 +279,12 @@ The 4.3 h soak on round 3c code captured **17/17 checkpoints** (skew p95 2.15 s)
 **Why.** A passing 72 h shakedown could not finish before the 2026-10-25 approval deadline, and the next one should span the Thursday 2026-10-29 07:00–09:00 UTC closure to exercise round 4h live.
 
 **Change.** `readiness_policy.START` is 2026-11-02; `make_revision.py --start 2026-11-02` regenerated the draft, copied byte for byte into `candidate/readiness_protocol.json`. Study ID `btc-prospective-005r2-20261102`; validation Nov 9, holdout Nov 16 → 2027-01-11, release 2027-01-13; approval deadline 2026-11-01 00:00 UTC. The inherited- and revised-policy digests exclude dates and are unchanged. The working manifest is regenerated. Still `PROPOSED_NOT_APPROVED`; a different date remains a separate review.
+
+
+## Round 4j (2026-10-24): proposed upstream 5xx excuse and monitor hour boundary
+
+**Approved by the owner 2026-10-24 as drafted (1% cap, 429 still counts).** Kalshi HTTP 5xx failures leave the hourly shakedown rate after WAN exclusions (WAN wins), with an exact-count seal check and a 1% cap over all raw run polls. HTTP 429, discovery and other failures still count. Miss reasons and coverage requirements are unchanged; old summaries remain supported. See `proposals/UPSTREAM_5XX_EXCUSE_NOT_APPROVED.md` for the owner decisions and risk.
+
+**Monitor.** Apply the same exclusion and lookback cap, report excused 5xx in drift alerts, and align the lookback down to the hour. Judge the run's partial first hour, closing the 03:00/15:00 timer blind spot.
+
+**Tests.** Synthetic summary/gate and monitor regressions added to `tests/test_shakedown_qa.py`. The requested shakedown, exchange-closure and release-gate suites pass (64 tests). No candidate, protocol, evidence, manifest, sealed-tree or production changes; not deployed.

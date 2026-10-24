@@ -11,7 +11,7 @@ Thresholds mirror release_tool's seal gate (>= 95% enrolled checkpoints, <= 1% p
 per hour, every miss explained, storage projection x2 under the main-database cap), with an
 early warning when the 95th-percentile snapshot skew passes 4 s (the veto budget is 5 s).
 """
-import json, math, sqlite3, subprocess, sys, time, zlib
+import json, math, re, sqlite3, subprocess, sys, time, zlib
 from collections import Counter
 from pathlib import Path
 from urllib.parse import urlencode
@@ -31,6 +31,8 @@ MIN_COVERAGE, MAX_FAIL_RATE, SKEW_WARN, TARGET_HOURS = 0.95, 0.01, 4.0, 72
 # network failure inside it.
 WAN_LOG = Path.home() / 'btc-study-qa/wan_outages.json'
 WAN_LEAD, WAN_TAIL, WAN_MAX = 30, 60, 900
+UPSTREAM_5XX_MAX_FRACTION = 0.01
+UPSTREAM_5XX = re.compile(r'Kalshi GET failed with HTTP 5\d\d(?!\d)')
 
 
 SKEW_SAMPLE, BATCH = 240, 20
@@ -77,7 +79,7 @@ def report(now):
         start = c.execute("SELECT MIN(epoch) FROM runtime_events WHERE kind='COLLECTOR_START'").fetchone()[0]
         if start is None:
             return {'problems': ['No COLLECTOR_START event: the shakedown has not started']}
-        since = max(start, now - LOOKBACK)
+        since = max(start, math.floor((now - LOOKBACK) / 3600) * 3600)
         events = c.execute('SELECT epoch,kind,detail FROM runtime_events WHERE epoch>=?', (since,)).fetchall()
         windows = wan_windows(events)
         in_window = lambda e: any(lo <= e <= hi for lo, hi, _ in windows)
@@ -119,14 +121,17 @@ def report(now):
             explained += [why for lo, hi, why in windows if s + BAND[0] <= hi and s + BAND[1] >= lo]
             unnamed += not (near + vetoes + explained)
             miss_reasons.update(set(near + vetoes + explained) or {'NO OBSERVATION OR REASON IN THE BAND'})
-        # Poll failure rate per full clock hour; failures inside a WAN outage window leave the rate (release tool rule).
+        # Judge completed clock hours, including the run's partial first hour; WAN wins over upstream 5xx.
         hours = []
         wan_failures = 0
-        for h in range(math.ceil(since / 3600) * 3600, int(now) - 3599, 3600):
+        upstream_failures = sum(1 for e, k, d in events if k == 'COLLECTION_FAILED' and not in_window(e) and UPSTREAM_5XX.search(d or ''))
+        all_polls = len(obs) + sum(1 for e, k, _ in events if k == 'COLLECTION_FAILED')
+        for h in range(math.floor(since / 3600) * 3600, int(now) - 3599, 3600):
             fail = sum(1 for e, k, _ in events if k == 'COLLECTION_FAILED' and h <= e < h + 3600)
             wan = sum(1 for e, k, _ in events if k == 'COLLECTION_FAILED' and h <= e < h + 3600 and in_window(e))
             ok = sum(1 for e in obs if h <= e < h + 3600)
-            hours.append((h, fail - wan, ok + fail - wan))
+            upstream = sum(1 for e, k, d in events if k == 'COLLECTION_FAILED' and h <= e < h + 3600 and not in_window(e) and UPSTREAM_5XX.search(d or ''))
+            hours.append((h, fail - wan - upstream, ok + fail - wan - upstream))
             wan_failures += wan
         bad_hours = [(time.strftime('%m-%d %H:00', time.gmtime(h)), f, n) for h, f, n in hours if n and f / n > MAX_FAIL_RATE]
         fail_reasons = Counter((d or 'NO DETAIL')[:90] for e, k, d in events if k == 'COLLECTION_FAILED')
@@ -149,6 +154,8 @@ def report(now):
         problems.append('Checkpoint coverage %d/%d (%.1f%%) is below 95%%' % (len(slots) - len(missed), len(slots), 100 * (1 - len(missed) / len(slots))))
     if bad_hours:
         problems.append('Poll failures above 1%% in %d hour(s): %s' % (len(bad_hours), ', '.join('%s %d/%d' % x for x in bad_hours[:4])))
+    if all_polls and upstream_failures / all_polls > UPSTREAM_5XX_MAX_FRACTION:
+        problems.append('Kalshi-side upstream 5xx cap exceeded (UPSTREAM_5XX_MAX_FRACTION = 1%%): %d/%d polls' % (upstream_failures, all_polls))
     if unnamed:
         problems.append('%d missed slot(s) with no reason (the seal gate needs one for every miss)' % unnamed)
     if unexplained:
@@ -162,7 +169,7 @@ def report(now):
             'missed_reasons': miss_reasons.most_common(4), 'failures': sum(f for _, f, _ in hours),
             'polls': sum(n for _, _, n in hours), 'failure_reasons': fail_reasons.most_common(4),
             'wan_log': str(WAN_LOG) if WAN_LOG.exists() else 'absent', 'wan_outages': [why for _, _, why in windows],
-            'failures_during_wan_outage': wan_failures,
+            'failures_during_wan_outage': wan_failures, 'failures_upstream_5xx': upstream_failures,
             'final_cutoff_events': cutoffs, 'skew_p95': p95, 'skew_max': skews[-1] if skews else None,
             'db_bytes': grown, 'storage_projection_x2_bytes': int(projected), 'main_db_cap_bytes': cap}
 
@@ -191,6 +198,8 @@ def main():
             lines.append('Missed-slot reasons: ' + '; '.join('%s (%d)' % x for x in r['missed_reasons']))
         if r.get('failure_reasons'):
             lines.append('Failure reasons: ' + '; '.join('%s (%d)' % x for x in r['failure_reasons']))
+        if r.get('failures_upstream_5xx', 0):
+            lines.append('Excused as Kalshi-side 5xx: %d failure(s)' % r['failures_upstream_5xx'])
         if r.get('wan_outages'):
             lines.append('Excused by home WAN outages (%d failure(s)): %s' % (r['failures_during_wan_outage'], '; '.join(r['wan_outages'])))
     if r.get('hours_run', 0) >= TARGET_HOURS and not state.get('target_reached_sent') and r.get('service') == 'active' and not r['problems']:
