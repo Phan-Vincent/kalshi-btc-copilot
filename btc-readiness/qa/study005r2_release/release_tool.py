@@ -8,7 +8,7 @@ date comes from readiness_policy.START, which the freeze sets after review, and 
 result still needs the final review, the user's approval file and `install.sh activate`.
 Offline only; no network, credentials or account access.
 """
-import argparse, hashlib, importlib.util, json, math, shutil, sqlite3, subprocess, sys, tempfile
+import argparse, hashlib, importlib.util, json, math, re, shutil, sqlite3, subprocess, sys, tempfile
 from contextlib import closing
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -26,6 +26,8 @@ WAN_LOG = Path.home() / 'command-center/data/home_internet.json'
 WAN_LEAD, WAN_TAIL, WAN_MAX = 30, 60, 900
 WAN_NETWORK_FAILURE = 'Network or TLS failure'
 WAN_REASON = 'home WAN outage '
+UPSTREAM_5XX_MAX_FRACTION = 0.01
+UPSTREAM_5XX = re.compile(r'Kalshi GET failed with HTTP 5\d\d(?!\d)')
 
 
 def sha(path):
@@ -163,10 +165,11 @@ def shakedown_summary(runtime=None,now=None,wan_log=None):
         fail=sum(hour<=epoch<hour+3600 and kind=='COLLECTION_FAILED' for epoch,kind,_ in events)
         wan=sum(hour<=epoch<hour+3600 and kind=='COLLECTION_FAILED' and in_window(epoch) for epoch,kind,_ in events)
         good=sum(hour<=epoch<hour+3600 for epoch in generations)
-        counted=fail-wan
+        upstream=sum(hour<=epoch<hour+3600 and kind=='COLLECTION_FAILED' and not in_window(epoch) and bool(UPSTREAM_5XX.search(detail or '')) for epoch,kind,detail in events)
+        counted=fail-wan-upstream
         inside=[s for s in slots if hour<=s<hour+3600]
         hourly.append({'hour_utc':datetime.fromtimestamp(hour,timezone.utc).isoformat(),'failed':fail,'successful':good,
-                       'failed_during_wan_outage':wan,
+                       'failed_during_wan_outage':wan,'failed_upstream_5xx':upstream,
                        'failure_rate':counted/(counted+good) if counted+good else None,
                        'partial_hour':hour<start or hour+3600>ended,
                        # An empty hour is excused only when every slot in it is a named miss: an
@@ -190,6 +193,8 @@ def shakedown_summary(runtime=None,now=None,wan_log=None):
              'all_misses_have_reasons':all(missed.values()),
              'poll_failure_rate_by_hour':hourly,
              'unexplained_collection_failures':sum(kind=='COLLECTION_FAILED' and not detail for _,kind,detail in events),
+             'upstream_5xx':{'max_fraction':UPSTREAM_5XX_MAX_FRACTION,'excused':sum(r['failed_upstream_5xx'] for r in hourly),
+                             'polls':sum(r['failed']+r['successful'] for r in hourly)},
              'wan_outages':{'source_sha256':sha(wan_log) if wan_log is not None else None,
                             'lead_seconds':WAN_LEAD,'tail_seconds':WAN_TAIL,'max_seconds':WAN_MAX,
                             'windows':[dict(o,reason=wan_reason(o)) for o in windows]},
@@ -208,7 +213,7 @@ def shakedown_rate_ok(row):
     return type(rate) in (int,float) and math.isfinite(rate) and 0<=rate<=.01
 
 def check_wan_outages(summary,wan_log=None):
-    """Every outage excuse must be well formed, consistent with the hourly counts, and present in this Mac's log."""
+    """Validate hourly exclusions and the upstream cap; confirm WAN windows against this Mac's log."""
     wan=summary.get('wan_outages')
     if wan is None:wan={'lead_seconds':WAN_LEAD,'tail_seconds':WAN_TAIL,'max_seconds':WAN_MAX,'windows':[]}
     finite=lambda x:type(x) in (int,float) and math.isfinite(x)
@@ -221,15 +226,29 @@ def check_wan_outages(summary,wan_log=None):
     for x in summary.get('missed_slots',[]):
         if any(type(r) is str and r.startswith(WAN_REASON) and r not in named for r in x.get('reasons') or []):
             raise SystemExit('A missed slot names a WAN outage the summary does not list')
+    upstream=summary.get('upstream_5xx')
+    has_upstream='upstream_5xx' in summary
+    excused=polls=0
     for row in summary.get('poll_failure_rate_by_hour',[]):
+        upstream_fail=row.get('failed_upstream_5xx',0)
+        if type(upstream_fail) is not int or upstream_fail<0 or (upstream_fail and not has_upstream):
+            raise SystemExit('Shakedown upstream 5xx-excused failure count is invalid')
         wan_fail=row.get('failed_during_wan_outage',0)
         if type(wan_fail) is not int or wan_fail<0 or (wan_fail and not windows):
             raise SystemExit('Shakedown WAN-excused failure count is invalid')
-        if 'failed' in row or 'successful' in row:
+        if 'failed' in row or 'successful' in row or 'failed_upstream_5xx' in row or has_upstream:
             fail,good=row.get('failed'),row.get('successful')
-            counted=fail-wan_fail if type(fail) is int else -1
-            if type(good) is not int or counted<0 or row.get('failure_rate')!=(counted/(counted+good) if counted+good else None):
+            counted=fail-wan_fail-upstream_fail if type(fail) is int else -1
+            if type(good) is not int or good<0 or counted<0 or row.get('failure_rate')!=(counted/(counted+good) if counted+good else None):
                 raise SystemExit('Shakedown hourly failure rate does not match its counts')
+            excused+=upstream_fail;polls+=fail+good
+    if has_upstream:
+        if (type(upstream) is not dict or type(upstream.get('max_fraction')) not in (int,float) or
+            upstream.get('max_fraction')!=UPSTREAM_5XX_MAX_FRACTION or type(upstream.get('excused')) is not int or
+            type(upstream.get('polls')) is not int or upstream['excused']!=excused or upstream['polls']!=polls):
+            raise SystemExit('Shakedown upstream 5xx cap counts or max_fraction are invalid')
+        if polls and excused/polls>UPSTREAM_5XX_MAX_FRACTION:
+            raise SystemExit('Shakedown upstream 5xx cap exceeded (UPSTREAM_5XX_MAX_FRACTION)')
     if windows:
         if wan_log is None or not Path(wan_log).is_file():raise SystemExit('The summary excuses WAN outages; seal needs the dashboard outage log to confirm them')
         logged={(o['start'],o['end']) for o in wan_outages(wan_log)}

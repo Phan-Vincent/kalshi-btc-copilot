@@ -291,5 +291,156 @@ class WanOutageTests(unittest.TestCase):
         self.assertEqual([label for label,_ in runs['logged']['missed_reasons']],['home WAN outage 10-20 10:48:45 (modem)'])
 
 
+HTTP_503='ReadError: Required data unavailable: benchmark (ReadError: Kalshi GET failed with HTTP 503)'
+
+
+def upstream_run(runtime,detail=HTTP_503,successes=200):
+    ended=START+72*3600;miss=START+15*3600+900
+    failures=[(miss+315+n,'COLLECTION_FAILED',detail) for n in range(43)]
+    build(runtime,[(START,'COLLECTOR_START','start'),*failures,(ended,'COLLECTOR_STOP','orderly stop')],
+          [(START+n*900,START+n*900+315) for n in range(288) if START+n*900!=miss],
+          [START+h*3600+10+n*15 for h in range(72) for n in range(successes)])
+    return ended
+
+
+class Upstream5xxTests(unittest.TestCase):
+    def test_72_hour_503_excuse_and_429_failure(self):
+        for detail in (HTTP_503,HTTP_503.replace('503','429')):
+            with self.subTest(detail=detail),tempfile.TemporaryDirectory() as td:
+                root,runtime=candidate(td);ended=upstream_run(runtime,detail)
+                out=summarize(runtime,ended);row=out['poll_failure_rate_by_hour'][15]
+                self.assertEqual(out['missed_slots'][0]['reasons'],[detail])
+                self.assertEqual(out['upstream_5xx']['polls'],14443)
+                if detail==HTTP_503:
+                    self.assertEqual((row['failed'],row['failed_upstream_5xx'],row['failure_rate']),(43,43,0.0))
+                    self.assertEqual(out['upstream_5xx'],{'max_fraction':.01,'excused':43,'polls':14443})
+                    sealed(runtime,ended)
+                else:
+                    self.assertEqual(row['failed_upstream_5xx'],0)
+                    with self.assertRaises(SystemExit):sealed(runtime,ended)
+
+    def test_wan_wins_over_5xx(self):
+        fails=FAILS+[(DROP+10,'COLLECTION_FAILED',HTTP_503)]
+        with tempfile.TemporaryDirectory() as td:
+            root,runtime=candidate(td);ended=wan_run(runtime,fails)
+            log=wan_log(Path(td)/'wan.json',OUTAGE);out=summarize(runtime,ended,log)
+            row=out['poll_failure_rate_by_hour'][10]
+            self.assertEqual((row['failed'],row['failed_during_wan_outage'],row['failed_upstream_5xx'],row['failure_rate']),(4,4,0,0.0))
+            self.assertEqual(out['upstream_5xx']['excused'],0)
+            sealed(runtime,ended,log)
+
+    def test_run_cap_rejects_even_zero_hourly_rates(self):
+        with tempfile.TemporaryDirectory() as td:
+            root,runtime=candidate(td);ended=upstream_run(runtime,successes=1)
+            out=summarize(runtime,ended)
+            self.assertEqual(out['poll_failure_rate_by_hour'][15]['failure_rate'],0.0)
+            with self.assertRaisesRegex(SystemExit,'UPSTREAM_5XX_MAX_FRACTION'):sealed(runtime,ended)
+
+    def test_summary_tampering_is_rejected(self):
+        with tempfile.TemporaryDirectory() as td:
+            root,runtime=candidate(td);ended=upstream_run(runtime);good=summarize(runtime,ended)
+            for field,value in (('failure_rate',.001),('failed_upstream_5xx',44),
+                                ('failed_upstream_5xx',-1),('failed_upstream_5xx',True),('failed_upstream_5xx',1.5),
+                                ('failed_during_wan_outage',1),('excused',42),('polls',14444),('max_fraction',.02)):
+                with self.subTest(field=field,value=value):
+                    bad=json.loads(json.dumps(good))
+                    if field in ('excused','polls','max_fraction'):bad['upstream_5xx'][field]=value
+                    else:bad['poll_failure_rate_by_hour'][15][field]=value
+                    (root/'shakedown_summary.json').write_text(json.dumps(bad))
+                    with self.assertRaises(SystemExit):sealed(runtime,ended)
+            # A corroborated WAN window must not allow overlapping counts either.
+        with tempfile.TemporaryDirectory() as td:
+            root,runtime=candidate(td);ended=wan_run(runtime)
+            log=wan_log(Path(td)/'wan.json',OUTAGE);bad=summarize(runtime,ended,log)
+            bad['poll_failure_rate_by_hour'][10]['failed_upstream_5xx']=1
+            bad['upstream_5xx']['excused']=1
+            (root/'shakedown_summary.json').write_text(json.dumps(bad))
+            with self.assertRaises(SystemExit):sealed(runtime,ended,log)
+
+    def test_old_format_summary_still_passes(self):
+        now=datetime(2026,10,24,tzinfo=timezone.utc)
+        with tempfile.TemporaryDirectory() as td:
+            root=Path(td);good=gate_summary(root,now)
+            self.assertNotIn('upstream_5xx',good)
+            (root/'shakedown_summary.json').write_text(json.dumps(good))
+            self.assertEqual(release_tool.check_shakedown(root,now)['slots'],288)
+
+    def test_other_failures_still_count(self):
+        for detail in ('Kalshi GET failed with HTTP 429','Network or TLS failure',
+                       'Cannot verify exactly one active BTC 15-minute contract',
+                       'Kalshi GET failed with HTTP 5030','other failure'):
+            with self.subTest(detail=detail),tempfile.TemporaryDirectory() as td:
+                root,runtime=candidate(td);ended=upstream_run(runtime,detail,successes=1)
+                out=summarize(runtime,ended)
+                self.assertEqual(out['upstream_5xx']['excused'],0)
+                with self.assertRaises(SystemExit):sealed(runtime,ended)
+
+
+def monitor_report(td,start,now,failures,successes=200,log=None):
+    root=Path(td);db=root/'evidence.sqlite3';limits=root/'limits.json'
+    limits.write_text(json.dumps({'quota_bytes':128*1024**3}))
+    payload=zlib.compress(json.dumps({'snapshot':{'retrieval_health':{'snapshot_skew_seconds':1.5}}}).encode())
+    with closing(sqlite3.connect(db)) as c,c:
+        c.executescript(SCHEMA+'CREATE TABLE observations(id INTEGER PRIMARY KEY,epoch REAL,payload BLOB);')
+        epochs=[h+10+n*15 for h in range(int(start//3600)*3600,int(now),3600) for n in range(successes)
+                if start<=h+10+n*15<=now]
+        c.executemany('INSERT INTO observations(epoch,payload) VALUES (?,?)',[(e,payload) for e in epochs])
+        c.executemany('INSERT INTO runtime_events VALUES (?,?,?)',[(start,'COLLECTOR_START','start')]+failures)
+        c.executemany('INSERT INTO markets VALUES (?,?)',[(s,s+315) for s in range(int(start//900)*900,int(now),900)])
+    with patch.object(shakedown_check,'DB',db),patch.object(shakedown_check,'LIMITS',limits), \
+         patch.object(shakedown_check,'WAN_LOG',log or root/'absent.json'), \
+         patch.object(shakedown_check.time,'sleep'), \
+         patch.object(shakedown_check.subprocess,'run',return_value=SimpleNamespace(stdout='active\n')):
+        return shakedown_check.report(now)
+
+
+class MonitorBoundaryTests(unittest.TestCase):
+    def test_timer_boundary_includes_previous_1500_hour(self):
+        now=START+27*3600+2;start=START+3*3600
+        for detail in (HTTP_503,HTTP_503.replace('503','429')):
+            with self.subTest(detail=detail),tempfile.TemporaryDirectory() as td:
+                failures=[(START+15*3600+1200+n,'COLLECTION_FAILED',detail) for n in range(3)]
+                out=monitor_report(td,start,now,failures)
+                bad=[p for p in out['problems'] if p.startswith('Poll failures above 1%')]
+                if detail==HTTP_503:
+                    self.assertEqual(bad,[])
+                    self.assertEqual(out['failures_upstream_5xx'],3)
+                    self.assertEqual(out['problems'],[])
+                else:
+                    self.assertEqual(len(bad),1)
+                    self.assertIn('10-20 15:00 3/203',bad[0])
+                    self.assertEqual(out['failures_upstream_5xx'],0)
+
+    def test_partial_first_hour_is_judged(self):
+        start=START+15*3600+1800;now=START+27*3600+2
+        with tempfile.TemporaryDirectory() as td:
+            failures=[(start+10+n,'COLLECTION_FAILED','Kalshi GET failed with HTTP 429') for n in range(3)]
+            out=monitor_report(td,start,now,failures)
+            self.assertTrue(any('10-20 15:00' in p for p in out['problems']))
+
+    def test_monitor_cap_and_wan_precedence(self):
+        now=START+12*3600
+        with tempfile.TemporaryDirectory() as td:
+            failures=[(START+3600+1200+n,'COLLECTION_FAILED',HTTP_503) for n in range(30)]
+            out=monitor_report(td,START,now,failures)
+            self.assertFalse(any(p.startswith('Poll failures above 1%') for p in out['problems']))
+            self.assertTrue(any('UPSTREAM_5XX_MAX_FRACTION' in p for p in out['problems']))
+        with tempfile.TemporaryDirectory() as td:
+            log=wan_log(Path(td)/'wan.json',OUTAGE)
+            out=monitor_report(td,START,now,FAILS+[(DROP+10,'COLLECTION_FAILED',HTTP_503)],log=log)
+            self.assertEqual(out['failures_during_wan_outage'],4)
+            self.assertEqual(out['failures_upstream_5xx'],0)
+            self.assertEqual(out['problems'],[])
+
+    def test_alert_names_excused_5xx(self):
+        with tempfile.TemporaryDirectory() as td:
+            state=Path(td)/'state.json'
+            with patch.object(shakedown_check,'report',return_value={'problems':['test drift'],'failures_upstream_5xx':3}), \
+                 patch.object(shakedown_check,'STATE',state),patch.object(shakedown_check.sys,'argv',['shakedown_check.py']), \
+                 patch.object(shakedown_check,'telegram') as send:
+                shakedown_check.main()
+            self.assertIn('Excused as Kalshi-side 5xx: 3 failure(s)',send.call_args.args[0])
+
+
 if __name__=='__main__':
     unittest.main()
