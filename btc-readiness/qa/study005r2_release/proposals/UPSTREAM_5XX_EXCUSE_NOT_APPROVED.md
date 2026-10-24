@@ -1,6 +1,6 @@
 # Excusing Kalshi-side HTTP 5xx in the shakedown gate — NOT APPROVED
 
-Draft on branch `shakedown-upstream-5xx`, 2026-10-24. Owner decision pending. Local implementation only; not deployed. No candidate, protocol, evidence, manifest or sealed-tree changes.
+**Owner decision 2026-10-24: approved as drafted** (1% run-level cap; HTTP 429 still counts). The file name is kept for history. Drafted on branch `shakedown-upstream-5xx`, 2026-10-24. Local implementation only; not deployed. No candidate, protocol, evidence, manifest or sealed-tree changes.
 
 ## Why
 

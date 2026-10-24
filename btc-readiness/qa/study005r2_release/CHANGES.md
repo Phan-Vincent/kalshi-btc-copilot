@@ -283,7 +283,7 @@ The 4.3 h soak on round 3c code captured **17/17 checkpoints** (skew p95 2.15 s)
 
 ## Round 4j (2026-10-24): proposed upstream 5xx excuse and monitor hour boundary
 
-**Proposal, NOT APPROVED.** Kalshi HTTP 5xx failures leave the hourly shakedown rate after WAN exclusions (WAN wins), with an exact-count seal check and a 1% cap over all raw run polls. HTTP 429, discovery and other failures still count. Miss reasons and coverage requirements are unchanged; old summaries remain supported. See `proposals/UPSTREAM_5XX_EXCUSE_NOT_APPROVED.md` for the owner decisions and risk.
+**Approved by the owner 2026-10-24 as drafted (1% cap, 429 still counts).** Kalshi HTTP 5xx failures leave the hourly shakedown rate after WAN exclusions (WAN wins), with an exact-count seal check and a 1% cap over all raw run polls. HTTP 429, discovery and other failures still count. Miss reasons and coverage requirements are unchanged; old summaries remain supported. See `proposals/UPSTREAM_5XX_EXCUSE_NOT_APPROVED.md` for the owner decisions and risk.
 
 **Monitor.** Apply the same exclusion and lookback cap, report excused 5xx in drift alerts, and align the lookback down to the hour. Judge the run's partial first hour, closing the 03:00/15:00 timer blind spot.
 
