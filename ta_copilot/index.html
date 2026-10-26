@@ -114,12 +114,14 @@ footer { margin-top: 14px; font-size: 12px; color: var(--muted); }
       <div class="label">Kalshi window <span id="ticker" class="muted" style="text-transform:none"></span></div>
       <div class="big" id="countdown">—</div>
       <div id="kalshiAge" class="muted" style="font-size:12px"></div>
+      <div id="discoverySource" class="muted" style="font-size:12px"></div>
       <div class="row"><span class="muted">Composite spot proxy</span><span id="composite">—</span></div>
       <div id="compositeQuality" class="record"></div>
       <div class="row"><span class="muted">Rolling 60s proxy average</span><span id="average60">—</span></div>
       <div class="row"><span class="muted">Target (floor strike)</span><span id="strike">—</span></div>
       <div class="row sigma-row"><span class="muted">Distance in σ (settle-avg model)</span><span id="sig">—</span></div>
       <div id="settlementCoverage" class="record"></div>
+      <div id="requiredDrift" class="record"></div>
       <div class="row quote-row"><span class="muted" id="yesLabel">YES bid / ask</span><span id="yes">—</span></div>
       <div id="yesSource" class="muted quote-source"></div>
       <div class="row quote-row"><span class="muted" id="noLabel">NO bid / ask</span><span id="no">—</span></div>
@@ -184,9 +186,12 @@ footer { margin-top: 14px; font-size: 12px; color: var(--muted); }
         <h2>Kalshi market context <span id="bookAge" class="muted"></span></h2>
         <div class="row"><span class="muted">YES bid depth / ask depth</span><span id="yesDepth">—</span></div>
         <div class="row"><span class="muted">NO bid depth / ask depth</span><span id="noDepth">—</span></div>
+        <div class="row"><span class="muted">YES book imbalance · top / 5 levels</span><span id="bookImbalance">—</span></div>
+        <div class="row"><span class="muted">YES microprice / skew from mid</span><span id="microprice">—</span></div>
+        <div class="row"><span class="muted">Kalshi tape · 60s / window</span><span id="tapeSummary">—</span></div>
         <div class="label" style="margin-top:8px">YES mid · this window</div>
         <svg id="yesMid" class="spark small-chart" role="img" aria-label="YES mid over current window"></svg>
-        <div class="muted" style="font-size:12px">Mid uses the best YES bid and implied YES ask; it is not an executable quote.</div>
+        <div class="muted" style="font-size:12px">Mid, book imbalance, microprice and tape are descriptive and not executable. Mid uses the best YES bid and implied YES ask.</div>
         <div class="label" style="margin-top:8px">Recent trades in this window</div>
         <table><thead><tr><th>Time UTC</th><th>YES price</th><th>Contracts</th></tr></thead><tbody id="kalshiTrades"></tbody></table>
       </div>

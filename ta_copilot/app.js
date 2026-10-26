@@ -208,7 +208,7 @@ function renderFrame(s, f) {
     ? `<tr class="context"><td>${r.name}</td><td>${r.detail} · context, not counted in families</td><td>${badge(r.state)}</td></tr>`
     : `<tr><td>${r.name}</td><td class="muted">${r.detail}</td><td>${badge(r.state)}</td></tr>`).join('');
   renderZones(s, f.levels, problem);
-  const lv = [['ATR 14', usd(v.atr)], ['BB upper / lower', `${usd(v.bb_upper, 0)} / ${usd(v.bb_lower, 0)}`],
+  const lv = [['ATR 14', `${usd(v.atr)}${v.vol_regime ? ` · ${v.vol_regime} (${v.atr_ratio.toFixed(2)}× median)` : ''}`], ['BB upper / lower', `${usd(v.bb_upper, 0)} / ${usd(v.bb_lower, 0)}`],
     ['BB width', v.bb_width_pct == null ? '—' : v.bb_width_pct.toFixed(2) + '%'], ['VWAP', usd(v.vwap)],
     ['EMA 200', usd(v.ema200)]];
   $('levels').innerHTML = lv.map(([a, b]) => `<tr><td class="muted">${esc(a)}</td><td>${esc(b)}</td></tr>`).join('');
@@ -228,7 +228,7 @@ function renderZones(s, levels, problem) {
   const touchText = z => z.crossings ? `${z.touches} (${z.crossings}× crossed)` : z.touches;
   $('zones').innerHTML = problem ? `<tr><td colspan="7" class="muted">${esc(problem)}</td></tr>` :
     rows.map(z => `<tr>${[roleText(z), range(z), distText(z),
-      touchText(z), z.timeframes.join(', ') || '—', [...(z.sources || []).filter(x => x !== 'swing').map(x => x.replace(/_/g, ' ')), ...z.tags].join(' · ') || '—', z.strength].map(x => `<td>${esc(x)}</td>`).join('')}</tr>`).join('');
+      touchText(z), z.timeframes.join(', ') || '—', [...(z.sources || []).filter(x => x !== 'swing').map(x => x.replace(/_/g, ' ')), ...z.tags, ...(z.mtf_confluence ? ['MTF'] : [])].join(' · ') || '—', z.strength].map(x => `<td>${esc(x)}</td>`).join('')}</tr>`).join('');
   const target = !problem && s.window && !s.kalshi_stale && s.window.strike != null && levels?.target;
   let note = '';
   if (target) {
@@ -274,6 +274,7 @@ function renderShared(s, f) {
   const w = s.window;
   if (w) {
     $('ticker').textContent = w.ticker;
+    $('discoverySource').textContent = w.discovery_source && w.discovery_source !== 'listing' ? `Market found via ${w.discovery_source}` : '';
     $('kalshiAge').textContent = w.age > 10 ? `Kalshi data ${Math.floor(w.age)} s old` : '';
     $('strike').textContent = w.strike == null ? 'Target pending' : usd(w.strike);
     $('distanceLabel').textContent = (w.distance_source === 'projected 60s average' ? 'Projected 60s average' : 'Composite') + ' vs target';
@@ -289,6 +290,8 @@ function renderShared(s, f) {
       `(${w.missing_seconds || 0} missing elapsed seconds; remainder still ahead).` +
       (w.required_remaining_avg != null ? ` Proxy: the remaining ${w.required_remaining_seconds} s need to average ${usd(w.required_remaining_avg)} (${sgn(w.required_remaining_move)} vs composite) to land on the target; missed seconds are filled with the composite.` : '') +
       ` Historical proxy error is separate.` : '';
+    $('requiredDrift').textContent = w.required_drift_per_sec == null ? '' :
+      `Settlement-average proxy: ${w.required_drift_per_sec >= 0 ? '+' : '−'}${usd(Math.abs(w.required_drift_per_sec))}/s needed from the composite; not BRTI.`;
     const book = w.orderbook_age != null && w.orderbook_age <= 10 ? w.orderbook || {} : {};
     const q = w.display_quotes || {};
     $('yesLabel').textContent = 'YES bid / ask';
@@ -305,6 +308,14 @@ function renderShared(s, f) {
     $('bookAge').textContent = w.orderbook_age == null ? '' : `· book ${w.orderbook_age.toFixed(1)}s old`;
     $('yesDepth').textContent = `${depth(book.yes_bid, book.yes_bids)} / ${depth(book.yes_ask, book.yes_asks)}`;
     $('noDepth').textContent = `${depth(book.no_bid, book.no_bids)} / ${depth(book.no_ask, book.no_asks)}`;
+    const imb = x => x == null ? '—' : `${x >= 0 ? '+' : ''}${x.toFixed(2)}`;
+    $('bookImbalance').textContent = `${imb(book.top_imbalance)} / ${imb(book.depth_imbalance)}`;
+    $('microprice').textContent = book.microprice == null ? '—' :
+      `${cents(book.microprice)} / ${book.micro_skew_cents >= 0 ? '+' : ''}${book.micro_skew_cents.toFixed(2)}¢`;
+    const tape = w.tape_summary || {};
+    const tapePart = x => x ? `${Number(x.contracts).toLocaleString()} contracts, ${x.trade_count} trades, ` +
+      `taker ${imb(x.taker_imbalance)}, VWAP ${cents(x.yes_vwap)}` : '—';
+    $('tapeSummary').textContent = `${tapePart(tape.last_60s)} / ${tapePart(tape.window)}`;
     spark('yesMid', w.yes_mid_path);
     $('kalshiTrades').innerHTML = (w.recent_trades || []).slice(0, 8).map(t =>
       `<tr><td>${t.time.slice(11, 19)}</td><td>${cents(t.yes_price)}</td><td>${Number(t.count).toLocaleString()}</td></tr>`).join('');
@@ -313,11 +324,13 @@ function renderShared(s, f) {
     ['ticker', 'strike', 'dist', 'sig', 'yes', 'no'].forEach(id => $(id).textContent = id === 'ticker' ? '' : '—');
     $('distanceLabel').textContent = 'Composite vs target';
     $('settlementCoverage').textContent = '';
+    $('requiredDrift').textContent = '';
+    $('discoverySource').textContent = '';
     $('distBlock').className = 'dist-block';
     $('countdown').textContent = s.exchange_closed ? 'Exchange closed' : 'No open window';
     $('yesLabel').textContent = 'YES bid / ask'; $('noLabel').textContent = 'NO bid / ask';
     $('yesSource').textContent = ''; $('noSource').textContent = '';
-    ['stripTime', 'stripAvg', 'stripHigh', 'stripLow', 'yesDepth', 'noDepth'].forEach(id => $(id).textContent = '—');
+    ['stripTime', 'stripAvg', 'stripHigh', 'stripLow', 'yesDepth', 'noDepth', 'bookImbalance', 'microprice', 'tapeSummary'].forEach(id => $(id).textContent = '—');
     $('bookAge').textContent = '';
     $('pathNote').textContent = '';
     $('kalshiTrades').innerHTML = '';
