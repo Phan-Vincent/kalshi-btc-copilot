@@ -291,7 +291,7 @@ function renderShared(s, f) {
       (w.required_remaining_avg != null ? ` Proxy: the remaining ${w.required_remaining_seconds} s need to average ${usd(w.required_remaining_avg)} (${sgn(w.required_remaining_move)} vs composite) to land on the target; missed seconds are filled with the composite.` : '') +
       ` Historical proxy error is separate.` : '';
     $('requiredDrift').textContent = w.required_drift_per_sec == null ? '' :
-      `Settlement-average proxy: ${w.required_drift_per_sec >= 0 ? '+' : '−'}${usd(Math.abs(w.required_drift_per_sec))}/s needed from the composite; not BRTI.`;
+      `Settlement-average proxy: constant slope ${w.required_drift_per_sec >= 0 ? '+' : '−'}${usd(Math.abs(w.required_drift_per_sec))}/s needed from the current composite (one sample per remaining second); not BRTI.`;
     const book = w.orderbook_age != null && w.orderbook_age <= 10 ? w.orderbook || {} : {};
     const q = w.display_quotes || {};
     $('yesLabel').textContent = 'YES bid / ask';
@@ -316,8 +316,9 @@ function renderShared(s, f) {
     const tapePart = x => x ? `${Number(x.contracts).toLocaleString()} contracts, ${x.trade_count} trades, ` +
       `taker ${imb(x.taker_imbalance)}, VWAP ${cents(x.yes_vwap)}` : '—';
     const tapeSince = tape.covered_from ? ` (since ${tape.covered_from.slice(11, 19)})` : ' (no trades fetched yet)';
-    $('tapeSummary').textContent = `${tapePart(tape.last_60s)}${tape.complete_60s ? '' : ' (partial)'} / ` +
-      `${tapePart(tape.window)}${tape.complete_window ? '' : tapeSince}`;
+    const tapeStale = tape.fresh === false && tape.observed_to ? ' (stale)' : '';
+    $('tapeSummary').textContent = `${tapePart(tape.last_60s)}${tape.complete_60s ? '' : tapeStale || ' (partial)'} / ` +
+      `${tapePart(tape.window)}${tape.complete_window ? '' : tapeStale + tapeSince}`;
     spark('yesMid', w.yes_mid_path);
     $('kalshiTrades').innerHTML = (w.recent_trades || []).slice(0, 8).map(t =>
       `<tr><td>${t.time.slice(11, 19)}</td><td>${cents(t.yes_price)}</td><td>${Number(t.count).toLocaleString()}</td></tr>`).join('');
