@@ -41,13 +41,16 @@ def stored_boot_and_last():
     db = RUNTIME / 'evidence.sqlite3'
     if not db.exists():
         return None, None
-    c = sqlite3.connect('file:%s?mode=ro' % db, uri=True)
     try:
-        boot = c.execute('SELECT boot FROM runtime_control').fetchone()
-        last = c.execute('SELECT MAX(epoch) FROM observations').fetchone()
-        return (boot[0] if boot else None), (last[0] if last else None)
-    finally:
-        c.close()
+        c = sqlite3.connect('file:%s?mode=ro' % db, uri=True)
+        try:
+            boot = c.execute('SELECT boot FROM runtime_control').fetchone()
+            last = c.execute('SELECT MAX(epoch) FROM observations').fetchone()
+            return (boot[0] if boot else None), (last[0] if last else None)
+        finally:
+            c.close()
+    except sqlite3.Error:
+        return None, None
 
 
 def telegram(text):

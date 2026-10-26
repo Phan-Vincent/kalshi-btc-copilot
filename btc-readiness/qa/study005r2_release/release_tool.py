@@ -135,10 +135,10 @@ def shakedown_summary(runtime=None,now=None,wan_log=None):
     outages=wan_outages(wan_log)
     windows=wan_windows(outages,events)
     in_window=lambda epoch:any(o['start']-WAN_LEAD<=epoch<=o['end']+WAN_TAIL for o in windows)
-    first=math.ceil(start/900)*900
-    # Every slot whose 330 s checkpoint band has elapsed counts (matches shakedown_check.py); the old
-    # floor(ended/900) bound silently dropped the final slot even when its band had completed.
-    slots=[s for s in range(first,math.floor((ended-330)/900)*900+1,900)]
+    first=math.ceil((start-300)/900)*900
+    # Every slot whose 300..330 s checkpoint band lies inside the run and has elapsed counts
+    # (matches shakedown_check.py); the old floor(ended/900) bound silently dropped the final slot.
+    slots=[s for s in range(first,math.floor((ended-330)/900)*900+1,900) if s+300>=start]
     missed={}
     for opened in slots:
         if opened in checkpoints:continue
@@ -206,10 +206,24 @@ def shakedown_summary(runtime=None,now=None,wan_log=None):
     (CANDIDATE/'shakedown_summary.json').write_text(json.dumps(summary,indent=2)+'\n')
     return summary
 
-def shakedown_rate_ok(row):
+def shakedown_rate_ok(row,missed=None):
     """A zero-attempt hour has no rate; it passes only when the window edge cut it or every slot in it is a named miss."""
     rate=row.get('failure_rate')
-    if rate is None:return row.get('partial_hour') is True or row.get('inactivity_explained') is True
+    if rate is None:
+        if row.get('partial_hour') is True:return True
+        if row.get('inactivity_explained') is not True:return False
+        if missed is None:return True
+        if not missed:return False
+        hour_utc=row.get('hour_utc')
+        if type(hour_utc) is not str:return True
+        try:hour=int(datetime.fromisoformat(hour_utc).timestamp())
+        except ValueError:return False
+        missed_epochs=set()
+        for x in missed:
+            if type(x) is not dict or type(x.get('slot_opened_utc')) is not str:return False
+            try:missed_epochs.add(int(datetime.fromisoformat(x['slot_opened_utc']).timestamp()))
+            except ValueError:return False
+        return all(s in missed_epochs for s in range(hour,hour+3600,900))
     return type(rate) in (int,float) and math.isfinite(rate) and 0<=rate<=.01
 
 def check_wan_outages(summary,wan_log=None):
@@ -236,7 +250,7 @@ def check_wan_outages(summary,wan_log=None):
         wan_fail=row.get('failed_during_wan_outage',0)
         if type(wan_fail) is not int or wan_fail<0 or (wan_fail and not windows):
             raise SystemExit('Shakedown WAN-excused failure count is invalid')
-        if 'failed' in row or 'successful' in row or 'failed_upstream_5xx' in row or has_upstream:
+        if 'failed' in row or 'successful' in row or 'failed_during_wan_outage' in row or 'failed_upstream_5xx' in row or has_upstream:
             fail,good=row.get('failed'),row.get('successful')
             counted=fail-wan_fail-upstream_fail if type(fail) is int else -1
             if type(good) is not int or good<0 or counted<0 or row.get('failure_rate')!=(counted/(counted+good) if counted+good else None):
@@ -261,9 +275,11 @@ def check_shakedown(root,now=None,wan_log=None):
     summary=json.loads(path.read_text());now=now or datetime.now(timezone.utc)
     age=now-datetime.fromisoformat(summary['generated_at_utc'])
     if not timedelta(0)<=age<MAX_EVIDENCE_AGE:raise SystemExit('Shakedown summary stale or future-dated')
-    slots=summary.get('slots',0);missed=summary.get('missed_slots',[])
+    slots=summary.get('slots',0);enrolled=summary.get('enrolled_checkpoints');missed=summary.get('missed_slots',[])
     rates=summary.get('poll_failure_rate_by_hour',[])
     growth=summary.get('storage_growth',{})
+    if type(missed) is not list or not all(type(x) is dict for x in missed) or type(rates) is not list or not all(type(r) is dict for r in rates) or type(growth) is not dict:
+        raise SystemExit('Shakedown coverage, reasons, failure rate or storage gate failed')
     quota=growth.get('quota_bytes');page_size=growth.get('sqlite_page_size')
     measured=growth.get('measured_bytes_per_day');projected=growth.get('projected_72_day_bytes')
     storage_valid=(type(quota) is int and quota>1024**2 and type(page_size) is int and
@@ -276,11 +292,12 @@ def check_shakedown(root,now=None,wan_log=None):
     reasons_valid=all(type(r) is str and r.strip() for x in missed for r in x.get('reasons') or [])
     if (summary.get('status')!='QA_SHAKEDOWN_NOT_STUDY_EVIDENCE' or
         summary.get('candidate_source_sha256')!=shakedown_source_digest(root) or
-        type(hours) not in (int,float) or not math.isfinite(hours) or hours<72 or slots<1 or
-        summary.get('enrolled_checkpoints')!=slots-len(missed) or summary.get('all_misses_have_reasons',True) is not True or
+        type(hours) not in (int,float) or not math.isfinite(hours) or hours<72 or
+        type(slots) is not int or slots<1 or type(enrolled) is not int or
+        enrolled!=slots-len(missed) or summary.get('all_misses_have_reasons',True) is not True or
         (slots-len(missed))/slots<.95 or not all(x.get('reasons') for x in missed) or not reasons_valid or
         type(summary.get('unexplained_collection_failures')) is not int or summary['unexplained_collection_failures']!=0 or
-        len(rates)<72 or not all(shakedown_rate_ok(row) for row in rates) or
+        len(rates)<72 or not all(shakedown_rate_ok(row,missed) for row in rates) or
         not storage_valid or growth.get('main_database_cap_bytes')!=cap or projected>cap):
         raise SystemExit('Shakedown coverage, reasons, failure rate or storage gate failed')
     check_wan_outages(summary,wan_log)

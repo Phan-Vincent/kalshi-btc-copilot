@@ -52,7 +52,7 @@ def dashboard_problem():
         # Two consecutive checks (5+ min) are needed to alert, so a rollover won't.
         return "dashboard Kalshi window missing or stale"
     age = state.get("watcher_age")
-    if isinstance(age, (int, float)) and age > WATCHER_MAX_AGE:
+    if isinstance(age, (int, float)) and not isinstance(age, bool) and age == age and age > WATCHER_MAX_AGE:
         return f"Acer watcher has not completed a run for {age / 60:.0f} min"
     return None
 
@@ -87,10 +87,12 @@ def load_previous(now):
         return {}
     except (OSError, ValueError):
         previous = None
-    number = (int, float)
-    if (isinstance(previous, dict) and isinstance(previous.get("fails", 0), int)
+    def is_num(v):
+        return isinstance(v, (int, float)) and not isinstance(v, bool) and (isinstance(v, int) or v == v and v not in (float("inf"), float("-inf")))
+    fails = previous.get("fails", 0) if isinstance(previous, dict) else None
+    if (isinstance(previous, dict) and isinstance(fails, int) and not isinstance(fails, bool) and fails >= 0
             and isinstance(previous.get("active", False), bool)
-            and isinstance(previous.get("last_sent_at", 0), number)):
+            and is_num(previous.get("last_sent_at", 0))):
         return previous
     try:
         os.replace(STATE_FILE, STATE_FILE.with_suffix(f".corrupt-{int(now)}"))

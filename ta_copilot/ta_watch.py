@@ -68,12 +68,13 @@ def load_previous(now):
 
 
 def valid_state(value):
-    number = (int, float)
+    def is_num(v):
+        return isinstance(v, (int, float)) and not isinstance(v, bool) and (isinstance(v, int) or v == v and v not in (float("inf"), float("-inf")))
     return (isinstance(value, dict) and isinstance(value.get("active", False), bool)
-            and isinstance(value.get("last_sent_at", 0), number)
+            and is_num(value.get("last_sent_at", 0))
             and isinstance(value.get("feed_since", {}), dict)
-            and all(isinstance(v, number) for v in value.get("feed_since", {}).values())
-            and isinstance(value.get("kalshi_stale_since"), (*number, type(None))))
+            and all(is_num(v) for v in value.get("feed_since", {}).values())
+            and (value.get("kalshi_stale_since") is None or is_num(value.get("kalshi_stale_since"))))
 
 
 def kalshi_stale_since(state, prior, now):

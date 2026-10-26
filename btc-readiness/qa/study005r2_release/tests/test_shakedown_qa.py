@@ -442,5 +442,75 @@ class MonitorBoundaryTests(unittest.TestCase):
             self.assertIn('Excused as Kalshi-side 5xx: 3 failure(s)',send.call_args.args[0])
 
 
+class AdversarialQA20261025Tests(unittest.TestCase):
+    def test_r2_01_monitor_counts_wan_failures_in_current_partial_hour(self):
+        now=START+5400
+        outage={'start':START+3700,'end':START+3760,'seconds':60,'confirmed':True,'where':'modem'}
+        with tempfile.TemporaryDirectory() as td:
+            log=wan_log(Path(td)/'wan.json',outage)
+            out=monitor_report(td,START,now,[(START+3710,'COLLECTION_FAILED',NET),(START+3720,'COLLECTION_FAILED',NET)],log=log)
+        self.assertEqual(out['wan_outages'],['home WAN outage 10-20 01:01:40 (modem)'])
+        self.assertEqual(out['failures_during_wan_outage'],2)
+
+    def test_r2_02_monitor_uses_stops_preceding_lookback_window(self):
+        now=START+24*3600+1800
+        since=int(now-shakedown_check.LOOKBACK)//3600*3600
+        with tempfile.TemporaryDirectory() as td:
+            root=Path(td);db=root/'evidence.sqlite3';limits=root/'limits.json'
+            limits.write_text(json.dumps({'quota_bytes':128*1024**3}))
+            payload=zlib.compress(json.dumps({'snapshot':{'retrieval_health':{'snapshot_skew_seconds':1.5}}}).encode())
+            with closing(sqlite3.connect(db)) as c,c:
+                c.executescript(SCHEMA+'CREATE TABLE observations(id INTEGER PRIMARY KEY,epoch REAL,payload BLOB);')
+                c.execute('INSERT INTO observations(epoch,payload) VALUES (?,?)',(since+600,payload))
+                c.executemany('INSERT INTO runtime_events VALUES (?,?,?)',
+                              [(START,'COLLECTOR_START','start'),(since-10,'COLLECTOR_STOP','orderly stop'),
+                               (since+320,'COLLECTOR_START','restart')])
+                c.executemany('INSERT INTO markets VALUES (?,?)',[(s,s+315) for s in range(int(since)+900,int(now),900)])
+            with patch.object(shakedown_check,'DB',db),patch.object(shakedown_check,'LIMITS',limits), \
+                 patch.object(shakedown_check,'WAN_LOG',root/'absent.json'), \
+                 patch.object(shakedown_check.time,'sleep'), \
+                 patch.object(shakedown_check.subprocess,'run',return_value=SimpleNamespace(stdout='active\n')):
+                out=shakedown_check.report(now)
+        self.assertEqual(out['problems'],[])
+        self.assertIn(('orderly stop',1),out['missed_reasons'])
+
+    def test_r2_03_seal_gate_rejects_unbacked_wan_counts_bool_slots_and_fake_inactivity_explained(self):
+        now=datetime(2026,10,24,tzinfo=timezone.utc)
+        with tempfile.TemporaryDirectory() as td:
+            root=Path(td).resolve();(root/'source.py').write_text('v1')
+            good=gate_summary(root,now);path=root/'shakedown_summary.json'
+            log=wan_log(root/'wan.json',OUTAGE)
+            wan_block={'source_sha256':release_tool.sha(log),'lead_seconds':30,'tail_seconds':60,'max_seconds':900,
+                       'windows':[dict(OUTAGE,reason=release_tool.wan_reason(OUTAGE))]}
+            for bad in (
+                dict(good,wan_outages=wan_block,poll_failure_rate_by_hour=[{'failure_rate':0.0,'failed_during_wan_outage':999}]+[{'failure_rate':.01}]*71),
+                dict(good,slots=True,enrolled_checkpoints=True,missed_slots=[]),
+                dict(good,missed_slots=[],enrolled_checkpoints=288,
+                     poll_failure_rate_by_hour=[{'hour_utc':stamps(START),'failure_rate':None,'partial_hour':False,'inactivity_explained':True}]+[{'failure_rate':.01}]*71),
+            ):
+                path.write_text(json.dumps(bad))
+                with self.assertRaises(SystemExit):
+                    release_tool.check_shakedown(root,now,log)
+
+    def test_r2_04_first_slot_band_after_unaligned_start_matches_monitor(self):
+        start=START+100;ended=start+72*3600
+        with tempfile.TemporaryDirectory() as td:
+            root,runtime=candidate(td)
+            build(runtime,[(start,'COLLECTOR_START','start'),(ended,'COLLECTOR_STOP','orderly stop')],
+                  [(START+n*900,START+n*900+315) for n in range(288)],
+                  [START+h*3600+300 for h in range(72)])
+            out=summarize(runtime,ended)
+            self.assertEqual((out['slots'],out['enrolled_checkpoints']),(288,288))
+
+    def test_r2_05_shakedown_start_handles_empty_or_uninitialized_db(self):
+        start_mod_path=str(Path(__file__).resolve().parents[3]/'acer/shakedown_check/shakedown_start.py')
+        spec=importlib.util.spec_from_file_location('shakedown_start_under_test',start_mod_path)
+        shakedown_start=importlib.util.module_from_spec(spec);spec.loader.exec_module(shakedown_start)
+        with tempfile.TemporaryDirectory() as td:
+            rt=Path(td);(rt/'evidence.sqlite3').write_bytes(b'')
+            with patch.object(shakedown_start,'RUNTIME',rt):
+                self.assertEqual(shakedown_start.stored_boot_and_last(),(None,None))
+
+
 if __name__=='__main__':
     unittest.main()

@@ -149,6 +149,16 @@ def record_problem(row):
         if not (finite_or_none(quote, strings=True)
                 or isinstance(quote, dict) and finite_or_none(quote.get("price"), strings=True)):
             return f"bad {key}"
+    for key in ("stale", "kalshi_stale"):
+        if row.get(key) is not None and not isinstance(row[key], bool):
+            return f"bad {key}"
+    history_stale = row.get("history_stale")
+    if history_stale is not None:
+        if not isinstance(history_stale, list) or not all(isinstance(x, str) for x in history_stale):
+            return "bad history_stale"
+    samples = row.get("samples")
+    if samples is not None and (not is_count(samples) or samples < 0):
+        return "bad samples"
     frames = row.get("timeframes")
     if frames is not None:
         if not isinstance(frames, dict) or not all(isinstance(f, dict) for f in frames.values()):
@@ -170,6 +180,9 @@ def record_problem(row):
                     return "bad levels"
             for key in COUNT_FIELDS:
                 if frame.get(key) is not None and not is_count(frame[key]):
+                    return f"bad {key}"
+            for key in ("rsi", "macd_hist"):
+                if not finite_or_none(frame.get(key)):
                     return f"bad {key}"
             if ("bull" in frame) != ("bear" in frame):
                 return "bad bull/bear"
@@ -677,7 +690,13 @@ def write_manifest(path, log_path, opened, minutes, now, source=None):
 def proxy_section(closes, settled):
     """Our closing-minute composite mean against Kalshi's settlement value."""
     errors, incomplete = [], 0
-    for ticker, row in sorted(closes.items(), key=lambda item: item[1].get("close_time") or ""):
+    def close_order(item):
+        ticker, row = item
+        for key in ("close_time", "captured_at"):
+            if row.get(key) and is_timestamp(row[key]):
+                return (0, parse_iso_ts(row[key]), "", ticker)
+        return (1, 0.0, str(row.get("close_time") or ""), ticker)
+    for ticker, row in sorted(closes.items(), key=close_order):
         settlement = (settled.get(ticker) or {}).get("expiration_value")
         if settlement is None or row.get("proxy_avg_60s") is None:
             continue
