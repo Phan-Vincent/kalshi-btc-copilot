@@ -163,6 +163,33 @@ class MetricsTests(unittest.TestCase):
         self.assertAlmostEqual(result["window"]["taker_imbalance"], -.2)
         self.assertAlmostEqual(result["window"]["yes_vwap"], .52)
 
+    def test_tape_keeps_window_and_detects_gaps(self):
+        def row(trade_id, at):
+            return {"time": ta.iso(at), "yes_price": "0.5", "count": "1",
+                    "taker_side": "yes", "is_block_trade": False, "trade_id": trade_id}
+        # Below the limit: every trade since open, so coverage starts at open.
+        tape = ta.merge_tape(None, [row("a", 1010), row("b", 1005)], False, 1000, 1011)
+        self.assertEqual((sorted(tape["rows"]), tape["from"]), (["a", "b"], 1000))
+        # A full fetch overlapping held trades keeps them and the coverage start.
+        tape = ta.merge_tape(tape, [row("c", 1020), row("a", 1010)], True, 1000, 1021)
+        self.assertEqual((sorted(tape["rows"]), tape["from"]), (["a", "b", "c"], 1000))
+        # A full fetch whose oldest trade is newer than anything held: a gap.
+        tape = ta.merge_tape(tape, [row("e", 1040), row("d", 1030)], True, 1000, 1041)
+        self.assertEqual((sorted(tape["rows"]), tape["from"]), (["d", "e"], 1030))
+        # First fetch full (restart mid-window): coverage starts at its oldest row.
+        tape = ta.merge_tape(None, [row("x", 1500), row("y", 1400)], True, 1000, 1501)
+        self.assertEqual(tape["from"], 1400)
+        # Rows without an ID are left out; an empty full fetch changes nothing.
+        self.assertEqual(sorted(ta.merge_tape(None, [row(None, 1010), row("z", 1009)], False, 1000, 1011)["rows"]), ["z"])
+        self.assertIs(ta.merge_tape(tape, [], True, 1000, 1600), tape)
+        # The display list keeps its old shape: newest 30, no trade_id.
+        data = {"trades": [{"ticker": "T", "created_time": ta.iso(1000 + i), "yes_price_dollars": "0.5",
+                            "count_fp": "1", "trade_id": f"id{i}"} for i in range(40)]}
+        shown = ta.kalshi_trades(data, "T", 1000, 1900)
+        self.assertEqual(len(shown), 30)
+        self.assertNotIn("trade_id", shown[0])
+        self.assertEqual(len(ta.kalshi_trade_rows(data, "T", 1000, 1900)), 40)
+
     def test_volatility_regimes_and_no_vote_change(self):
         bars = [{"time": i * 60, "open": 100, "high": 101, "low": 99,
                  "close": 100, "volume": 1} for i in range(100)]
@@ -253,7 +280,8 @@ const out = {};
     required_drift_per_sec: -2, orderbook_age: 1,
     orderbook: {top_imbalance: .5, depth_imbalance: .2, microprice: .55, micro_skew_cents: 1},
     tape_summary: {last_60s: {contracts: 2, trade_count: 1, taker_imbalance: 1, yes_vwap: .5},
-      window: {contracts: 3, trade_count: 2, taker_imbalance: 0, yes_vwap: .6}},
+      window: {contracts: 3, trade_count: 2, taker_imbalance: 0, yes_vwap: .6},
+      covered_from: '2026-10-26T09:18:40.000000Z', complete_window: false, complete_60s: false},
     price_path: [], yes_mid_path: [], recent_trades: []};
   streams[0].emit('state', s);
   for (const id of ['discoverySource','requiredDrift','bookImbalance','microprice','tapeSummary','zones','levels'])
@@ -270,5 +298,7 @@ const out = {};
         self.assertIn("derived", rendered["discoverySource"])
         self.assertIn("/s needed", rendered["requiredDrift"])
         self.assertIn("+0.50 / +0.20", rendered["bookImbalance"])
+        self.assertIn("(partial) /", rendered["tapeSummary"])
+        self.assertTrue(rendered["tapeSummary"].endswith("(since 09:18:40)"))
         self.assertIn("MTF", rendered["zones"])
         self.assertIn("expanding", rendered["levels"])

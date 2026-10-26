@@ -58,6 +58,7 @@ TICKER_BAR_LIMIT = 3
 CANDLE_REFRESH = {"1m": 10, "5m": 30, "15m": 60, "1h": 120}
 SPOT_REFRESH = 2
 KALSHI_REFRESH = 2
+KALSHI_TRADES_LIMIT = 100
 COINBASE_WS = "wss://ws-feed.exchange.coinbase.com"
 KRAKEN_WS = "wss://ws.kraken.com/v2"
 LARGE_TRADE_USD = float(os.environ.get("TA_LARGE_TRADE_USD", "25000"))
@@ -379,6 +380,33 @@ def kalshi_tape_summary(trades, now):
 
 
 def kalshi_trades(data, ticker, open_ts, close_ts):
+    return [{k: v for k, v in row.items() if k != "trade_id"}
+            for row in kalshi_trade_rows(data, ticker, open_ts, close_ts)[:30]]
+
+
+def merge_tape(tape, rows, full, open_ts, fetched_at):
+    """Fold one trades fetch (the newest KALSHI_TRADES_LIMIT since open) into
+    the window's tape. A fetch below the limit holds every trade since open. A
+    full one reaches back only to its oldest row; if the tape doesn't reach
+    that far, trades in between were missed and the tape restarts there."""
+    held = dict(tape["rows"]) if tape else {}
+    covered_from = tape["from"] if tape else None
+    rows = [row for row in rows if row["trade_id"]]
+    if not full:
+        covered_from = open_ts
+    elif rows:
+        oldest = min(parse_ts(row["time"]) for row in rows)
+        reach = max((parse_ts(row["time"]) for row in held.values()),
+                    default=tape["to"] if tape else None)
+        if covered_from is None or reach is None or oldest > reach:
+            held, covered_from = {}, oldest
+    else:
+        return tape
+    held.update((row["trade_id"], row) for row in rows)
+    return {"rows": held, "from": covered_from, "to": fetched_at}
+
+
+def kalshi_trade_rows(data, ticker, open_ts, close_ts):
     rows = []
     for trade in data.get("trades", []):
         if trade.get("ticker") != ticker:
@@ -393,11 +421,13 @@ def kalshi_trades(data, ticker, open_ts, close_ts):
         count = positive_decimal(trade.get("count_fp"))
         if price is None or count is None:
             continue
+        trade_id = trade.get("trade_id")
         rows.append({"time": trade["created_time"], "yes_price": str(price),
                      "count": str(count), "taker_side": trade.get("taker_side"),
-                     "is_block_trade": bool(trade.get("is_block_trade"))})
+                     "is_block_trade": bool(trade.get("is_block_trade")),
+                     "trade_id": trade_id if isinstance(trade_id, str) else None})
     rows.sort(key=lambda row: row["time"], reverse=True)
-    return rows[:30]
+    return rows
 
 
 # ---------------------------------------------------------------- indicators
@@ -753,6 +783,9 @@ class Feed:
         self.book = None
         self.book_at = 0.0
         self.kalshi_recent_trades = []
+        # Every public trade seen in the context window, with the time from
+        # which it is known to be complete (see merge_tape).
+        self.kalshi_tape = None
         self.yes_mid_path = deque(maxlen=460)
         self.context_ticker = None
 
@@ -1194,6 +1227,7 @@ class Feed:
                 self.context_ticker = None
                 self.book = None
                 self.kalshi_recent_trades = []
+                self.kalshi_tape = None
                 self.yes_mid_path.clear()
             return
         ticker = market["ticker"]
@@ -1208,17 +1242,22 @@ class Feed:
                 return
             if self.context_ticker != ticker:
                 self.context_ticker = ticker
+                self.kalshi_tape = None
                 self.yes_mid_path.clear()
             self.book, self.book_at = book, book_observed_at
             if book["yes_mid"] is not None:
                 self.yes_mid_path.append({"time": int(book_observed_at), "value": book["yes_mid"]})
-        trades = kalshi_trades(get_json(f"{KALSHI}/markets/trades",
-                                        {"ticker": ticker, "min_ts": int(opened), "limit": 100}),
-                               ticker, opened, closed)
+        data = get_json(f"{KALSHI}/markets/trades",
+                        {"ticker": ticker, "min_ts": int(opened), "limit": KALSHI_TRADES_LIMIT})
+        fetched_at = time.time()
+        rows = kalshi_trade_rows(data, ticker, opened, closed)
+        trades = [{k: v for k, v in row.items() if k != "trade_id"} for row in rows[:30]]
+        full = len(data.get("trades") or []) >= KALSHI_TRADES_LIMIT
         with self.lock:
-            if not self.market or self.market["ticker"] != ticker:
+            if not self.market or self.market["ticker"] != ticker or self.context_ticker != ticker:
                 return
             self.kalshi_recent_trades = trades
+            self.kalshi_tape = merge_tape(self.kalshi_tape, rows, full, opened, fetched_at)
             self.errors.pop("kalshi_context", None)
 
     def run_market_context(self):
@@ -1302,6 +1341,8 @@ class Feed:
             book_at = self.book_at
             context_ticker = self.context_ticker
             recent_trades = list(self.kalshi_recent_trades)
+            tape_rows = list(self.kalshi_tape["rows"].values()) if self.kalshi_tape else []
+            tape_from = self.kalshi_tape["from"] if self.kalshi_tape else None
             mid_path = list(self.yes_mid_path)
         if not spot or not bars["1m"]:
             return {"ready": False, "stale": True, "kalshi_stale": True,
@@ -1343,7 +1384,12 @@ class Feed:
                     {"price": level["price"], "source": "book", "age": window["orderbook_age"]}
                     if level else {"price": window[side], "source": "market summary", "age": window["age"]})
             window["recent_trades"] = recent_trades if context_ticker == market["ticker"] else []
-            window["tape_summary"] = kalshi_tape_summary(window["recent_trades"], now)
+            if context_ticker != market["ticker"]:
+                tape_rows, tape_from = [], None
+            window["tape_summary"] = {**kalshi_tape_summary(tape_rows, now),
+                                      "covered_from": iso(tape_from) if tape_from is not None else None,
+                                      "complete_window": tape_from is not None and tape_from <= open_ts,
+                                      "complete_60s": tape_from is not None and tape_from <= now - 60}
             window["yes_mid_path"] = mid_path if context_ticker == market["ticker"] else []
             sig = realized_sigma([b["close"] for b in bars["1m"]])
             window.update(window_distance(strike, composite, window["seconds_left"], sig,

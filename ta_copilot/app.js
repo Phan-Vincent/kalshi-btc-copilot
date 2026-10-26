@@ -315,7 +315,9 @@ function renderShared(s, f) {
     const tape = w.tape_summary || {};
     const tapePart = x => x ? `${Number(x.contracts).toLocaleString()} contracts, ${x.trade_count} trades, ` +
       `taker ${imb(x.taker_imbalance)}, VWAP ${cents(x.yes_vwap)}` : '—';
-    $('tapeSummary').textContent = `${tapePart(tape.last_60s)} / ${tapePart(tape.window)}`;
+    const tapeSince = tape.covered_from ? ` (since ${tape.covered_from.slice(11, 19)})` : ' (no trades fetched yet)';
+    $('tapeSummary').textContent = `${tapePart(tape.last_60s)}${tape.complete_60s ? '' : ' (partial)'} / ` +
+      `${tapePart(tape.window)}${tape.complete_window ? '' : tapeSince}`;
     spark('yesMid', w.yes_mid_path);
     $('kalshiTrades').innerHTML = (w.recent_trades || []).slice(0, 8).map(t =>
       `<tr><td>${t.time.slice(11, 19)}</td><td>${cents(t.yes_price)}</td><td>${Number(t.count).toLocaleString()}</td></tr>`).join('');
