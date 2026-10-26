@@ -39,7 +39,7 @@ def boot_time():
 
 def stored_boot_and_last():
     db = RUNTIME / 'evidence.sqlite3'
-    if not db.exists():
+    if not db.exists() or db.stat().st_size == 0:  # a fresh run, or a database not yet initialized
         return None, None
     try:
         c = sqlite3.connect('file:%s?mode=ro' % db, uri=True)
@@ -49,8 +49,10 @@ def stored_boot_and_last():
             return (boot[0] if boot else None), (last[0] if last else None)
         finally:
             c.close()
-    except sqlite3.Error:
-        return None, None
+    except sqlite3.OperationalError as e:
+        if "no such table" in str(e):
+            return None, None
+        raise
 
 
 def telegram(text):

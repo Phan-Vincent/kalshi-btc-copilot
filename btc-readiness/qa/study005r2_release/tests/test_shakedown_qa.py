@@ -478,19 +478,42 @@ class AdversarialQA20261025Tests(unittest.TestCase):
         now=datetime(2026,10,24,tzinfo=timezone.utc)
         with tempfile.TemporaryDirectory() as td:
             root=Path(td).resolve();(root/'source.py').write_text('v1')
-            good=gate_summary(root,now);path=root/'shakedown_summary.json'
             log=wan_log(root/'wan.json',OUTAGE)
+            good=gate_summary(root,now);path=root/'shakedown_summary.json'
             wan_block={'source_sha256':release_tool.sha(log),'lead_seconds':30,'tail_seconds':60,'max_seconds':900,
                        'windows':[dict(OUTAGE,reason=release_tool.wan_reason(OUTAGE))]}
-            for bad in (
-                dict(good,wan_outages=wan_block,poll_failure_rate_by_hour=[{'failure_rate':0.0,'failed_during_wan_outage':999}]+[{'failure_rate':.01}]*71),
-                dict(good,slots=True,enrolled_checkpoints=True,missed_slots=[]),
-                dict(good,missed_slots=[],enrolled_checkpoints=288,
-                     poll_failure_rate_by_hour=[{'hour_utc':stamps(START),'failure_rate':None,'partial_hour':False,'inactivity_explained':True}]+[{'failure_rate':.01}]*71),
+            gate_error='Shakedown coverage, reasons, failure rate or storage gate failed'
+            for name,base,changes,message in (
+                ('wan counts',dict(good,wan_outages=wan_block),
+                 {'poll_failure_rate_by_hour':[{'failure_rate':0.0,'failed_during_wan_outage':999}]+[{'failure_rate':.01}]*71},
+                 'Shakedown hourly failure rate does not match its counts'),
+                ('bool slots',dict(good,slots=1,enrolled_checkpoints=1,missed_slots=[]),
+                 {'slots':True},gate_error),
+                ('bool enrolled',dict(good,slots=1,enrolled_checkpoints=1,missed_slots=[]),
+                 {'enrolled_checkpoints':True},gate_error),
+                ('fake inactivity',dict(good,missed_slots=[],enrolled_checkpoints=288),
+                 {'poll_failure_rate_by_hour':[{'hour_utc':stamps(START),'failure_rate':None,'partial_hour':False,
+                                               'inactivity_explained':True}]+[{'failure_rate':.01}]*71},gate_error),
             ):
-                path.write_text(json.dumps(bad))
-                with self.assertRaises(SystemExit):
-                    release_tool.check_shakedown(root,now,log)
+                with self.subTest(case=name):
+                    path.write_text(json.dumps(base))
+                    self.assertEqual(release_tool.check_shakedown(root,now,log),base)
+                    path.write_text(json.dumps(dict(base,**changes)))
+                    with self.assertRaises(SystemExit) as caught:
+                        release_tool.check_shakedown(root,now,log)
+                    self.assertEqual(str(caught.exception),message)
+
+    def test_r2_03_inactivity_requires_parseable_string_hour(self):
+        row={'hour_utc':stamps(START),'failure_rate':None,'partial_hour':False,'inactivity_explained':True}
+        missed=[{'slot_opened_utc':stamps(START+n*900),'reasons':['recorded veto']} for n in range(4)]
+        self.assertTrue(release_tool.shakedown_rate_ok(row,missed))
+        for hour in (None,False,123,'not a timestamp'):
+            for supplied_misses in (None,missed):
+                with self.subTest(hour=hour,missed=supplied_misses):
+                    bad=dict(row)
+                    if hour is None:bad.pop('hour_utc')
+                    else:bad['hour_utc']=hour
+                    self.assertFalse(release_tool.shakedown_rate_ok(bad,supplied_misses))
 
     def test_r2_04_first_slot_band_after_unaligned_start_matches_monitor(self):
         start=START+100;ended=start+72*3600
@@ -502,14 +525,43 @@ class AdversarialQA20261025Tests(unittest.TestCase):
             out=summarize(runtime,ended)
             self.assertEqual((out['slots'],out['enrolled_checkpoints']),(288,288))
 
+    def start_module(self):
+        path=Path(__file__).resolve().parents[3]/'acer/shakedown_check/shakedown_start.py'
+        spec=importlib.util.spec_from_file_location('shakedown_start_under_test',path)
+        module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module)
+        return module
+
     def test_r2_05_shakedown_start_handles_empty_or_uninitialized_db(self):
-        start_mod_path=str(Path(__file__).resolve().parents[3]/'acer/shakedown_check/shakedown_start.py')
-        spec=importlib.util.spec_from_file_location('shakedown_start_under_test',start_mod_path)
-        shakedown_start=importlib.util.module_from_spec(spec);spec.loader.exec_module(shakedown_start)
+        module=self.start_module()
         with tempfile.TemporaryDirectory() as td:
-            rt=Path(td);(rt/'evidence.sqlite3').write_bytes(b'')
-            with patch.object(shakedown_start,'RUNTIME',rt):
-                self.assertEqual(shakedown_start.stored_boot_and_last(),(None,None))
+            rt=Path(td);db=rt/'evidence.sqlite3';db.write_bytes(b'')
+            with patch.object(module,'RUNTIME',rt):
+                self.assertEqual(module.stored_boot_and_last(),(None,None))
+                with closing(sqlite3.connect(db)) as c,c:
+                    c.execute('CREATE TABLE unrelated(value TEXT)')
+                self.assertGreater(db.stat().st_size,0)
+                self.assertEqual(module.stored_boot_and_last(),(None,None))
+                with closing(sqlite3.connect(db)) as c,c:
+                    c.executescript("CREATE TABLE runtime_control(boot TEXT); INSERT INTO runtime_control VALUES ('boot'); "
+                                    'CREATE TABLE observations(epoch REAL); INSERT INTO observations VALUES (123);')
+                self.assertEqual(module.stored_boot_and_last(),('boot',123))
+
+    def test_r2_05_shakedown_start_propagates_database_errors(self):
+        module=self.start_module()
+        with tempfile.TemporaryDirectory() as td:
+            rt=Path(td);db=rt/'evidence.sqlite3';db.write_bytes(b'not a SQLite database')
+            with patch.object(module,'RUNTIME',rt):
+                with self.subTest(case='corruption'):
+                    with self.assertRaises(sqlite3.DatabaseError):module.stored_boot_and_last()
+                for error in (sqlite3.OperationalError('database is locked'),
+                              sqlite3.OperationalError('unable to open database file'),
+                              sqlite3.DatabaseError('no such table: not an OperationalError')):
+                    with self.subTest(error=str(error)),patch.object(module.sqlite3,'connect',side_effect=error):
+                        with self.assertRaises(type(error)) as caught:module.stored_boot_and_last()
+                        self.assertIs(caught.exception,error)
+                db.unlink()
+                with self.subTest(case='missing file is a fresh run'):
+                    self.assertEqual(module.stored_boot_and_last(),(None,None))
 
 
 if __name__=='__main__':

@@ -288,3 +288,11 @@ The 4.3 h soak on round 3c code captured **17/17 checkpoints** (skew p95 2.15 s)
 **Monitor.** Apply the same exclusion and lookback cap, report excused 5xx in drift alerts, and align the lookback down to the hour. Judge the run's partial first hour, closing the 03:00/15:00 timer blind spot.
 
 **Tests.** Synthetic summary/gate and monitor regressions added to `tests/test_shakedown_qa.py`. The requested shakedown, exchange-closure and release-gate suites pass (64 tests). No candidate, protocol, evidence, manifest, sealed-tree or production changes; not deployed.
+
+
+## Round 4k (2026-10-25)
+
+QA patches in `cecff77` cover R2-01..05 and TA-01..05.
+Follow-up: repair the R2-03 fixtures and hour validation, reject non-finite watcher ages, propagate SQLite faults, and expire future-dated closure probes.
+R2-04 counts one more first slot when its enrollment band remains ahead, matching the monitor; this can lower coverage by one slot and change seal eligibility.
+R2-06 is deferred to the next candidate revision.

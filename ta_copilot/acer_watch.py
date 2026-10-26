@@ -7,6 +7,7 @@ failing checks, and stays silent when the Mac itself is offline. Only while
 the Mac is awake.
 """
 import json
+import math
 import os
 from pathlib import Path
 import socket
@@ -52,7 +53,9 @@ def dashboard_problem():
         # Two consecutive checks (5+ min) are needed to alert, so a rollover won't.
         return "dashboard Kalshi window missing or stale"
     age = state.get("watcher_age")
-    if isinstance(age, (int, float)) and not isinstance(age, bool) and age == age and age > WATCHER_MAX_AGE:
+    if age is not None and (type(age) not in (int, float) or not math.isfinite(age)):
+        return "Acer watcher age invalid"
+    if age is not None and age > WATCHER_MAX_AGE:
         return f"Acer watcher has not completed a run for {age / 60:.0f} min"
     return None
 

@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Adversarial QA regression tests (2026-10-25) for BTC TA Copilot."""
+import io
 import json
 from pathlib import Path
 import tempfile
@@ -157,6 +158,33 @@ class AdversarialQA20261025Tests(unittest.TestCase):
             feed.poll_market()
         self.assertTrue(feed.exchange_closed)
         self.assertIn("kalshi", feed.errors)
+
+    def test_ta04_future_exchange_closed_probe_is_expired(self):
+        for listing_error in (False,True):
+            with self.subTest(listing_error=listing_error):
+                feed = ta_copilot.Feed()
+                feed.exchange_closed = feed.exchange_closed_probe = True
+                feed.exchange_status_at = 20010.0
+                calls = []
+                def get(url, params=None):
+                    calls.append(url)
+                    if listing_error:
+                        raise OSError("HTTP 503")
+                    return {"exchange_active": True, "trading_active": True} if url.endswith("/exchange/status") else {"markets": []}
+                with patch("ta_copilot.time.time", return_value=20005.0), patch("ta_copilot.get_json", side_effect=get):
+                    feed.poll_market()
+                self.assertFalse(feed.exchange_closed)
+                if not listing_error:
+                    self.assertTrue(any(url.endswith("/exchange/status") for url in calls))
+                    self.assertEqual(feed.exchange_status_at,20005.0)
+
+    def test_ta05_dashboard_rejects_nonfinite_watcher_age(self):
+        class Response(io.BytesIO):
+            status = 200
+        for age in (float("nan"),float("inf"),float("-inf")):
+            with self.subTest(age=age), patch.object(acer_watch,"urlopen",return_value=Response(
+                    json.dumps({"ready":True,"watcher_age":age}).encode())):
+                self.assertEqual(acer_watch.dashboard_problem(),"Acer watcher age invalid")
 
     def test_ta05_watchers_reject_boolean_and_nonfinite_state_values(self):
         """ta_watch and acer_watch must reject bools and NaN/inf in persisted state and watcher_age."""

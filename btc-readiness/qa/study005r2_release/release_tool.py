@@ -212,12 +212,12 @@ def shakedown_rate_ok(row,missed=None):
     if rate is None:
         if row.get('partial_hour') is True:return True
         if row.get('inactivity_explained') is not True:return False
-        if missed is None:return True
-        if not missed:return False
         hour_utc=row.get('hour_utc')
-        if type(hour_utc) is not str:return True
+        if type(hour_utc) is not str:return False
         try:hour=int(datetime.fromisoformat(hour_utc).timestamp())
         except ValueError:return False
+        if missed is None:return True
+        if not missed:return False
         missed_epochs=set()
         for x in missed:
             if type(x) is not dict or type(x.get('slot_opened_utc')) is not str:return False

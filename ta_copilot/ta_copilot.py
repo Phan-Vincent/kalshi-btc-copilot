@@ -1038,7 +1038,7 @@ class Feed:
             with self.lock:
                 cached_closed = self.exchange_closed_probe
                 status_age = now - self.exchange_status_at if self.exchange_status_at else float("inf")
-            if status_age < EXCHANGE_STATUS_REFRESH:
+            if 0 <= status_age < EXCHANGE_STATUS_REFRESH:
                 closed = cached_closed is True
             elif not listing_error:
                 try:
