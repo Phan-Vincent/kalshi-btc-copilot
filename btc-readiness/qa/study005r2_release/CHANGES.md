@@ -296,3 +296,13 @@ QA patches in `cecff77` cover R2-01..05 and TA-01..05.
 Follow-up: repair the R2-03 fixtures and hour validation, reject non-finite watcher ages, propagate SQLite faults, and expire future-dated closure probes.
 R2-04 counts one more first slot when its enrollment band remains ahead, matching the monitor; this can lower coverage by one slot and change seal eligibility.
 R2-06 is deferred to the next candidate revision.
+
+## Round 4l (2026-10-25): proposed direct-contract fallback for listing lag
+
+**NOT APPROVED.** Run A halted October 24 at 16:10:20 UTC after 40 empty-listing failures while the separately observed 16:00–16:15 contract remained live. Shorter `:00:35` lags occurred October 19/20. Incident details are supplied context.
+
+**Candidate draft.** Completed zero-eligible discovery with both exchange flags boolean true may verify one remembered current-slot ticker, or derive it from the slot close in America/New_York. Memory retains completed-listing tickers for current/next slots only. Direct reads use the existing allowlist and unchanged eligibility predicate, exact identity and slot times. Ambiguous memory and direct failures do not retry. Snapshot event lists, when supplied, must have exactly one eligible entry matching the selected ticker and event. `retrieval_health.discovery` records `listing`, `remembered_ticker` or `derived_ticker`; no new runtime events. Normal polls add no requests; fallback adds one direct GET plus the pre-existing zero-eligible status probe.
+
+**Owner decision.** Approve the uniqueness interpretation and choose both ticker sources or remembered-only. An empty listing cannot exclude an unlisted second contract. See `proposals/LISTING_LAG_FALLBACK_NOT_APPROVED.md`. Candidate digest changed; a fresh run B is required. Protocols, request allowlist, evidence and production trees are unchanged. No commit, push or deployment.
+
+**Verification.** `tests/test_listing_fallback.py` uses fake clients for remembered/derived selection, EDT/EST and supplied ticker samples, HTTP/verification errors, status gates, duplicate discovery, memory retention, event membership and request counts. Results: 22/22 new tests pass; full release discovery runs 330 tests, 329 pass and one skips (`kern.boottime` unavailable in the Mac sandbox). Manifest hashes match 34/34 files. `run_checks.py` is not used.
