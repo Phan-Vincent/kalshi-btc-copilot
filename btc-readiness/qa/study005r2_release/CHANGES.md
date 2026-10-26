@@ -306,3 +306,5 @@ R2-06 is deferred to the next candidate revision.
 **Owner decision.** Approve the uniqueness interpretation and choose both ticker sources or remembered-only. An empty listing cannot exclude an unlisted second contract. See `proposals/LISTING_LAG_FALLBACK_NOT_APPROVED.md`. Candidate digest changed; a fresh run B is required. Protocols, request allowlist, evidence and production trees are unchanged. No commit, push or deployment.
 
 **Verification.** `tests/test_listing_fallback.py` uses fake clients for remembered/derived selection, EDT/EST and supplied ticker samples, HTTP/verification errors, status gates, duplicate discovery, memory retention, event membership and request counts. Results: 22/22 new tests pass; full release discovery runs 330 tests, 329 pass and one skips (`kern.boottime` unavailable in the Mac sandbox). Manifest hashes match 34/34 files. `run_checks.py` is not used.
+
+**Round 4l approved by the owner 2026-10-25** as drafted (remembered and derived ticker). Run B is the first shakedown on this candidate.

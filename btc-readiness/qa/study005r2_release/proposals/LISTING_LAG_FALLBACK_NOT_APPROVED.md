@@ -1,6 +1,6 @@
 # Direct-contract fallback for listing lag — NOT APPROVED
 
-Drafted on `listing-lag-fallback`, 2026-10-25. Local candidate implementation for owner review; not approved, sealed or deployed. No protocol change.
+**Owner decision 2026-10-25: approved as drafted, with both the remembered and the derived ticker.** The file name is kept for history. Drafted on `listing-lag-fallback`, 2026-10-25. No protocol change; not yet sealed or deployed.
 
 ## Why
 
