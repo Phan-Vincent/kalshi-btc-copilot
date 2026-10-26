@@ -477,6 +477,34 @@ class Copilot:
         self.state_path=WORK/"btc_copilot_state.json"
         self.state=json.loads(self.state_path.read_text()) if self.state_path.exists() else {"contracts":{},"previous":None}
         self.raw={}
+        self.listed_slots={}
+
+    def remember_listing(self, listed, now):
+        slot=int(now)//900*900
+        self.listed_slots={k:v for k,v in getattr(self,'listed_slots',{}).items() if k in (slot,slot+900)}
+        for m in listed:
+            if not m.get('ticker','').startswith(SERIES+'-') or not m.get('event_ticker','').startswith(SERIES+'-'):continue
+            try:opened=dt(m['open_time']).timestamp();closed=dt(m['close_time']).timestamp()
+            except (KeyError,TypeError,ValueError):continue
+            if opened in (slot,slot+900) and closed==opened+900:
+                self.listed_slots.setdefault(opened,set()).add(m['ticker'])
+
+    def direct_candidate(self, now):
+        slot=int(now)//900*900
+        remembered=self.listed_slots.get(slot,set())
+        if len(remembered)>1:raise ReadError('ambiguous remembered tickers')
+        if remembered:t=next(iter(remembered));source='remembered_ticker'
+        else:
+            close=datetime.fromtimestamp(slot+900,ZoneInfo('America/New_York'))
+            month=('JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC')[close.month-1]
+            t=SERIES+'-'+close.strftime('%y')+month+close.strftime('%d%H%M-%M');source='derived_ticker'
+        envelope=self.client.market(t);m=envelope['data']['market']
+        if envelope.get('error') or envelope['data'].get('error'):raise ReadError('market upstream error')
+        if m.get('ticker')!=t:raise ReadError('market identity mismatch')
+        if not verified_market(m,now):raise ReadError('market verification failed')
+        if dt(m['open_time']).timestamp()!=slot or dt(m['close_time']).timestamp()!=slot+900:
+            raise ReadError('market slot mismatch')
+        return m,source
 
     def collect(self, replay_health=None, persist=True):
         attestation=None
@@ -498,6 +526,8 @@ class Copilot:
         if not discovery['complete']:
             raise ReadError('Active contract discovery was truncated')
         listed=[m for p in discovery['pages'] for m in p['data'].get('markets',[])]
+        self.remember_listing(listed,now)
+        discovery_source='listing';fallback_error=None
         eligible=[m for m in listed if verified_market(m,now)]
         if len(eligible)!=1:
             status_error=None
@@ -515,7 +545,15 @@ class Copilot:
                 detail='duplicate ticker '+eligible[0]['ticker']
             else:
                 detail='%d eligible: '%len(eligible)+', '.join(m['ticker']+' '+dt(m['open_time']).astimezone(timezone.utc).strftime('%H:%M:%S')+'..'+dt(m['close_time']).astimezone(timezone.utc).strftime('%H:%M:%S') for m in eligible)
-            raise ReadError(('Cannot verify exactly one active BTC 15-minute contract: '+detail)[:189]) from status_error
+            original=('Cannot verify exactly one active BTC 15-minute contract: '+detail)[:189]
+            # Older read-only adapters may not expose direct market reads.
+            if not eligible and flags==(True,True) and all(type(v) is bool for v in flags) and callable(getattr(self.client,'market',None)):
+                fallback_error=original
+                try:candidate,discovery_source=self.direct_candidate(now)
+                except Exception as error:
+                    raise ReadError((original+'; direct fallback: '+failure_note(error))[:200]) from error
+                eligible=[candidate]
+            else:raise ReadError(original) from status_error
         candidate=eligible[0];t=candidate['ticker'];e=candidate['event_ticker']
         jobs={
             # The 50-token benchmark is submitted first so it holds the first pacing ticket (FIFO pacer).
@@ -562,12 +600,22 @@ class Copilot:
                 raise ReadError(key+' returned an upstream error')
         now=replay_health.get('analysis_epoch',time.time()) if replay_health is not None else time.time()
         m=raw['market']['data']['market']
-        if m.get('ticker')!=t or m.get('event_ticker')!=e:raise ReadError('Market identity changed during collection')
-        if raw['event']['data']['event'].get('event_ticker')!=e:raise ReadError('Event identity mismatch')
-        if not verified_market(m,now):
-            raise ReadError('Contract rolled or became inactive during retrieval')
-        if raw['event']['data']['event'].get('series_ticker')!=SERIES:
-            raise ReadError('Event series verification failed')
+        try:
+            if m.get('ticker')!=t or m.get('event_ticker')!=e:raise ReadError('Market identity changed during collection')
+            if not verified_market(m,now):raise ReadError('Contract rolled or became inactive during retrieval')
+            event_body=raw['event']['data'];event=event_body['event']
+            if event.get('event_ticker')!=e:raise ReadError('Event identity mismatch')
+            if event.get('series_ticker')!=SERIES:raise ReadError('Event series verification failed')
+            for container in (event_body,event):
+                if 'markets' not in container:continue
+                markets=container['markets']
+                if not isinstance(markets,list):raise ReadError('Event markets malformed')
+                matches=[x for x in markets if verified_market(x,now)]
+                if len(matches)!=1 or matches[0].get('ticker')!=t or matches[0].get('event_ticker')!=e:
+                    raise ReadError('Event market membership ambiguous or mismatched')
+        except Exception as error:
+            if fallback_error:raise ReadError((fallback_error+'; direct fallback: '+failure_note(error))[:200]) from error
+            raise
         s=raw['series']['data']['series']
         if s.get('ticker')!=SERIES:raise ReadError('Series identity mismatch')
         if s.get('frequency')!='fifteen_min' or s.get('fee_type')!='quadratic':
@@ -759,7 +807,7 @@ class Copilot:
             'book':book,'model':model,'structure':st,'initial_bias':st['bias'],'decision':selected or 'NO TRADE',
             'entry':entry,'side_evaluations':prices,'position':position,'profit_taking_bid_zone':profit,
             'invalidation':invalidation,'data_quality_faults':data_faults,'entry_blockers':blockers(veto),
-            'retrieval_health':{'requests':timing,'snapshot_skew_seconds':skew},
+            'retrieval_health':{'requests':timing,'snapshot_skew_seconds':skew,'discovery':discovery_source},
             'model_version':version(settings),'confidence':'Low','risk_flags':list(dict.fromkeys(flags)),
             'why':[f"1h BRTI move ${st['changes']['1h']['dollars']:+.2f}; trend {st['bias']} (z={st['hour_trend_z']:+.2f})",
                    f"{st['structure']}; {st['setup']}",
