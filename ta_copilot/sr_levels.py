@@ -71,6 +71,8 @@ def levels(view_tf, bars_by_tf, history, price, atr, vwap=None, target=None,
         if vwap is not None and low - tol <= vwap <= high + tol:
             tags.append("VWAP · Coinbase volume")
         sources = sorted({src for _, _, src, _ in group})
+        higher_tf_count = len({tf for _, tf, src, _ in group
+                               if src == "swing" and tf in wanted and tf != view_tf})
         parts = {"touches": sum(WEIGHTS[tf] for _, tf, src, _ in group if src == "swing"),
                  "session": len(set(sources) - {"swing"}), "confluence": len(tags)}
         lo, hi, center, ref = round(low, 2), round(high, 2), round(mid, 2), round(price, 2)
@@ -92,6 +94,7 @@ def levels(view_tf, bars_by_tf, history, price, atr, vwap=None, target=None,
                 "touches": sum(src == "swing" for _, _, src, _ in group),
                 "timeframes": [tf for tf in FRAMES if any(c[1] == tf for c in group)],
                 "sources": sources, "last_touch": last_touch,
+                "higher_tf_count": higher_tf_count, "mtf_confluence": higher_tf_count >= 2,
                 "crossings": crossings,
                 "tags": tags, "strength": sum(parts.values()), "strength_parts": parts,
                 "role": "at price" if inside else "support" if center < ref else "resistance",

@@ -19,6 +19,7 @@ import sys
 import threading
 import time
 from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, quote, urlencode, urlparse
@@ -105,6 +106,14 @@ def get_json(url, params=None, timeout=8):
 
 def iso(epoch):
     return datetime.fromtimestamp(epoch, timezone.utc).isoformat().replace("+00:00", "Z")
+
+
+def derived_window_ticker(now):
+    """Ticker named for the current slot's New York close."""
+    slot = int(now // 900) * 900
+    close = datetime.fromtimestamp(slot + 900, ZoneInfo("America/New_York"))
+    month = ("JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC")[close.month - 1]
+    return SERIES + "-" + close.strftime("%y") + month + close.strftime("%d%H%M-%M")
 
 
 def parse_ts(text):
@@ -222,7 +231,8 @@ def window_distance(strike, composite, seconds_left, sigma_1m, close_ts, samples
               "sigma_model": "brownian settlement-average proxy",
               "observed_seconds": 0, "missing_seconds": 0,
               "observed_mean": None, "required_remaining_avg": None,
-              "required_remaining_move": None, "required_remaining_seconds": None}
+              "required_remaining_move": None, "required_remaining_seconds": None,
+              "required_drift_per_sec": None}
     if composite is None or strike is None:
         return result
     strike = finite_float(strike)
@@ -249,6 +259,7 @@ def window_distance(strike, composite, seconds_left, sigma_1m, close_ts, samples
             result["required_remaining_avg"] = req
             result["required_remaining_move"] = req - composite
             result["required_remaining_seconds"] = remaining
+            result["required_drift_per_sec"] = (req - composite) / remaining
         reference = (obs_sum + composite * rem) / 60
         factor = (seconds_left / 60) ** 3 / 3
     sigma_usd = sigma_1m * reference if sigma_1m is not None else None
@@ -276,6 +287,13 @@ def is_exchange_closed(status):
     return type(ea) is bool and type(ta_flag) is bool and (not ea or not ta_flag)
 
 
+def is_exchange_open(status):
+    if not isinstance(status, dict):
+        return False
+    body = status.get("data") if isinstance(status.get("data"), dict) else status
+    return body.get("exchange_active") is True and body.get("trading_active") is True
+
+
 def book_context(data):
     """Kalshi publishes YES and NO bids; the opposite bid is the ask."""
     book = data["orderbook_fp"]
@@ -300,6 +318,13 @@ def book_context(data):
         return {"price": str(level[0]), "count": str(level[1])} if level else None
     mid = (yes[0] + yes_ask[0]) / 2 if yes and yes_ask else None
     spread = yes_ask[0] - yes[0] if yes and yes_ask else None
+    def imbalance(a, b):
+        total = a + b
+        return float((a - b) / total) if total else None
+    top_imbalance = imbalance(yes[1] if yes else 0, no[1] if no else 0)
+    depth_imbalance = imbalance(sum(c for _, c in yes_levels), sum(c for _, c in no_levels))
+    microprice = ((yes[0] * no[1] + yes_ask[0] * yes[1]) / (yes[1] + no[1])
+                  if yes and no else None)
     return {"yes_bid": show(yes), "yes_ask": show(yes_ask),
             "no_bid": show(no), "no_ask": show(no_ask),
             "yes_bids": [show(l) for l in yes_levels],
@@ -307,7 +332,50 @@ def book_context(data):
             "no_bids": [show(l) for l in no_levels],
             "no_asks": [show(l) for l in no_asks],
             "yes_spread": float(spread) if spread is not None else None,
-            "yes_mid": float(mid) if mid is not None else None}
+            "yes_mid": float(mid) if mid is not None else None,
+            "top_imbalance": top_imbalance, "depth_imbalance": depth_imbalance,
+            "microprice": float(microprice) if microprice is not None else None,
+            "micro_skew_cents": float((microprice - mid) * 100) if microprice is not None else None}
+
+
+def kalshi_tape_summary(trades, now):
+    """Observed public trades in this window; malformed rows contribute nothing."""
+    totals = {"contracts": 0.0, "trade_count": 0, "yes_taker": 0.0, "no_taker": 0.0,
+              "price_times_count": 0.0}
+    recent = totals.copy()
+    for trade in trades:
+        if not isinstance(trade, dict):
+            continue
+        try:
+            at = parse_ts(trade["time"])
+            count = float(trade["count"])
+            price = float(trade["yes_price"])
+        except (KeyError, TypeError, ValueError, OverflowError):
+            continue
+        if not (math.isfinite(at) and math.isfinite(count) and math.isfinite(price)
+                and count > 0 and 0 < price < 1 and at <= now):
+            continue
+        buckets = (totals, recent) if now - at <= 60 else (totals,)
+        if any(not (math.isfinite(bucket["contracts"] + count) and
+                    math.isfinite(bucket["price_times_count"] + price * count))
+               for bucket in buckets):
+            continue
+        for bucket in buckets:
+            bucket["contracts"] += count
+            bucket["trade_count"] += 1
+            bucket["price_times_count"] += price * count
+            if trade.get("taker_side") == "yes":
+                bucket["yes_taker"] += count
+            elif trade.get("taker_side") == "no":
+                bucket["no_taker"] += count
+    def show(bucket):
+        side_total = bucket["yes_taker"] + bucket["no_taker"]
+        return {"contracts": bucket["contracts"], "trade_count": bucket["trade_count"],
+                "taker_imbalance": ((bucket["yes_taker"] - bucket["no_taker"]) / side_total
+                                    if side_total else None),
+                "yes_vwap": (bucket["price_times_count"] / bucket["contracts"]
+                             if bucket["contracts"] else None)}
+    return {"last_60s": show(recent), "window": show(totals)}
 
 
 def kalshi_trades(data, ticker, open_ts, close_ts):
@@ -464,6 +532,9 @@ def analyze(bars, price, anchor, vwap_label="VWAP"):
     m_line, m_sig, m_hist = macd(closes)
     bb_mid, bb_up, bb_lo = bollinger(closes)
     a = atr(highs, lows, closes)
+    trailing_atr = [x for x in a if x is not None][-60:]
+    median_atr = statistics.median(trailing_atr) if len(trailing_atr) == 60 else None
+    atr_ratio = trailing_atr[-1] / median_atr if median_atr and median_atr > 0 else None
     st_k, st_d = stochastic(highs, lows, closes)
     vw = anchored_vwap(bars, anchor)
     sw_hi, sw_lo = pivots(bars)
@@ -471,6 +542,9 @@ def analyze(bars, price, anchor, vwap_label="VWAP"):
     v = {"ema9": last(e9), "ema21": last(e21), "ema50": last(e50), "ema200": last(e200),
          "rsi": last(r), "macd": last(m_line), "macd_signal": last(m_sig), "macd_hist": last(m_hist),
          "bb_mid": last(bb_mid), "bb_upper": last(bb_up), "bb_lower": last(bb_lo), "atr": last(a),
+         "atr_ratio": atr_ratio,
+         "vol_regime": ("expanding" if atr_ratio >= 1.3 else "compressed" if atr_ratio <= 0.7 else "normal")
+         if atr_ratio is not None else None,
          "stoch_k": last(st_k), "stoch_d": last(st_d), "vwap": last(vw)}
     hist_vals = [x for x in m_hist if x is not None]
     v["macd_hist_prev"] = hist_vals[-2] if len(hist_vals) > 1 else None
@@ -640,6 +714,7 @@ class Feed:
         self.spot_at = 0.0
         self.market = None
         self.market_at = 0.0
+        self.market_discovery_source = None
         self.last_market_ticker = None
         # A new window's first metadata comes from the 30 s listing prefetch.
         # `market_promoted_at` starts the short stale grace, `market_wake` lets
@@ -652,6 +727,7 @@ class Feed:
         self.exchange_closed = False
         self.exchange_status_at = 0.0
         self.exchange_closed_probe = None
+        self.exchange_open_probe = False
         self.upcoming_markets = {}
         self.upcoming_at = 0.0
         self.captured_tickers = set()
@@ -874,6 +950,7 @@ class Feed:
                         self.market_wake.set()
                         self.market_at = self.upcoming_at
                     self.market = promoted
+                    self.market_discovery_source = "prefetch"
             for market in self.upcoming_markets.values():
                 try:
                     delay = at - parse_ts(market["open_time"])
@@ -1005,9 +1082,11 @@ class Feed:
         live.sort(key=lambda m: m["close_time"])
         selected = live[0] if live else None
         selected_at = time.time() if selected else 0.0
+        discovery_source = "listing" if selected else None
         refreshed = selected is not None
         from_prefetch = False
         if not selected:
+            known_open = False
             with self.lock:
                 upcoming = [dict(m) for m in self.upcoming_markets.values()
                             if parse_ts(m["open_time"]) <= now < parse_ts(m["close_time"])]
@@ -1016,14 +1095,17 @@ class Feed:
             prefetched = upcoming[0] if upcoming else None
             if current and (not prefetched or current_at >= upcoming_at):
                 selected, selected_at = current, current_at
+                discovery_source = "cached"
             else:
                 selected, selected_at = prefetched, upcoming_at
+                discovery_source = "prefetch" if selected else None
                 refreshed = bool(selected and upcoming_at > current_at)
                 from_prefetch = selected is not None
         if selected and direct and direct["ticker"] == selected["ticker"]:
             selected, selected_at = direct, direct_at
             refreshed = True
             from_prefetch = False
+            discovery_source = "direct"
         elif selected and not live:
             try:
                 detail, fetched_at = self.direct_market(selected["ticker"], now)
@@ -1031,27 +1113,47 @@ class Feed:
                     selected, selected_at = detail, fetched_at
                     refreshed = True
                     from_prefetch = False
+                    discovery_source = "direct"
             except Exception as exc:
                 direct_error = exc
         closed = False
         if not selected:
             with self.lock:
                 cached_closed = self.exchange_closed_probe
+                cached_open = self.exchange_open_probe
                 status_age = now - self.exchange_status_at if self.exchange_status_at else float("inf")
             if 0 <= status_age < EXCHANGE_STATUS_REFRESH:
                 closed = cached_closed is True
+                known_open = cached_open is True
             elif not listing_error:
                 try:
                     status = get_json(f"{KALSHI}/exchange/status")
                     closed = is_exchange_closed(status)
+                    known_open = is_exchange_open(status)
                 except Exception:
                     closed = False
+                    known_open = False
                 with self.lock:
                     self.exchange_status_at = now
                     self.exchange_closed_probe = closed
+                    self.exchange_open_probe = known_open
+            if known_open:
+                slot = int(now // 900) * 900
+                ticker = derived_window_ticker(now)
+                try:
+                    detail, fetched_at = self.direct_market(ticker, now)
+                    if (detail and detail["ticker"] == ticker and
+                            parse_ts(detail["open_time"]) == slot and
+                            parse_ts(detail["close_time"]) == slot + 900):
+                        selected, selected_at = detail, fetched_at
+                        refreshed = True
+                        discovery_source = "derived"
+                except Exception as exc:
+                    direct_error = exc
         with self.lock:
             old_ticker = self.last_market_ticker
             self.market, self.market_at = selected, selected_at
+            self.market_discovery_source = discovery_source
             self.exchange_closed = bool(not self.market and closed)
             if self.market and self.market["ticker"] != old_ticker:
                 if from_prefetch:
@@ -1173,6 +1275,7 @@ class Feed:
             fetched_last = dict(self.fetched_last)
             spot, spot_at = dict(self.spot) if self.spot else None, self.spot_at
             market, market_at = self.market, self.market_at
+            discovery_source = self.market_discovery_source
             promoted_at = self.market_promoted_at
             exchange_closed = self.exchange_closed
             errors = dict(self.errors)
@@ -1217,6 +1320,7 @@ class Feed:
             yb, ya = market.get("yes_bid_dollars"), market.get("yes_ask_dollars")
             quotes_ready = market.get("status") != "initialized"
             window = {"ticker": market["ticker"], "strike": strike, "open_time": market["open_time"],
+                      "discovery_source": discovery_source,
                       "close_time": market["close_time"], "seconds_left": max(0.0, close_ts - now),
                       "yes_bid": optional_float(yb) if quotes_ready else None,
                       "yes_ask": optional_float(ya) if quotes_ready else None,
@@ -1239,6 +1343,7 @@ class Feed:
                     {"price": level["price"], "source": "book", "age": window["orderbook_age"]}
                     if level else {"price": window[side], "source": "market summary", "age": window["age"]})
             window["recent_trades"] = recent_trades if context_ticker == market["ticker"] else []
+            window["tape_summary"] = kalshi_tape_summary(window["recent_trades"], now)
             window["yes_mid_path"] = mid_path if context_ticker == market["ticker"] else []
             sig = realized_sigma([b["close"] for b in bars["1m"]])
             window.update(window_distance(strike, composite, window["seconds_left"], sig,

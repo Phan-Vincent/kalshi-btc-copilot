@@ -715,7 +715,58 @@ def proxy_section(closes, settled):
     return lines
 
 
-def report(opened, settled, minutes=None, now=None, closes=None):
+def calibration_section(opened, settled, minutes):
+    """Observed settlement frequencies; exploratory and not a live estimate."""
+    distance, market = {}, {}
+    lock_hits = lock_count = 0
+    for ticker, rows in minutes.items():
+        result = (settled.get(ticker) or {}).get("result")
+        if result not in ("yes", "no"):
+            continue
+        for minute, row in rows.items():
+            if record_problem(row) or row.get("stale") or row.get("kalshi_stale"):
+                continue
+            composite, target, sigma = (row.get(k) for k in ("composite", "target", "sigma_1m_usd"))
+            if (composite is None or target is None or sigma is None or sigma <= 0
+                    or "1m" in (row.get("history_stale") or [])):
+                continue
+            if minute == 14:
+                lock_count += 1
+                lock_hits += (composite >= target) == (result == "yes")
+            left = row.get("seconds_left")
+            if left is not None and left > 60:
+                scale = sigma * math.sqrt((left - 60) / 60 + 1 / 3)
+                value = (composite - target) / scale
+                bucket = ("<−2σ" if value < -2 else "−2 to −1σ" if value < -1 else
+                          "−1 to 0σ" if value < 0 else "0 to 1σ" if value < 1 else
+                          "1 to 2σ" if value < 2 else "≥2σ")
+                hits, count = distance.get(bucket, (0, 0))
+                distance[bucket] = (hits + (result == "yes"), count + 1)
+            bid, ask = row.get("yes_bid"), row.get("yes_ask")
+            if (isinstance(bid, dict) and isinstance(ask, dict) and
+                    isinstance(bid.get("age"), (int, float)) and isinstance(ask.get("age"), (int, float))
+                    and 0 <= bid["age"] <= 10 and 0 <= ask["age"] <= 10):
+                price = mid(row)
+                if price is not None:
+                    bucket = min(9, int(price * 10))
+                    hits, count = market.get(bucket, (0, 0))
+                    market[bucket] = (hits + (result == "yes"), count + 1)
+    def line(label, hits, count, unit="YES"):
+        ci = wilson95(hits, count)
+        return f"{label}: {hits}/{count} {unit} ({hits / count:.1%}), Wilson 95% [{ci[0]:.1%}, {ci[1]:.1%}]"
+    lines = ["", "== Calibration " + EXPLORATORY + " ==",
+             "Observed YES settlement rates by minute-row proxy distance and fresh YES mid; descriptive, not a probability estimate or trade signal.",
+             "Distance in σ (minutes with more than 60 s left):"]
+    lines += [line(bucket, *distance[bucket]) for bucket in
+              ("<−2σ", "−2 to −1σ", "−1 to 0σ", "0 to 1σ", "1 to 2σ", "≥2σ") if bucket in distance]
+    lines.append("Fresh YES mid (10¢ buckets):")
+    lines += [line(f"{bucket * 10:02d}–{bucket * 10 + 9:02d}¢", *market[bucket]) for bucket in sorted(market)]
+    lines.append(line("Minute-14 composite side lock-in accuracy", lock_hits, lock_count, "matched")
+                 if lock_count else "Minute-14 composite side lock-in accuracy: 0 rows")
+    return lines
+
+
+def report(opened, settled, minutes=None, now=None, closes=None, calibration=False):
     minutes = minutes or {}
     now = now or datetime.now(timezone.utc)
     lines = legacy_section(opened, settled)
@@ -726,6 +777,8 @@ def report(opened, settled, minutes=None, now=None, closes=None):
     lines += market_section(opened, settled, minutes)
     lines += levels_section(opened, settled, minutes)
     lines += primary_section(opened, minutes, now)
+    if calibration:
+        lines += calibration_section(opened, settled, minutes)
     return "\n".join(lines)
 
 
@@ -734,6 +787,7 @@ def main():
     parser.add_argument("path", nargs="?", type=Path, default=Path.home() / "btc-ta/state/tally_log.jsonl")
     parser.add_argument("--manifest", type=Path,
                         help="also write the primary's selection, seed, input and code digests as JSON")
+    parser.add_argument("--calibration", action="store_true", help="append exploratory observed-rate calibration")
     args = parser.parse_args()
     skipped = []
     closes = {}
@@ -742,7 +796,7 @@ def main():
     if skipped[0]:
         print(f"Skipped {skipped[0]} unreadable log lines.")
     now = datetime.now(timezone.utc)
-    print(report(*rows, now=now, closes=closes))
+    print(report(*rows, now=now, closes=closes, calibration=args.calibration))
     if args.manifest:
         write_manifest(args.manifest, source, rows[0], rows[2], now, source=args.path)
         print(f"Primary manifest written to {args.manifest}; its exact input is {source}")
