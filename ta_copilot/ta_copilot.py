@@ -717,8 +717,10 @@ class Feed:
         self.update_spot(spot.price, spot.bid, spot.ask, t.get("time"), venue, fetched_at)
 
     def update_spot(self, price, bid, ask, stamp, venue, fetched_at):
-        price, bid, ask = finite_float(price), finite_float(bid), finite_float(ask)
-        if min(price, bid, ask) <= 0:
+        price = finite_float(price)
+        bid = optional_float(bid)
+        ask = optional_float(ask)
+        if price <= 0 or (bid is not None and bid <= 0) or (ask is not None and ask <= 0):
             raise ValueError("nonpositive spot quote")
         with self.lock:
             self.spot, self.spot_at = {"price": price, "bid": bid, "ask": ask,
@@ -1032,13 +1034,13 @@ class Feed:
             except Exception as exc:
                 direct_error = exc
         closed = False
-        if not selected and not listing_error:
+        if not selected:
             with self.lock:
                 cached_closed = self.exchange_closed_probe
                 status_age = now - self.exchange_status_at if self.exchange_status_at else float("inf")
-            if status_age < EXCHANGE_STATUS_REFRESH:
+            if 0 <= status_age < EXCHANGE_STATUS_REFRESH:
                 closed = cached_closed is True
-            else:
+            elif not listing_error:
                 try:
                     status = get_json(f"{KALSHI}/exchange/status")
                     closed = is_exchange_closed(status)
@@ -1478,6 +1480,12 @@ class TallyLogger:
         self.path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
         os.chmod(self.path.parent, 0o700)
         skipped, late_values = [], {}
+        self.opened.clear()
+        self.settled.clear()
+        self.results.clear()
+        self.closes.clear()
+        self.expirations.clear()
+        self.value_pending.clear()
         self.skipped_lines = 0
         self._archived_record = {"hits": 0, "scored": 0}
         self._archived_coverage = {"total_closes": 0, "scored": 0, "incomplete_samples": 0,
@@ -1621,7 +1629,7 @@ class TallyLogger:
         # Windows with only a close row (the server started mid-window) still
         # need their settlement to score the closing-minute proxy.
         for ticker, row in list({**self.closes, **self.opened}.items()):
-            if ticker in self.settled:
+            if ticker in self.settled or not row.get("close_time"):
                 continue
             try:
                 if parse_ts(row["close_time"]) > now:
@@ -1679,6 +1687,14 @@ class TallyLogger:
             arch_cov = self._archived_coverage = {"total_closes": 0, "scored": 0, "incomplete_samples": 0,
                                                   "missing_settlement": 0, "invalid_proxy": 0}
         limit = max(MAX_MEMORY_WINDOWS, PROXY_RECORD_WINDOWS)
+        active_tickers = set(self.opened) | set(self.closes)
+        if len(self.settled) > limit:
+            keep_settled = active_tickers | set(getattr(self, "pending_open", {})) | set(self.value_pending)
+            for orphan in list(self.settled):
+                if orphan not in keep_settled:
+                    self.settled.discard(orphan)
+                    getattr(self, "results", {}).pop(orphan, None)
+                    self.expirations.pop(orphan, None)
         if len(self.opened) <= limit and len(self.closes) <= limit:
             return
         def win_ts(ticker):
@@ -1686,15 +1702,15 @@ class TallyLogger:
             for key in ("close_time", "open_time", "captured_at"):
                 if row.get(key):
                     try:
-                        return parse_ts(row[key])
+                        return (0, parse_ts(row[key]), "")
                     except Exception:
                         pass
-            return float("inf")
-        all_tickers = sorted(set(self.opened) | set(self.closes), key=lambda t: (win_ts(t), t))
+            return (1, 0.0, str(row.get("close_time") or ""))
+        all_tickers = sorted(active_tickers, key=lambda t: (*win_ts(t), t))
         if len(all_tickers) <= limit:
             return
         scored_closes = [
-            t for t, row in sorted(self.closes.items(), key=lambda item: item[1].get("close_time") or "")
+            t for t, row in sorted(self.closes.items(), key=lambda item: (*win_ts(item[0]), item[0]))
             if (row.get("samples") == 60
                 and optional_float(self.expirations.get(t)) is not None
                 and optional_float(row.get("proxy_avg_60s")) is not None)
@@ -1760,7 +1776,16 @@ class TallyLogger:
         coverage = {"total_closes": arch["total_closes"] + len(self.closes), "scored": arch["scored"],
                     "incomplete_samples": arch["incomplete_samples"], "awaiting_settlement": 0,
                     "missing_settlement": arch["missing_settlement"], "invalid_proxy": arch["invalid_proxy"]}
-        for ticker, row in sorted(self.closes.items(), key=lambda item: item[1].get("close_time") or ""):
+        def close_order(item):
+            ticker, row = item
+            for key in ("close_time", "captured_at"):
+                if row.get(key):
+                    try:
+                        return (0, parse_ts(row[key]), "", ticker)
+                    except Exception:
+                        pass
+            return (1, 0.0, str(row.get("close_time") or ""), ticker)
+        for ticker, row in sorted(self.closes.items(), key=close_order):
             settled = optional_float(self.expirations.get(ticker))
             proxy = optional_float(row.get("proxy_avg_60s"))
             # Exclusive reasons, in this order; coverage spans all recorded closes.

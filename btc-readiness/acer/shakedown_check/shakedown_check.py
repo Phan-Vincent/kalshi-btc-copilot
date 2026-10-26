@@ -80,8 +80,9 @@ def report(now):
         if start is None:
             return {'problems': ['No COLLECTOR_START event: the shakedown has not started']}
         since = max(start, math.floor((now - LOOKBACK) / 3600) * 3600)
-        events = c.execute('SELECT epoch,kind,detail FROM runtime_events WHERE epoch>=?', (since,)).fetchall()
-        windows = wan_windows(events)
+        all_events = c.execute('SELECT epoch,kind,detail FROM runtime_events ORDER BY epoch').fetchall()
+        events = [row for row in all_events if row[0] >= since]
+        windows = wan_windows(all_events)
         in_window = lambda e: any(lo <= e <= hi for lo, hi, _ in windows)
         obs = [e for (e,) in c.execute('SELECT epoch FROM observations WHERE epoch>=?', (since,)).fetchall()]
         enrolled = {round(o) for (o,) in c.execute('SELECT opened FROM markets WHERE checkpoint IS NOT NULL AND opened>=?', (since - 900,)).fetchall()}
@@ -98,12 +99,12 @@ def report(now):
         miss_reasons = Counter()
         unnamed = 0
         for s in missed[-12:]:  # the most recent misses are enough to name the cause
-            near = [d for e, k, d in events if k in ('COLLECTION_FAILED','EXCHANGE_CLOSED','CLOSURE_STATUS_UNAVAILABLE') and s + BAND[0] - 15 <= e <= s + BAND[1]]
+            near = [d for e, k, d in all_events if k in ('COLLECTION_FAILED','EXCHANGE_CLOSED','CLOSURE_STATUS_UNAVAILABLE') and s + BAND[0] - 15 <= e <= s + BAND[1] and d]
             ids = [i for (i,) in c.execute('SELECT id FROM observations WHERE epoch BETWEEN ? AND ?', (s + BAND[0], s + BAND[1])).fetchall()]
             vetoes = [v for snap in payloads(c, ids) for v in snap.get('operational_vetoes', [])]
             explained = [r for r in logged.get(s, []) if r]
             # A reboot that resumed after this band opened explains it; the release tool applies the same test.
-            for e, k, d in events:
+            for e, k, d in all_events:
                 if k != 'REBOOT_RESUME':
                     continue
                 try:
@@ -112,18 +113,18 @@ def report(now):
                         explained.append('reboot')
                 except (TypeError, ValueError, KeyError):
                     pass
-            stops = [(e, d) for e, k, d in events if k == 'COLLECTOR_STOP' and e <= s + BAND[1]]
+            stops = [(e, d) for e, k, d in all_events if k == 'COLLECTOR_STOP' and e <= s + BAND[1]]
             if stops:
                 stopped, detail = stops[-1]
                 # Cleared only by a restart that had the collector up for the whole band (release tool rule).
-                if not any(e > stopped and e <= s + BAND[0] and k == 'COLLECTOR_START' for e, k, _ in events):
+                if not any(e > stopped and e <= s + BAND[0] and k == 'COLLECTOR_START' for e, k, _ in all_events):
                     explained.append(detail or 'Collector stopped')
             explained += [why for lo, hi, why in windows if s + BAND[0] <= hi and s + BAND[1] >= lo]
             unnamed += not (near + vetoes + explained)
             miss_reasons.update(set(near + vetoes + explained) or {'NO OBSERVATION OR REASON IN THE BAND'})
         # Judge completed clock hours, including the run's partial first hour; WAN wins over upstream 5xx.
         hours = []
-        wan_failures = 0
+        wan_failures = sum(1 for e, k, _ in events if k == 'COLLECTION_FAILED' and in_window(e))
         upstream_failures = sum(1 for e, k, d in events if k == 'COLLECTION_FAILED' and not in_window(e) and UPSTREAM_5XX.search(d or ''))
         all_polls = len(obs) + sum(1 for e, k, _ in events if k == 'COLLECTION_FAILED')
         for h in range(math.floor(since / 3600) * 3600, int(now) - 3599, 3600):
@@ -132,7 +133,6 @@ def report(now):
             ok = sum(1 for e in obs if h <= e < h + 3600)
             upstream = sum(1 for e, k, d in events if k == 'COLLECTION_FAILED' and h <= e < h + 3600 and not in_window(e) and UPSTREAM_5XX.search(d or ''))
             hours.append((h, fail - wan - upstream, ok + fail - wan - upstream))
-            wan_failures += wan
         bad_hours = [(time.strftime('%m-%d %H:00', time.gmtime(h)), f, n) for h, f, n in hours if n and f / n > MAX_FAIL_RATE]
         fail_reasons = Counter((d or 'NO DETAIL')[:90] for e, k, d in events if k == 'COLLECTION_FAILED')
         unexplained = sum(1 for e, k, d in events if k == 'COLLECTION_FAILED' and not d)
