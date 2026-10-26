@@ -182,6 +182,58 @@ class MetricsTests(unittest.TestCase):
         # Rows without an ID are left out; an empty full fetch changes nothing.
         self.assertEqual(sorted(ta.merge_tape(None, [row(None, 1010), row("z", 1009)], False, 1000, 1011)["rows"]), ["z"])
         self.assertIs(ta.merge_tape(tape, [], True, 1000, 1600), tape)
+        self.assertIsNone(ta.tape_reach(None))
+        self.assertEqual(ta.tape_reach(tape), 1500)
+
+    def test_trades_paging_reaches_held_trades_within_the_cap(self):
+        limit = ta.KALSHI_TRADES_LIMIT
+        def trade(i):  # i counts back from the newest trade, 0.1 s apart
+            return {"ticker": "T", "created_time": ta.iso(2000 - i / 10), "yes_price_dollars": "0.5",
+                    "count_fp": "1", "taker_side": "yes", "trade_id": f"id{i}"}
+        def pages(total):
+            calls = []
+            def get(url, params=None, timeout=8):
+                calls.append(dict(params))
+                start = int(params.get("cursor") or 0)
+                end = min(total, start + limit)
+                return {"trades": [trade(i) for i in range(start, end)],
+                        "cursor": str(end) if end < total else ""}
+            return get, calls
+        # Reaches held trades on the second page: stops there, still "full".
+        get, calls = pages(1000)
+        with patch.object(ta, "get_json", side_effect=get):
+            raw, full = ta.fetch_trades("T", 1000, 2000 - 150 / 10)
+        self.assertEqual((len(raw), full, len(calls)), (200, True, 2))
+        self.assertEqual(calls[1]["cursor"], "100")
+        self.assertEqual(calls[0], {"ticker": "T", "min_ts": 1000, "limit": limit})
+        # Never reaches held trades: stops at the cap.
+        get, calls = pages(10000)
+        with patch.object(ta, "get_json", side_effect=get):
+            raw, full = ta.fetch_trades("T", 1000, 0)
+        self.assertEqual((len(raw), full, len(calls)), (limit * ta.KALSHI_TRADE_PAGES, True, ta.KALSHI_TRADE_PAGES))
+        # Runs out of trades (short page, then a full last page with no cursor): whole window.
+        for total in (250, 300):
+            get, calls = pages(total)
+            with patch.object(ta, "get_json", side_effect=get):
+                raw, full = ta.fetch_trades("T", 1000, None)
+            self.assertEqual((len(raw), full), (total, False))
+        # End to end: a 150-trade burst since the last poll no longer resets the tape.
+        feed = ta.Feed()
+        feed.market = {"ticker": "T", "open_time": ta.iso(1000), "close_time": ta.iso(2100)}
+        held = {f"id{i}": {"time": ta.iso(2000 - i / 10), "yes_price": "0.5", "count": "1",
+                           "taker_side": "yes", "is_block_trade": False, "trade_id": f"id{i}"}
+                for i in range(150, 160)}
+        feed.context_ticker, feed.kalshi_tape = "T", {"rows": held, "from": 1500, "to": 1985}
+        get, calls = pages(1000)
+        def routed(url, params=None, timeout=8):
+            if url.endswith("/orderbook"):
+                return {"orderbook_fp": {"yes_dollars": [["0.40", "5"]], "no_dollars": [["0.50", "5"]]}}
+            return get(url, params, timeout)
+        with patch.object(ta, "get_json", side_effect=routed), patch.object(ta.time, "time", return_value=2000.5):
+            feed.poll_market_context()
+        self.assertEqual(feed.kalshi_tape["from"], 1500)
+        self.assertEqual(len(feed.kalshi_tape["rows"]), 200)
+        self.assertEqual(len(feed.kalshi_recent_trades), 30)
         # The display list keeps its old shape: newest 30, no trade_id.
         data = {"trades": [{"ticker": "T", "created_time": ta.iso(1000 + i), "yes_price_dollars": "0.5",
                             "count_fp": "1", "trade_id": f"id{i}"} for i in range(40)]}

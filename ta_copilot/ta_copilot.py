@@ -59,6 +59,9 @@ CANDLE_REFRESH = {"1m": 10, "5m": 30, "15m": 60, "1h": 120}
 SPOT_REFRESH = 2
 KALSHI_REFRESH = 2
 KALSHI_TRADES_LIMIT = 100
+# Trades pages per context poll (2 s): enough to bridge a burst back to the
+# trades already held, without unbounded requests in a busy window.
+KALSHI_TRADE_PAGES = 4
 COINBASE_WS = "wss://ws-feed.exchange.coinbase.com"
 KRAKEN_WS = "wss://ws.kraken.com/v2"
 LARGE_TRADE_USD = float(os.environ.get("TA_LARGE_TRADE_USD", "25000"))
@@ -384,11 +387,44 @@ def kalshi_trades(data, ticker, open_ts, close_ts):
             for row in kalshi_trade_rows(data, ticker, open_ts, close_ts)[:30]]
 
 
+def tape_reach(tape):
+    """Newest time up to which the tape holds every trade, or None."""
+    if not tape or tape["from"] is None:
+        return None
+    return max((parse_ts(row["time"]) for row in tape["rows"].values()), default=tape["to"])
+
+
+def fetch_trades(ticker, opened, reach):
+    """Newest trades since open, paging back with the cursor until a page
+    reaches `reach`, ends the window's trades, or KALSHI_TRADE_PAGES is hit.
+    Returns the raw trades and whether older ones may be left unfetched."""
+    trades, cursor = [], None
+    for _ in range(KALSHI_TRADE_PAGES):
+        params = {"ticker": ticker, "min_ts": int(opened), "limit": KALSHI_TRADES_LIMIT}
+        if cursor:
+            params["cursor"] = cursor
+        data = get_json(f"{KALSHI}/markets/trades", params)
+        page = data.get("trades") or []
+        trades += page
+        cursor = data.get("cursor")
+        if len(page) < KALSHI_TRADES_LIMIT or not isinstance(cursor, str) or not cursor:
+            return trades, False
+        times = []
+        for trade in page:
+            try:
+                times.append(parse_ts(trade["created_time"]))
+            except (KeyError, TypeError, ValueError):
+                pass
+        if reach is not None and times and min(times) <= reach:
+            return trades, True
+    return trades, True
+
+
 def merge_tape(tape, rows, full, open_ts, fetched_at):
-    """Fold one trades fetch (the newest KALSHI_TRADES_LIMIT since open) into
-    the window's tape. A fetch below the limit holds every trade since open. A
-    full one reaches back only to its oldest row; if the tape doesn't reach
-    that far, trades in between were missed and the tape restarts there."""
+    """Fold one trades fetch (see fetch_trades) into the window's tape. A fetch
+    that ran out of trades holds every trade since open. Otherwise it reaches
+    back only to its oldest row; if the tape doesn't reach that far, trades in
+    between were missed and the tape restarts there."""
     held = dict(tape["rows"]) if tape else {}
     covered_from = tape["from"] if tape else None
     rows = [row for row in rows if row["trade_id"]]
@@ -396,9 +432,8 @@ def merge_tape(tape, rows, full, open_ts, fetched_at):
         covered_from = open_ts
     elif rows:
         oldest = min(parse_ts(row["time"]) for row in rows)
-        reach = max((parse_ts(row["time"]) for row in held.values()),
-                    default=tape["to"] if tape else None)
-        if covered_from is None or reach is None or oldest > reach:
+        reach = tape_reach(tape)
+        if reach is None or oldest > reach:
             held, covered_from = {}, oldest
     else:
         return tape
@@ -1247,12 +1282,12 @@ class Feed:
             self.book, self.book_at = book, book_observed_at
             if book["yes_mid"] is not None:
                 self.yes_mid_path.append({"time": int(book_observed_at), "value": book["yes_mid"]})
-        data = get_json(f"{KALSHI}/markets/trades",
-                        {"ticker": ticker, "min_ts": int(opened), "limit": KALSHI_TRADES_LIMIT})
+        with self.lock:
+            reach = tape_reach(self.kalshi_tape)
+        raw, full = fetch_trades(ticker, opened, reach)
         fetched_at = time.time()
-        rows = kalshi_trade_rows(data, ticker, opened, closed)
+        rows = kalshi_trade_rows({"trades": raw}, ticker, opened, closed)
         trades = [{k: v for k, v in row.items() if k != "trade_id"} for row in rows[:30]]
-        full = len(data.get("trades") or []) >= KALSHI_TRADES_LIMIT
         with self.lock:
             if not self.market or self.market["ticker"] != ticker or self.context_ticker != ticker:
                 return
