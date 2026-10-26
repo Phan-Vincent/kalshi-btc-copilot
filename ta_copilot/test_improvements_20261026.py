@@ -225,6 +225,9 @@ class ReportAndDeployTests(unittest.TestCase):
         primary = source[source.index("def primary_result("):source.index("def primary_section(")]
         self.assertEqual(hashlib.sha256(primary.encode()).hexdigest(),
                          "0ee39f0ea8c97779607720e75872c17c7ee70e3f10c5639e29a2d56aea1485f3")
+        # The Acer copy (~/btc-ta) has no acer/ directory.
+        if not (HERE / "acer/deploy.sh").exists():
+            return
         deploy = (HERE / "acer/deploy.sh").read_text()
         self.assertIn("check) check ;;", deploy)
         self.assertIn("  deploy)\n    check", deploy)
