@@ -326,6 +326,28 @@ class IntegrationTests(unittest.TestCase):
         self.assertEqual(feed.ws_trade_seq[2], 3)
         self.assertEqual(socket.sent, [])
 
+    def test_recent_trades_stay_newest_30_on_a_large_tape(self):
+        feed = ta.Feed()
+        feed.market = {"ticker": "T", "open_time": ta.iso(1000), "close_time": ta.iso(1900)}
+        def trade(seq, ms):
+            return {"type": "trade", "sid": 5, "seq": seq, "msg": {
+                "market_ticker": "T", "trade_id": f"t{ms}", "yes_price_dollars": "0.50",
+                "count_fp": "1", "taker_side": "yes", "ts_ms": ms}}
+        seq = 0
+        for ms in range(1000000, 1000000 + 250 * 400, 400):  # 250 trades, beyond the full-sort size
+            seq += 1
+            feed.handle_kalshi_frame(trade(seq, ms), ms / 1000)
+        expected = sorted(feed.kalshi_tape["rows"].values(), key=lambda r: r["time"], reverse=True)[:30]
+        strip = lambda rows: [{k: v for k, v in r.items() if k != "trade_id"} for r in rows]
+        self.assertEqual(feed.kalshi_recent_trades, strip(expected))
+        seq += 1
+        feed.handle_kalshi_frame(trade(seq, 1000000 + 249 * 400), 1100)  # duplicate trade_id
+        self.assertEqual(feed.kalshi_recent_trades, strip(expected))
+        seq += 1
+        feed.handle_kalshi_frame(trade(seq, 1000000 + 5 * 400 + 1), 1100)  # late, older trade
+        self.assertEqual(feed.kalshi_recent_trades, strip(expected))
+        self.assertEqual(len(feed.kalshi_tape["rows"]), 251)
+
     def test_trades_before_promotion_are_adopted_into_new_tape(self):
         feed = ta.Feed()
         feed.market = {"ticker": "T", "open_time": ta.iso(100), "close_time": ta.iso(1000)}
