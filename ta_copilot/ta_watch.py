@@ -19,6 +19,9 @@ FEED_ERROR_SECONDS = 10 * 60
 # Kalshi context must stay stale across checks spanning this long (the third
 # consecutive five-minute check) before it counts: rollovers recover in seconds.
 KALSHI_STALE_SECONDS = 8 * 60
+# Same span for BRTI while a Kalshi key is configured: without it the page
+# quietly falls back to the composite proxy for every settlement figure.
+BRTI_STALE_SECONDS = 8 * 60
 DEFAULT_STATE = {"active": False, "last_sent_at": 0}
 
 
@@ -74,7 +77,8 @@ def valid_state(value):
             and is_num(value.get("last_sent_at", 0))
             and isinstance(value.get("feed_since", {}), dict)
             and all(is_num(v) for v in value.get("feed_since", {}).values())
-            and (value.get("kalshi_stale_since") is None or is_num(value.get("kalshi_stale_since"))))
+            and (value.get("kalshi_stale_since") is None or is_num(value.get("kalshi_stale_since")))
+            and (value.get("brti_stale_since") is None or is_num(value.get("brti_stale_since"))))
 
 
 def kalshi_stale_since(state, prior, now):
@@ -84,7 +88,20 @@ def kalshi_stale_since(state, prior, now):
     return prior if prior is not None else now
 
 
-def problems(service_active, state, now, feed_since=None, kalshi_since=None):
+def brti_down(state):
+    """Key configured (and scope-checked) but no fresh BRTI; never while Kalshi reports itself closed."""
+    brti = (state or {}).get("brti") or {}
+    return bool(brti.get("configured") and not brti.get("fresh") and not state.get("exchange_closed"))
+
+
+def brti_stale_since(state, prior, now):
+    """When the current stretch of unavailable BRTI began, or None while fresh or keyless."""
+    if not brti_down(state):
+        return None
+    return prior if prior is not None else now
+
+
+def problems(service_active, state, now, feed_since=None, kalshi_since=None, brti_since=None):
     found = []
     if service_active is None:
         found.append("service status unknown (systemctl failed)")
@@ -102,6 +119,8 @@ def problems(service_active, state, now, feed_since=None, kalshi_since=None):
     if (state.get("kalshi_stale") and not state.get("exchange_closed")
             and kalshi_since is not None and now - kalshi_since >= KALSHI_STALE_SECONDS):
         found.append("Kalshi window missing or stale >8 min")
+    if brti_down(state) and brti_since is not None and now - brti_since >= BRTI_STALE_SECONDS:
+        found.append("BRTI unavailable >8 min (settlement figures on the proxy)")
     feed_since = error_start_times(state, {}, now) if feed_since is None else feed_since
     for name, error in sorted(state.get("errors", {}).items()):
         if now - feed_since.get(name, now) > FEED_ERROR_SECONDS:
@@ -163,12 +182,15 @@ def main():
         service, state = check()
         feed_since = error_start_times(state, previous.get("feed_since", {}), now)
         kalshi_since = kalshi_stale_since(state, previous.get("kalshi_stale_since"), now)
-        message, next_state = transition(previous, problems(service, state, now, feed_since, kalshi_since), now)
+        brti_since = brti_stale_since(state, previous.get("brti_stale_since"), now)
+        message, next_state = transition(previous, problems(service, state, now, feed_since, kalshi_since,
+                                                            brti_since), now)
         if message:
             send_message(message)
         store(STATE_FILE, json.dumps({"active": next_state.get("active", False),
                                       "last_sent_at": next_state.get("last_sent_at", 0),
-                                      "feed_since": feed_since, "kalshi_stale_since": kalshi_since}) + "\n")
+                                      "feed_since": feed_since, "kalshi_stale_since": kalshi_since,
+                                      "brti_stale_since": brti_since}) + "\n")
         return 0
     except Exception:
         # No exception text: urllib exceptions can contain the bot-token URL.
