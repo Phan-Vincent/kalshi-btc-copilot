@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%233056d3'/%3E%3Ctext x='32' y='45' text-anchor='middle' font-size='38' fill='white'%3E₿%3C/text%3E%3C/svg%3E">
 <title>BTC TA Copilot</title>
-<script src="https://unpkg.com/lightweight-charts@4.2.3/dist/lightweight-charts.standalone.production.js" integrity="sha384-stKllnUqA9AD0gsKCuUtf5XlqAW7PwIgDagoNsTWkjkBmJ/GZ/uHTgEBxdLV2VSK" crossorigin="anonymous"></script>
+<script src="/vendor/lightweight-charts-4.2.3.js" integrity="sha384-stKllnUqA9AD0gsKCuUtf5XlqAW7PwIgDagoNsTWkjkBmJ/GZ/uHTgEBxdLV2VSK" crossorigin="anonymous"></script>
 <style>
 :root {
   --bg: #f6f7f9; --panel: #ffffff; --line: #e3e6eb; --text: #14171c; --muted: #667085;
@@ -135,11 +135,12 @@ footer { margin-top: 14px; font-size: 12px; color: var(--muted); }
       </div>
     </div>
     <div class="card">
-      <div class="label">Indicator tally · <span id="tallyTf">1m</span> <span id="tallyStale" class="stale-note"></span></div>
+      <div class="label">Family lean · <span id="tallyTf">1m</span> · trend / momentum / flow <span id="tallyStale" class="stale-note"></span></div>
       <div class="big" id="lean">—</div>
+      <div class="families" id="families">—</div>
+      <div class="label" id="legacyLabel" style="margin-top:10px">Legacy indicator count (secondary)</div>
       <div class="bar"><span id="bBull" style="background:var(--bull)"></span><span id="bNeu" style="background:var(--neutral)"></span><span id="bBear" style="background:var(--bear)"></span></div>
       <div class="row"><span class="bull" id="nBull">—</span><span class="neutral" id="nNeu"></span><span class="bear" id="nBear"></span></div>
-      <div class="families" id="families">—</div>
       <div class="record" id="tallyRecord"></div>
       <div class="label" style="margin-top:10px">All indicators by timeframe</div>
       <table class="mtf"><thead id="mtfHead"></thead><tbody id="mtf"></tbody></table>

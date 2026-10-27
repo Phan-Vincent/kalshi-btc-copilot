@@ -375,8 +375,12 @@ function renderShared(s, f) {
   $('errors').textContent = errs.length ? 'Feed errors: ' + errs.map(([k, e]) => `${k} — ${e.error}`).join(' · ') : '';
 }
 
+const leanClass = lean => lean === 'bullish' ? 'bull' : lean === 'bearish' ? 'bear' : 'neutral';
+const leanText = lean => lean[0].toUpperCase() + lean.slice(1);
+
 function renderTally(s, head) {
   const problem = readingProblem(s, '1m');
+  const fam = head && head.family;
   $('tallyTf').textContent = '1m';
   $('tallyStale').textContent = problem;
   $('readTf').textContent = $('lvlTf').textContent = s.timeframe;
@@ -386,17 +390,23 @@ function renderTally(s, head) {
     ['bBull', 'bNeu', 'bBear'].forEach(id => $(id).style.width = '0%');
     ['nBull', 'nNeu', 'nBear'].forEach(id => $(id).textContent = '');
   } else {
+    // The legacy count is secondary now: show it under its own label, unchanged.
     const t = head.tally, n = t.bull + t.bear + t.neutral || 1;
-    $('lean').innerHTML = `<span class="${t.lean === 'bullish' ? 'bull' : t.lean === 'bearish' ? 'bear' : 'neutral'}">${t.lean[0].toUpperCase() + t.lean.slice(1)}</span>`;
     $('bBull').style.width = t.bull / n * 100 + '%'; $('bNeu').style.width = t.neutral / n * 100 + '%'; $('bBear').style.width = t.bear / n * 100 + '%';
     $('nBull').textContent = `${t.bull} bull`; $('nNeu').textContent = `${t.neutral} neutral`; $('nBear').textContent = `${t.bear} bear`;
-    // One vote per family (trend, momentum, 1m flow); the legacy count above is unchanged.
-    const fam = head.family;
-    $('families').innerHTML = fam ? Object.entries(fam.votes).map(([k, vote]) =>
-      k === 'flow' && fam.flow_ready === false
-        ? `Flow <span class="neutral">warming up (${Math.floor(fam.flow_coverage_seconds || 0)}/60 s)</span>`
-        : `${k[0].toUpperCase() + k.slice(1)} <span class="${vote}">${vote}</span>`).join(' · ') +
-      ` → net ${fam.net > 0 ? '+' : ''}${fam.net} (<span class="${fam.lean === 'bullish' ? 'bull' : fam.lean === 'bearish' ? 'bear' : 'neutral'}">${fam.lean}</span>)` : '—';
+    // The headline is the one-vote-per-family reading; never substitute the legacy lean.
+    if (!fam || !fam.lean) {
+      $('lean').innerHTML = '<span class="muted">Unavailable</span>';
+      $('families').innerHTML = '<span class="muted">1m family reading unavailable</span>';
+    } else {
+      $('lean').innerHTML = `<span class="${leanClass(fam.lean)}">${leanText(fam.lean)}</span>`;
+      const votes = fam.votes || {};
+      $('families').innerHTML = Object.entries(votes).map(([k, vote]) =>
+        k === 'flow' && fam.flow_ready === false
+          ? `Flow <span class="neutral">warming up (${Math.floor(fam.flow_coverage_seconds || 0)}/60 s)</span>`
+          : `${k[0].toUpperCase() + k.slice(1)} <span class="${vote}">${vote}</span>`).join(' · ') +
+        ` → net ${fam.net > 0 ? '+' : ''}${fam.net} (<span class="${leanClass(fam.lean)}">${fam.lean}</span>)`;
+    }
   }
   const rec = s.tally_record;
   $('tallyRecord').textContent = !rec || !rec.scored ? 'Legacy 1m opening lean vs settlement: no scored windows yet'

@@ -21,6 +21,9 @@ status() {
 }
 
 check() {
+  for asset in "$SRC/vendor/lightweight-charts-4.2.3.js" "$SRC/vendor/LICENSE"; do
+    [ -f "$asset" ] || { echo "missing vendor asset: $asset" >&2; exit 1; }
+  done
   (cd "$SRC" && python3 -m py_compile ta_copilot.py kalshi_ws.py stream_flow.py sr_levels.py ta_watch.py tally_report.py log_tools.py acer_watch.py test_*.py)
   if command -v node >/dev/null 2>&1; then
     (cd "$SRC" && node --check app.js)
@@ -34,9 +37,11 @@ case "${1:-deploy}" in
   check) check ;;
   deploy)
     check
-    remote 'mkdir -p ~/btc-ta/state ~/btc-ta/fixtures ~/.config/systemd/user && chmod 700 ~/btc-ta ~/btc-ta/state'
+    remote 'mkdir -p ~/btc-ta/state ~/btc-ta/fixtures ~/btc-ta/vendor ~/.config/systemd/user && chmod 700 ~/btc-ta ~/btc-ta/state'
     scp -q "$SRC/ta_copilot.py" "$SRC/kalshi_ws.py" "$SRC/stream_flow.py" "$SRC/sr_levels.py" "$SRC/ta_watch.py" "$SRC/tally_report.py" "$SRC/log_tools.py" "$SRC/acer_watch.py" "$SRC/index.html" "$SRC/app.js" "$SRC/README.md" "$SRC"/test_*.py "$HOST:btc-ta/"
     scp -q "$SRC"/fixtures/* "$HOST:btc-ta/fixtures/"
+    scp -q "$SRC/vendor/lightweight-charts-4.2.3.js" "$SRC/vendor/LICENSE" "$HOST:btc-ta/vendor/"
+    if [ -f "$SRC/vendor/NOTICE" ]; then scp -q "$SRC/vendor/NOTICE" "$HOST:btc-ta/vendor/"; fi
     scp -q "$HERE/btc-ta-copilot.service" "$HERE/btc-ta-watch.service" "$HERE/btc-ta-watch.timer" "$HOST:.config/systemd/user/"
     remote "set -e
             cd ~/btc-ta && python3 -m unittest discover -q -p 'test_*.py'

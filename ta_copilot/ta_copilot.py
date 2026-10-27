@@ -9,6 +9,7 @@ advice gate is unaffected.
 """
 import argparse
 from collections import deque
+from copy import deepcopy
 from decimal import Decimal, InvalidOperation
 import json
 import math
@@ -87,13 +88,19 @@ PROXY_RECORD_WINDOWS = 200    # proxy-vs-settlement readout uses the latest 200 
 PROXY_RECORD_MIN = 20         # below this, the readout says "too few to judge"
 MAX_MEMORY_WINDOWS = 500      # settled windows kept in memory before archiving into running counters
 MINUTE_CAPTURE_SLACK = 2.0    # a minute row is written only within 2 s of :00
+MINUTE_BACKLOG_LIMIT = 60     # queued minute rows kept while appends fail
+MINUTE_RETRY_SECONDS = 5.0    # bounded cadence for retrying queued minute appends
 KALSHI_PROMOTION_GRACE = 5
 EXCHANGE_STATUS_REFRESH = 30  # seconds between /exchange/status probes when no market is listed
-# Served on every response. The page needs the unpkg chart script, its inline
-# stylesheet, the data-URL favicon and same-origin fetch/EventSource only.
-CSP = ("default-src 'none'; script-src 'self' https://unpkg.com; "
+# Served on every response. The page needs the pinned same-origin chart script,
+# its inline stylesheet, the data-URL favicon and same-origin fetch/EventSource
+# only.
+CSP = ("default-src 'none'; script-src 'self'; "
        "style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; "
        "base-uri 'none'; form-action 'none'; frame-ancestors 'none'")
+# The only file served from vendor/: an explicit route, never a directory walk.
+VENDOR_CHART = "lightweight-charts-4.2.3.js"
+VENDOR_CHART_PATH = f"/vendor/{VENDOR_CHART}"
 SECURITY_HEADERS = (("Content-Security-Policy", CSP),
                     ("X-Content-Type-Options", "nosniff"),
                     ("Referrer-Policy", "no-referrer"))
@@ -2146,6 +2153,8 @@ class TallyLogger:
         self.pending_closes = {}
         self.next_settle = self.next_hydrate = 0
         self.minute_captured = None
+        self.minute_pending = {}  # (ticker, minute) -> original row, oldest first
+        self.minute_overflowed = 0
         self.skipped_lines = 0
         self.closes = {}
         self.expirations = {}
@@ -2495,23 +2504,78 @@ class TallyLogger:
         self.proxy = summary
 
     def capture_minute(self, now):
-        row = minute_record(cached_state("1m"), now)
-        if row is None or (row["ticker"], row["minute"]) == self.minute_captured:
-            return
-        self.append(row)
-        self.minute_captured = (row["ticker"], row["minute"])
+        """Capture one original minute snapshot inside the 2 s band, then queue it.
 
-    def run_minutes(self):
-        """Write one row per whole minute inside a window; missed minutes stay missing."""
-        while True:
-            time.sleep(60.5 - time.time() % 60)
+        The row is built once, at capture time. A retry only re-appends that same
+        row, so it can never recapture newer state or backfill a missed minute.
+        """
+        row = minute_record(cached_state("1m"), now)
+        if row is None:
+            return False
+        ident = (row["ticker"], row["minute"])
+        if ident == self.minute_captured or ident in self.minute_pending:
+            return False
+        # Advance the capture identity when the observation is taken, not when
+        # its append succeeds: an old row's retry must not reset it.
+        self.minute_captured = ident
+        if len(self.minute_pending) >= MINUTE_BACKLOG_LIMIT:
+            self.minute_overflowed += 1
+            with self.feed.lock:
+                self.feed._note("tally_minute_overflow", RuntimeError(
+                    f"minute backlog full ({MINUTE_BACKLOG_LIMIT} rows); "
+                    f"{row['ticker']} minute {row['minute']} not queued "
+                    f"({self.minute_overflowed} dropped)"))
+            return False
+        self.minute_pending[ident] = deepcopy(row)
+        with self.feed.lock:
+            self.feed.errors.pop("tally_minute_overflow", None)
+        return self.flush_minutes()
+
+    def flush_minutes(self):
+        """Append queued minute rows oldest first; keep each until it is written.
+
+        A temporary append error leaves the row queued and shows ``tally_minute``;
+        the error is cleared only when the whole backlog has been written.
+        """
+        while self.minute_pending:
+            ident = next(iter(self.minute_pending))
             try:
-                self.capture_minute(time.time())
-                with self.feed.lock:
-                    self.feed.errors.pop("tally_minute", None)
+                self.append(self.minute_pending[ident])
             except Exception as exc:
                 with self.feed.lock:
                     self.feed._note("tally_minute", exc)
+                return False
+            del self.minute_pending[ident]
+        with self.feed.lock:
+            self.feed.errors.pop("tally_minute", None)
+        return True
+
+    def run_minutes(self):
+        """Write one original row per whole minute; missed minutes stay missing.
+
+        New captures continue while a failed append is retried every
+        MINUTE_RETRY_SECONDS, so a temporary disk error cannot cost later rows.
+        """
+        next_capture = (int(time.time() // 60) + 1) * 60 + 0.5
+        while True:
+            now = time.time()
+            captured = False
+            if now >= next_capture:
+                next_capture = (int(now // 60) + 1) * 60 + 0.5
+                captured = True
+                try:
+                    self.capture_minute(now)
+                except Exception as exc:
+                    with self.feed.lock:
+                        self.feed._note("tally_minute", exc)
+            # capture_minute already flushed; retry an older backlog on its own
+            # bounded cadence without a second immediate attempt.
+            if self.minute_pending and not captured:
+                self.flush_minutes()
+            delay = next_capture - time.time()
+            if self.minute_pending:
+                delay = min(delay, MINUTE_RETRY_SECONDS)
+            time.sleep(max(0.2, delay))
 
     def run(self):
         try:
@@ -2749,6 +2813,13 @@ class Handler(BaseHTTPRequestHandler):
             body, ctype = (HERE / "index.html").read_bytes(), "text/html; charset=utf-8"
         elif url.path == "/app.js":
             body, ctype = (HERE / "app.js").read_bytes(), "application/javascript; charset=utf-8"
+        elif url.path == VENDOR_CHART_PATH:
+            try:
+                body = (HERE / "vendor" / VENDOR_CHART).read_bytes()
+            except OSError:
+                self.send_error(404)
+                return
+            ctype = "application/javascript; charset=utf-8"
         elif url.path == "/api/state":
             tf = parse_qs(url.query).get("tf", ["1m"])[0]
             tf = tf if tf in TIMEFRAMES else "1m"
