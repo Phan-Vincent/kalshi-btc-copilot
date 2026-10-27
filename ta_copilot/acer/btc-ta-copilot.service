@@ -1,5 +1,5 @@
 [Unit]
-Description=BTC TA copilot dashboard (read-only public data, no account access)
+Description=BTC TA copilot dashboard (read-only Kalshi market data and BRTI key)
 After=network-online.target
 Wants=network-online.target
 

@@ -58,7 +58,8 @@ class StreamIntegrationTests(unittest.TestCase):
                             for i in range(30)]
         modes = feed.state("1m")["feed_modes"]
         self.assertEqual(modes, {"Bitstamp": "REST", "Gemini": "REST",
-                                 "Coinbase": "REST fallback", "Kraken": "REST fallback"})
+                                 "Coinbase": "REST fallback", "Kraken": "REST fallback",
+                                 "Kalshi": "keyless"})
 
     def test_recorded_coinbase_and_kraken_messages_update_modes_and_flow(self):
         feed = ta.Feed()

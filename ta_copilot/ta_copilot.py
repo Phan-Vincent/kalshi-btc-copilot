@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Real-time BTC technical-analysis view for the Kalshi KXBTC15M series.
 
-Paper only: no orders, no account access, no credentials. Every external
-call is an unauthenticated GET to public endpoints (exchange tickers, Coinbase
-candles, Kalshi public market data). The tally remains descriptive. The
+Paper only: a scope-checked, read-only Kalshi key may read the market-data
+WebSocket, BRTI backfill and its own scopes. No orders, portfolio or balance
+reads. Keyless operation uses public REST and the composite proxy. The tally remains descriptive. The
 experimental paper scalp trigger was retired on 2026-10-03. The Study 005
 advice gate is unaffected.
 """
@@ -26,6 +26,7 @@ from urllib.parse import parse_qs, quote, urlencode, urlparse
 from urllib.request import Request, urlopen
 
 import sr_levels
+import kalshi_ws
 
 from tally_report import parse_iso_ts, record_problem
 from stream_flow import OrderFlow, parse_coinbase, parse_coinbase_spot, parse_kraken, MalformedMessage
@@ -229,26 +230,33 @@ def rolling_average(samples, now):
     return statistics.fmean(price for _, price in recent)
 
 
-def window_distance(strike, composite, seconds_left, sigma_1m, close_ts, samples):
+def window_distance(strike, composite, seconds_left, sigma_1m, close_ts, samples,
+                    brti=None, brti_samples=None):
     """Distance and Brownian proxy scale for the final 60-second mean."""
-    source = "composite" if seconds_left > 60 else "projected 60s average"
+    use_brti = brti is not None
+    reference_price = brti if use_brti else composite
+    source = ("BRTI" if use_brti else "composite") if seconds_left > 60 else (
+        "projected 60s BRTI average" if use_brti else "projected 60s average")
     result = {"distance_source": source, "distance": None, "distance_sigmas": None,
+              "settlement_basis": "BRTI" if use_brti else "proxy",
               "distance_sd_usd": None, "sigma_1m_usd": None,
               "sigma_model": "brownian settlement-average proxy",
               "observed_seconds": 0, "missing_seconds": 0,
               "observed_mean": None, "required_remaining_avg": None,
               "required_remaining_move": None, "required_remaining_seconds": None,
               "required_drift_per_sec": None}
-    if composite is None or strike is None:
+    if reference_price is None or strike is None:
         return result
     strike = finite_float(strike)
     if seconds_left > 60:
-        reference = composite
+        reference = reference_price
         factor = (seconds_left - 60) / 60 + 1 / 3
     else:
         start, now = close_ts - 60, close_ts - seconds_left
-        observed = {int(p["time"]): p["value"] for p in samples
-                    if start <= p["time"] < now and p["value"] is not None}
+        observed = ({int(t): v for t, v in (brti_samples or {}).items()
+                     if start <= t < now and v is not None} if use_brti else
+                    {int(p["time"]): p["value"] for p in samples
+                     if start <= p["time"] < now and p["value"] is not None})
         # A second is due once it has ended. The sampler stamps second t just
         # after t begins, so the second in progress is never "missing", and an
         # early sample of it can't hide an older gap.
@@ -259,15 +267,15 @@ def window_distance(strike, composite, seconds_left, sigma_1m, close_ts, samples
         result["missing_seconds"] = sum(int(start + k) not in observed for k in range(expected))
         result["observed_mean"] = obs_sum / len(observed) if observed else None
         remaining = 60 - expected
-        known_sum = sum(v for t, v in observed.items() if t < start + expected) + composite * result["missing_seconds"]
+        known_sum = sum(v for t, v in observed.items() if t < start + expected) + reference_price * result["missing_seconds"]
         if remaining >= 5:
             req = (60 * strike - known_sum) / remaining
             result["required_remaining_avg"] = req
-            result["required_remaining_move"] = req - composite
+            result["required_remaining_move"] = req - reference_price
             result["required_remaining_seconds"] = remaining
             # Straight-line path from composite, one sample per second (1..R).
-            result["required_drift_per_sec"] = 2 * (req - composite) / (remaining + 1)
-        reference = (obs_sum + composite * rem) / 60
+            result["required_drift_per_sec"] = 2 * (req - reference_price) / (remaining + 1)
+        reference = (obs_sum + reference_price * rem) / 60
         factor = (seconds_left / 60) ** 3 / 3
     sigma_usd = sigma_1m * reference if sigma_1m is not None else None
     sd = sigma_usd * math.sqrt(factor) if sigma_usd is not None else None
@@ -275,6 +283,15 @@ def window_distance(strike, composite, seconds_left, sigma_1m, close_ts, samples
     result.update(distance=distance, distance_sd_usd=sd, sigma_1m_usd=sigma_usd,
                   distance_sigmas=distance / sd if sd and sd > 0 else None)
     return result
+
+
+def brti_settlement_average(seconds, close_ts, now):
+    """Observed, ended BRTI seconds in the fixed Kalshi settlement minute."""
+    first = int(close_ts) - 60
+    due = min(int(close_ts), int(now))
+    held = [seconds[t] for t in range(first, due) if t in seconds]
+    return {"value": statistics.fmean(held) if held else None,
+            "observed_seconds": len(held), "complete": len(held) == 60}
 
 
 def positive_decimal(value):
@@ -784,6 +801,7 @@ class Feed:
         self.spot = None
         self.spot_at = 0.0
         self.market = None
+        self.previous_market = None
         self.market_at = 0.0
         self.market_discovery_source = None
         self.last_market_ticker = None
@@ -827,13 +845,306 @@ class Feed:
         # Every public trade seen in the context window, with the time from
         # which it is known to be complete (see merge_tape).
         self.kalshi_tape = None
+        self.tape_source = "rest"
         self.yes_mid_path = deque(maxlen=460)
         self.context_ticker = None
+        self.book_source = "rest"
+        self.kalshi_key = None
+        self.kalshi_scoped = False
+        self.kalshi_connected = False
+        self.kalshi_last_at = 0.0
+        self.ws_books = kalshi_ws.BookStream()
+        self.ws_subs = kalshi_ws.Subscriptions()
+        self.ws_trade_seq = {}
+        self.ws_trade_start = {}
+        self.ws_trade_contiguous = set()
+        self.ws_pending_ids = set()
+        # Trades for a subscribed upcoming ticker that arrive before the sampler
+        # promotes it (up to ~1 s after its open), adopted when its tape starts.
+        self.ws_early_trades = {}
+        self.rest_tape_at = 0.0
+        self.brti_seconds = {}
+        self.brti_value = None
+        self.brti_source_at = 0.0
+        self.brti_backfill_at = 0.0
 
     def _note(self, key, exc):
         now = iso(time.time())
         first = self.errors.get(key, {}).get("first_at", now)
         self.errors[key] = {"error": f"{type(exc).__name__}: {exc}", "at": now, "first_at": first}
+
+    def _kalshi_error(self, key, reason):
+        # Never surface a network/library exception: it may include headers.
+        self._note(key, kalshi_ws.KeyErrorSafe(reason))
+
+    def kalshi_signed_get(self, path, query=None, headers=None):
+        headers = self.kalshi_key.headers("GET", path) if headers is None else headers
+        url = kalshi_ws.API_URL + path + ("?" + urlencode(query) if query else "")
+        with urlopen(Request(url, method="GET", headers=headers), timeout=10) as response:
+            return json.loads(response.read().decode())
+
+    def backfill_brti(self, now=None):
+        now = time.time() if now is None else now
+        with self.lock:
+            if now - self.brti_backfill_at < 30:
+                return False
+            latest = int(now) - 1
+            if all(second in self.brti_seconds for second in range(latest - 119, latest + 1)):
+                return False
+            self.brti_backfill_at = now
+        data = self.kalshi_signed_get("/trade-api/v2/cfbenchmarks/values", {"id": "BRTI"})
+        with self.lock:
+            kalshi_ws.merge_brti_backfill(self.brti_seconds, data, now)
+            self.errors.pop("brti", None)
+            for second in list(self.brti_seconds):
+                if second < now - 1200:
+                    del self.brti_seconds[second]
+        return True
+
+    def desired_kalshi_tickers(self, now):
+        with self.lock:
+            markets = ([self.market] if self.market else []) + list(self.upcoming_markets.values())
+        return {m["ticker"] for m in markets if m and
+                parse_ts(m["close_time"]) > now and parse_ts(m["open_time"]) <= now + 60}
+
+    def _ws_book_view(self, ticker, now):
+        """REST-shaped WebSocket book for ticker while in sync and fresh, else None. Hold self.lock."""
+        sid = self.ws_subs.sids.get("orderbook_delta")
+        if sid is None or not self.kalshi_connected or now - self.kalshi_last_at > 3:
+            return None
+        return self.ws_books.view(sid, ticker)
+
+    def _adopt_early_trades(self, ticker):
+        """Fold trades received for ticker before it became the current market. Hold self.lock."""
+        early = self.ws_early_trades.pop(ticker, {})
+        if early and self.kalshi_tape is not None:
+            self.kalshi_tape["rows"].update(early)
+            if self.tape_source != "websocket":
+                self.ws_pending_ids.update(early)
+
+    def _ws_send(self, socket, command):
+        socket.send(json.dumps(command, separators=(",", ":")))
+
+    def _ws_resubscribe(self, socket, channel, now):
+        with self.lock:
+            sid = self.ws_subs.sids.pop(channel, None)
+            if sid is not None:
+                unsubscribe = self.ws_subs.command("unsubscribe", {"sids": [sid]}, now)
+                self.ws_subs.tickers.pop(sid, None)
+                if channel == "orderbook_delta":
+                    self.ws_books.invalidate(sid)
+                if channel == "trade":
+                    self.ws_trade_contiguous.clear()
+            else:
+                unsubscribe = None
+        if unsubscribe:
+            self._ws_send(socket, unsubscribe)
+        params = {"channels": [channel]}
+        if channel.startswith("cfbenchmarks"):
+            params["index_ids"] = ["BRTI"]
+        else:
+            params["market_tickers"] = sorted(self.desired_kalshi_tickers(now))
+            if not params["market_tickers"]:
+                return
+        with self.lock:
+            command = self.ws_subs.command("subscribe", params, now)
+        self._ws_send(socket, command)
+
+    def handle_kalshi_frame(self, frame, received_at, socket=None):
+        """Parse before taking the feed lock; socket is injectable for offline tests."""
+        if isinstance(frame, str):
+            frame = json.loads(frame)
+        kind = frame.get("type")
+        tick = kalshi_ws.brti_tick(frame)
+        row = kalshi_ws.trade_row(frame)
+        with self.lock:
+            # Kalshi numbers control frames on a subscription too: the `ok` for
+            # add_markets/delete_markets takes the next seq (seen live 2026-10-27).
+            # Count it, or every rollover reads as a lost update.
+            sid, seq = frame.get("sid"), frame.get("seq")
+            if kind not in ("orderbook_snapshot", "orderbook_delta", "trade") and type(seq) is int:
+                if self.ws_books.seq.get(sid) == seq - 1:
+                    self.ws_books.seq[sid] = seq
+                if self.ws_trade_seq.get(sid) == seq - 1:
+                    self.ws_trade_seq[sid] = seq
+            book_event = self.ws_books.apply(frame)
+            ack = self.ws_subs.ack(frame)
+            if kind == "error" or ack == "error":
+                raise ValueError("Kalshi subscription error")
+            if book_event == "gap" and self.book_source == "websocket":
+                self.book, self.book_at, self.book_source = None, 0.0, "rest"
+            self.kalshi_last_at = received_at
+            self.errors.pop("kalshi_ws", None)
+            if tick:
+                source, value, whole = tick
+                if source / 1000 >= self.brti_source_at:
+                    self.brti_source_at, self.brti_value = source / 1000, value
+                if whole:
+                    self.brti_seconds[source // 1000] = value
+                    for second in list(self.brti_seconds):
+                        if second < received_at - 1200:
+                            del self.brti_seconds[second]
+            if ack == "subscribe" and kind == "subscribed" and frame["msg"]["channel"] == "trade":
+                sid = frame["msg"]["sid"]
+                for ticker in self.ws_subs.tickers.get(sid, ()):
+                    self.ws_trade_start[ticker] = received_at
+                    self.ws_trade_contiguous.add(ticker)
+            if ack == "update_subscription" and kind == "ok":
+                sid = frame.get("sid")
+                if sid == self.ws_subs.sids.get("trade"):
+                    for ticker in self.ws_subs.tickers.get(sid, ()):
+                        self.ws_trade_start.setdefault(ticker, received_at)
+                        self.ws_trade_contiguous.add(ticker)
+            if row:
+                sid, seq = frame.get("sid"), frame.get("seq")
+                prior = self.ws_trade_seq.get(sid)
+                if prior is not None and seq != prior + 1:
+                    self.ws_trade_contiguous.clear()
+                    self.ws_trade_seq.pop(sid, None)
+                    self.ws_pending_ids.clear()
+                    self.rest_tape_at = 0.0
+                    self.tape_source = "websocket_disconnected"
+                    trade_gap = True
+                else:
+                    self.ws_trade_seq[sid] = seq
+                    trade_gap = False
+                ticker, trade = row
+                upcoming = self.upcoming_markets.get(ticker)
+                if (not trade_gap and upcoming and trade["trade_id"] and
+                        not (self.market and ticker == self.market["ticker"]) and
+                        parse_ts(upcoming["open_time"]) <= parse_ts(trade["time"]) < parse_ts(upcoming["close_time"])):
+                    self.ws_early_trades.setdefault(ticker, {})[trade["trade_id"]] = trade
+                    for held in list(self.ws_early_trades):
+                        if held not in self.upcoming_markets:
+                            del self.ws_early_trades[held]
+                if not trade_gap and self.market and ticker == self.market["ticker"]:
+                    opened, closed = parse_ts(self.market["open_time"]), parse_ts(self.market["close_time"])
+                    if opened <= parse_ts(trade["time"]) < closed and trade["trade_id"]:
+                        if self.context_ticker != ticker:
+                            self.context_ticker = ticker
+                            self.kalshi_tape = None
+                            self.tape_source = "rest"
+                            self.ws_pending_ids.clear()
+                            self.rest_tape_at = 0.0
+                        if self.kalshi_tape is None:
+                            covered = opened if self.ws_trade_start.get(ticker, float("inf")) <= opened else None
+                            self.kalshi_tape = {"rows": {}, "from": covered, "to": 0.0}
+                        self._adopt_early_trades(ticker)
+                        self.kalshi_tape["rows"][trade["trade_id"]] = trade
+                        if self.tape_source == "websocket":
+                            self.kalshi_tape["to"] = received_at
+                        else:
+                            self.ws_pending_ids.add(trade["trade_id"])
+                        self.kalshi_recent_trades = [{k: v for k, v in r.items() if k != "trade_id"}
+                            for r in sorted(self.kalshi_tape["rows"].values(), key=lambda x: x["time"], reverse=True)[:30]]
+            elif (self.kalshi_tape and self.tape_source == "websocket" and
+                  self.context_ticker in self.ws_trade_contiguous):
+                self.kalshi_tape["to"] = received_at
+        if book_event == "gap" and socket is not None:
+            self._ws_resubscribe(socket, "orderbook_delta", received_at)
+        if row and trade_gap and socket is not None:
+            self._ws_resubscribe(socket, "trade", received_at)
+        return book_event
+
+    def run_kalshi_ws(self):
+        try:
+            from websockets.sync.client import connect
+        except ImportError:
+            with self.lock:
+                self._kalshi_error("kalshi_ws", "websockets unavailable")
+            return
+        delay, scope_retry, next_scope = 1, 1, 0.0
+        while True:
+            now = time.time()
+            if now >= next_scope:
+                try:
+                    kalshi_ws.check_scopes(self.kalshi_key, lambda headers: self.kalshi_signed_get(
+                        "/trade-api/v2/api_keys", headers=headers))
+                except kalshi_ws.KeyErrorSafe as exc:
+                    with self.lock:
+                        self.kalshi_scoped = self.kalshi_connected = False
+                        self._kalshi_error("kalshi_key", str(exc))
+                    time.sleep(min(scope_retry, 300))
+                    scope_retry = min(scope_retry * 2, 300)
+                    next_scope = 0
+                    continue
+                except Exception:
+                    with self.lock:
+                        if not self.kalshi_scoped:
+                            self._kalshi_error("kalshi_key", "scope check unavailable")
+                    if not self.kalshi_scoped:
+                        time.sleep(min(scope_retry, 300))
+                        scope_retry = min(scope_retry * 2, 300)
+                        continue
+                    next_scope = now + min(scope_retry, 300)
+                    scope_retry = min(scope_retry * 2, 300)
+                else:
+                    with self.lock:
+                        self.kalshi_scoped = True
+                        self.errors.pop("kalshi_key", None)
+                    next_scope, scope_retry = now + 6 * 3600, 1
+            try:
+                headers = self.kalshi_key.headers("GET", "/trade-api/ws/v2")
+                with connect(kalshi_ws.WS_URL, additional_headers=headers, open_timeout=10,
+                             ping_interval=20, ping_timeout=20, max_size=4_000_000) as socket:
+                    with self.lock:
+                        self.kalshi_connected = True
+                        self.kalshi_last_at = time.time()
+                        self.ws_trade_contiguous.clear()
+                        self.ws_trade_start.clear()
+                        self.ws_pending_ids.clear()
+                        self.rest_tape_at = 0.0
+                        self.ws_books = kalshi_ws.BookStream()
+                        self.ws_subs = kalshi_ws.Subscriptions()
+                        self.ws_trade_seq = {}
+                    for channel in ("cfbenchmarks_value", "cfbenchmarks_value_5hz", "orderbook_delta", "trade"):
+                        self._ws_resubscribe(socket, channel, time.time())
+                    try:
+                        self.backfill_brti()
+                    except Exception:
+                        with self.lock:
+                            self._kalshi_error("brti", "backfill unavailable")
+                    delay = 1
+                    while True:
+                        raw = socket.recv(timeout=10)
+                        now = time.time()
+                        frame = json.loads(raw)
+                        try:
+                            self.handle_kalshi_frame(frame, now, socket)
+                        except (ValueError, KeyError, TypeError, IndexError):
+                            raise RuntimeError("Kalshi frame or subscription invalid") from None
+                        with self.lock:
+                            expired = self.ws_subs.expired(now)
+                        if expired:
+                            raise RuntimeError("Kalshi subscription acknowledgement timed out")
+                        desired = self.desired_kalshi_tickers(now)
+                        for channel in ("orderbook_delta", "trade"):
+                            with self.lock:
+                                missing = (channel not in self.ws_subs.sids and not any(
+                                    params.get("channels") == [channel]
+                                    for _, params, _ in self.ws_subs.pending.values()))
+                            if desired and missing:
+                                self._ws_resubscribe(socket, channel, now)
+                            with self.lock:
+                                commands = self.ws_subs.update(channel, desired, now)
+                            for command in commands:
+                                self._ws_send(socket, command)
+                        if now >= next_scope:
+                            break
+            except Exception:
+                with self.lock:
+                    self._kalshi_error("kalshi_ws", "connection or subscription unavailable")
+            with self.lock:
+                self.kalshi_connected = False
+                self.ws_trade_contiguous.clear()
+                self.ws_pending_ids.clear()
+                self.rest_tape_at = 0.0
+                if self.book_source == "websocket":
+                    self.book, self.book_at, self.book_source = None, 0.0, "rest"
+                if self.tape_source == "websocket":
+                    self.tape_source = "websocket_disconnected"
+            time.sleep(delay)
+            delay = min(delay * 2, 30)
 
     def poll_candles(self, tf):
         granularity, sec, pages = FETCHES[tf]
@@ -1009,6 +1320,13 @@ class Feed:
                 self.flow_gap_window = None if all(self.socket_connected.values()) else opened
             if value is not None:
                 self.window_path.append({"time": int(at), "value": value})
+            if (self.market and self.context_ticker == self.market["ticker"]
+                    and (not self.yes_mid_path or self.yes_mid_path[-1]["time"] != int(at))):
+                ws_view = self._ws_book_view(self.market["ticker"], at)
+                mid = (book_context(ws_view)["yes_mid"] if ws_view else
+                       self.book.get("yes_mid") if self.book and at - self.book_at <= 10 else None)
+                if mid is not None:
+                    self.yes_mid_path.append({"time": int(at), "value": mid})
             self.flow.advance(at)
             if not self.market or parse_ts(self.market["close_time"]) <= at:
                 current = [m for m in self.upcoming_markets.values()
@@ -1016,6 +1334,7 @@ class Feed:
                 if current:
                     promoted = min(current, key=lambda m: m["close_time"])
                     if not self.market or self.market["ticker"] != promoted["ticker"]:
+                        self.previous_market = self.market
                         # The prefetched metadata is up to 30 s old and may have
                         # no target or quotes yet. Ask the market loop for the
                         # direct per-ticker refresh now instead of waiting out
@@ -1041,14 +1360,18 @@ class Feed:
         Called on the first sample at or after boundary B, before that sample
         is appended, so the deque still holds the closing minute.
         """
-        markets = ([self.market] if self.market else []) + list(self.upcoming_markets.values())
+        markets = ([self.market] if self.market else []) + ([self.previous_market] if self.previous_market else []) + list(self.upcoming_markets.values())
         market = next((m for m in markets if parse_ts(m["close_time"]) == boundary), None)
         if market is None:
             return None
         prices = [price for t, price in self.samples if boundary - 60 <= t < boundary and price is not None]
+        brti_prices = [self.brti_seconds.get(t) for t in range(boundary - 60, boundary)]
+        brti_held = [price for price in brti_prices if price is not None]
         return {"type": "close", "ticker": market["ticker"], "close_time": market["close_time"],
                 "proxy_avg_60s": statistics.fmean(prices) if prices else None,
-                "samples": len(prices), "captured_at": iso(at)}
+                "samples": len(prices), "brti_avg_60s": (statistics.fmean(brti_held)
+                    if len(brti_held) == 60 else None), "brti_samples": len(brti_held),
+                "captured_at": iso(at)}
 
     def _capture_open(self, market, at):
         ticker = market["ticker"]
@@ -1226,6 +1549,8 @@ class Feed:
                     direct_error = exc
         with self.lock:
             old_ticker = self.last_market_ticker
+            if self.market and (not selected or selected["ticker"] != self.market["ticker"]):
+                self.previous_market = self.market
             self.market, self.market_at = selected, selected_at
             self.market_discovery_source = discovery_source
             self.exchange_closed = bool(not self.market and closed)
@@ -1269,12 +1594,19 @@ class Feed:
                 self.book = None
                 self.kalshi_recent_trades = []
                 self.kalshi_tape = None
+                self.tape_source = "rest"
+                self.ws_pending_ids.clear()
+                self.rest_tape_at = 0.0
                 self.yes_mid_path.clear()
             return
         ticker = market["ticker"]
         opened, closed = parse_ts(market["open_time"]), parse_ts(market["close_time"])
-        book = book_context(get_json(f"{KALSHI}/markets/{quote(ticker, safe='')}/orderbook",
-                                     {"depth": 5}))
+        with self.lock:
+            ws_view = self._ws_book_view(ticker, time.time())
+            ws_at = self.kalshi_last_at
+        book = book_context(ws_view) if ws_view else book_context(get_json(
+            f"{KALSHI}/markets/{quote(ticker, safe='')}/orderbook", {"depth": 5}))
+        source = "websocket" if ws_view else "rest"
         book_observed_at = time.time()
         # Store the book before the trades GET: a failed trades call must not
         # throw away a fresh orderbook, which refreshes on its own 2 s cadence.
@@ -1284,22 +1616,64 @@ class Feed:
             if self.context_ticker != ticker:
                 self.context_ticker = ticker
                 self.kalshi_tape = None
+                self.tape_source = "rest"
+                self.ws_pending_ids.clear()
+                self.rest_tape_at = 0.0
                 self.yes_mid_path.clear()
-            self.book, self.book_at = book, book_observed_at
-            if book["yes_mid"] is not None:
+            self.book, self.book_at, self.book_source = book, (ws_at if ws_view else book_observed_at), source
+            if book["yes_mid"] is not None and (not self.yes_mid_path or
+                    self.yes_mid_path[-1]["time"] != int(book_observed_at)):
                 self.yes_mid_path.append({"time": int(book_observed_at), "value": book["yes_mid"]})
+            start = self.ws_trade_start.get(ticker)
+            ws_tape = (self.kalshi_connected and time.time() - self.kalshi_last_at <= 3
+                       and ticker in self.ws_trade_contiguous and start is not None and
+                       (start <= opened or self.kalshi_tape is not None and
+                        self.kalshi_tape["from"] is not None and
+                        self.kalshi_tape["from"] <= start and self.rest_tape_at >= start))
+            if ws_tape:
+                if self.kalshi_tape is None:
+                    self.kalshi_tape = {"rows": {}, "from": opened, "to": ws_at}
+                    self._adopt_early_trades(ticker)
+                else:
+                    if start <= opened:
+                        self.kalshi_tape["from"] = opened
+                    self.kalshi_tape["to"] = ws_at
+                self.kalshi_recent_trades = [{k: v for k, v in row.items() if k != "trade_id"}
+                    for row in sorted(self.kalshi_tape["rows"].values(),
+                                      key=lambda row: row["time"], reverse=True)[:30]]
+                self.tape_source = "websocket"
+                self.ws_pending_ids.clear()
+                self.errors.pop("kalshi_context", None)
+                return
         with self.lock:
-            reach = tape_reach(self.kalshi_tape)
-            held_ids = set(self.kalshi_tape["rows"]) if self.kalshi_tape else set()
+            base_tape = None
+            if self.kalshi_tape:
+                base_tape = {"rows": {trade_id: row for trade_id, row in self.kalshi_tape["rows"].items()
+                                       if trade_id not in self.ws_pending_ids},
+                             "from": self.kalshi_tape["from"],
+                             "to": self.rest_tape_at or (self.kalshi_tape["to"]
+                                                        if not self.ws_pending_ids else 0.0)}
+            reach = tape_reach(base_tape)
+            held_ids = set(base_tape["rows"]) if base_tape else set()
         raw, full = fetch_trades(ticker, opened, reach, held_ids)
         fetched_at = time.time()
         rows = kalshi_trade_rows({"trades": raw}, ticker, opened, closed)
-        trades = [{k: v for k, v in row.items() if k != "trade_id"} for row in rows[:30]]
         with self.lock:
             if not self.market or self.market["ticker"] != ticker or self.context_ticker != ticker:
                 return
-            self.kalshi_recent_trades = trades
-            self.kalshi_tape = merge_tape(self.kalshi_tape, rows, full, opened, fetched_at)
+            pending = {trade_id: self.kalshi_tape["rows"][trade_id]
+                       for trade_id in self.ws_pending_ids
+                       if self.kalshi_tape and trade_id in self.kalshi_tape["rows"]}
+            self.kalshi_tape = merge_tape(base_tape, rows, full, opened, fetched_at)
+            if pending:
+                if self.kalshi_tape is None:
+                    self.kalshi_tape = {"rows": {}, "from": None, "to": fetched_at}
+                self.kalshi_tape["rows"].update(pending)
+            self.rest_tape_at = fetched_at
+            self.tape_source = "rest"
+            self.kalshi_recent_trades = [{k: v for k, v in row.items() if k != "trade_id"}
+                for row in sorted(self.kalshi_tape["rows"].values(),
+                                  key=lambda row: row["time"], reverse=True)[:30]] if self.kalshi_tape else []
             self.errors.pop("kalshi_context", None)
 
     def run_market_context(self):
@@ -1356,12 +1730,17 @@ class Feed:
             fetched_last = dict(self.fetched_last)
             spot, spot_at = dict(self.spot) if self.spot else None, self.spot_at
             market, market_at = self.market, self.market_at
+            previous_market = self.previous_market
             discovery_source = self.market_discovery_source
             promoted_at = self.market_promoted_at
             exchange_closed = self.exchange_closed
             errors = dict(self.errors)
             composite, composite_at = self.composite, self.composite_at
             average_60s = self.average_60s
+            brti_seconds = dict(self.brti_seconds)
+            brti_value, brti_source_at = self.brti_value, self.brti_source_at
+            kalshi_configured = self.kalshi_key is not None and self.kalshi_scoped
+            kalshi_connected = self.kalshi_connected and now - self.kalshi_last_at <= 3
             fresh_composite, venues = composite_quote(self.venues, now)
             modes = {"Bitstamp": "REST", "Gemini": "REST"}
             modes.update({name: ("WebSocket" if self.socket_connected[name] and
@@ -1369,6 +1748,8 @@ class Feed:
                                  now - self.stream_trade_at[name] <= VENUE_MAX_AGE
                                  else "REST fallback")
                           for name in self.feed_modes})
+            modes["Kalshi"] = ("keyless" if not kalshi_configured else
+                               "WebSocket" if kalshi_connected else "REST fallback")
             flow = self.flow.snapshot(now)
             flow["partial_window"] = (flow["partial_window"] or
                                        self.flow_gap_window == flow["window"]["open_epoch"])
@@ -1381,23 +1762,49 @@ class Feed:
             path = list(self.window_path)
             book = dict(self.book) if self.book else None
             book_at = self.book_at
+            book_source = self.book_source
             context_ticker = self.context_ticker
+            # The in-sync WebSocket book is read live here, not at the 2 s context poll.
+            ws_view = self._ws_book_view(market["ticker"], now) if market else None
+            ws_book_at = self.kalshi_last_at
             recent_trades = list(self.kalshi_recent_trades)
             tape_rows = list(self.kalshi_tape["rows"].values()) if self.kalshi_tape else []
             tape_from = self.kalshi_tape["from"] if self.kalshi_tape else None
             tape_to = self.kalshi_tape["to"] if self.kalshi_tape else None
+            tape_source = self.tape_source
             mid_path = list(self.yes_mid_path)
+        brti_age = max(0.0, now - brti_source_at) if brti_source_at else None
+        brti_fresh = kalshi_configured and brti_age is not None and brti_age <= 2
+        last_second = int(brti_source_at) if brti_source_at else None
+        brti_state = {"configured": kalshi_configured, "connected": kalshi_connected,
+                      "value": brti_value if kalshi_configured else None,
+                      "age": brti_age if kalshi_configured else None, "fresh": brti_fresh,
+                      "avg_60s": (kalshi_ws.brti_average(brti_seconds, last_second - 59)
+                                   if kalshi_configured and last_second is not None else None),
+                      "minus_composite": None,
+                      "error": (errors.get("kalshi_key") or errors.get("brti") or errors.get("kalshi_ws") or {}).get("error")
+                               or ("not configured" if self.kalshi_key is None else None)}
         if not spot or not bars["1m"]:
             return {"ready": False, "stale": True, "kalshi_stale": True,
-                    "exchange_closed": False, "errors": errors, "server_time": iso(now)}
+                    "exchange_closed": False, "errors": errors, "server_time": iso(now),
+                    "brti": brti_state, "feed_modes": modes}
         price = spot["price"]
         if not composite_at or now - composite_at > 2:
             composite = fresh_composite
             average_60s = None
+        brti_state["minus_composite"] = (brti_value - composite if kalshi_configured and
+            brti_value is not None and composite is not None else None)
+        previous_settlement = None
+        if (kalshi_configured and previous_market and
+                0 <= now - parse_ts(previous_market["close_time"]) < 30):
+            previous_settlement = {"ticker": previous_market["ticker"],
+                **brti_settlement_average(brti_seconds, parse_ts(previous_market["close_time"]), now)}
 
         window = None
         anchor = int(now // 900) * 900
-        if market and parse_ts(market["open_time"]) <= now < parse_ts(market["close_time"]):
+        if market and parse_ts(market["open_time"]) <= now and (
+                now < parse_ts(market["close_time"]) or
+                kalshi_configured and now < parse_ts(market["close_time"]) + 30):
             open_ts, close_ts = parse_ts(market["open_time"]), parse_ts(market["close_time"])
             anchor = int(open_ts)
             strike = optional_float(market.get("floor_strike"))
@@ -1417,8 +1824,12 @@ class Feed:
             window["high_since_open"] = max((p["value"] for p in window_points), default=None)
             window["low_since_open"] = min((p["value"] for p in window_points), default=None)
             window["path_partial"] = not window_points or window_points[0]["time"] > open_ts + 2
-            window["orderbook"] = book if context_ticker == market["ticker"] else None
-            window["orderbook_age"] = now - book_at if context_ticker == market["ticker"] and book else None
+            if ws_view:
+                book, book_at, book_source = book_context(ws_view), ws_book_at, "websocket"
+            book_ticker = market["ticker"] if ws_view else context_ticker
+            window["orderbook"] = book if book_ticker == market["ticker"] else None
+            window["orderbook_age"] = now - book_at if book_ticker == market["ticker"] and book else None
+            window["orderbook_source"] = book_source if book_ticker == market["ticker"] else "rest"
             shown_book = window["orderbook"] if window["orderbook_age"] is not None and window["orderbook_age"] <= 10 else None
             window["display_quotes"] = {}
             for side in ("yes_bid", "yes_ask", "no_bid", "no_ask"):
@@ -1430,7 +1841,8 @@ class Feed:
             if context_ticker != market["ticker"]:
                 tape_rows, tape_from, tape_to = [], None, None
             tape_age = now - tape_to if tape_to is not None else None
-            tape_fresh = tape_age is not None and tape_age <= KALSHI_TAPE_MAX_AGE
+            tape_fresh = (tape_age is not None and tape_age <= KALSHI_TAPE_MAX_AGE and
+                          tape_source != "websocket_disconnected")
             window["tape_summary"] = {**kalshi_tape_summary(tape_rows, now),
                                       "covered_from": iso(tape_from) if tape_from is not None else None,
                                       "observed_to": iso(tape_to) if tape_to is not None else None,
@@ -1440,7 +1852,10 @@ class Feed:
             window["yes_mid_path"] = mid_path if context_ticker == market["ticker"] else []
             sig = realized_sigma([b["close"] for b in bars["1m"]])
             window.update(window_distance(strike, composite, window["seconds_left"], sig,
-                                          close_ts, window_points))
+                                          close_ts, window_points,
+                                          brti_value if brti_fresh else None, brti_seconds))
+            window["settlement_average"] = (brti_settlement_average(brti_seconds, close_ts, now)
+                if kalshi_configured and close_ts - 60 <= now < close_ts + 30 else None)
 
         frames, history = {}, {}
         for name, b in bars.items():
@@ -1479,7 +1894,8 @@ class Feed:
                 "ref_15m": ref(15), "ref_1h": ref(60),
                 "spot": spot, "spot_age": max(now - spot_at, now - parse_ts(spot["time"])),
                 "composite": composite, "composite_age": now - composite_at if composite_at else None,
-                "average_60s": average_60s, "venues": venues,
+                "average_60s": average_60s, "venues": venues, "brti": brti_state,
+                "previous_settlement_average": previous_settlement,
                 "feed_modes": modes, "order_flow": flow,
                 "candle_age": {k: now - v for k, v in self.bars_at.items()},
                 # Data quality per timeframe, apart from fetch success: stale
@@ -1590,6 +2006,8 @@ def minute_record(state, now):
     return {"type": "minute", "ticker": window["ticker"], "minute": minute,
             "captured_at": iso(now), "seconds_left": round(window["seconds_left"], 2),
             "composite": state.get("composite"), "average_60s": state.get("average_60s"),
+            "brti": (state.get("brti") or {}).get("value") if (state.get("brti") or {}).get("fresh") else None,
+            "brti_age": (state.get("brti") or {}).get("age"),
             "target": window.get("strike"), "sigma_1m_usd": window.get("sigma_1m_usd"),
             "yes_bid": quote("yes_bid"), "yes_ask": quote("yes_ask"),
             "flow_imbalance_1m": ((state.get("order_flow") or {}).get("one_minute") or {}).get("imbalance"),
@@ -2124,7 +2542,9 @@ def cached_state(tf):
                 state["stale"] = state["stale"] or state["spot_age"] > VENUE_MAX_AGE
                 if state.get("window"):
                     window = dict(state["window"])
-                    if current >= parse_ts(window["close_time"]):
+                    if current >= parse_ts(window["close_time"]) and not (
+                            window.get("settlement_average") and
+                            current < parse_ts(window["close_time"]) + 30):
                         state["window"] = None
                         state["exchange_closed"] = False
                         state["frames"] = dict(state.get("frames", {}))
@@ -2280,6 +2700,12 @@ def main():
     ap.add_argument("--host", default="127.0.0.1")
     ap.add_argument("--port", type=int, default=8770)
     args = ap.parse_args()
+    credentials, key_error = kalshi_ws.load_credentials()
+    if credentials is not None:
+        FEED.kalshi_key = credentials
+    elif key_error != "not configured":
+        with FEED.lock:
+            FEED._kalshi_error("kalshi_key", key_error)
     FEED.tally_logger = TallyLogger(HERE / "state", FEED)
     threading.Thread(target=FEED.tally_logger.run, daemon=True).start()
     threading.Thread(target=FEED.tally_logger.run_minutes, daemon=True).start()
@@ -2293,8 +2719,10 @@ def main():
     threading.Thread(target=FEED.run_spot, daemon=True).start()
     for name in ("Coinbase", "Kraken"):
         threading.Thread(target=FEED.run_stream, args=(name,), daemon=True).start()
+    if FEED.kalshi_key is not None:
+        threading.Thread(target=FEED.run_kalshi_ws, daemon=True).start()
     server = ThreadingHTTPServer((args.host, args.port), Handler)
-    print(f"BTC TA copilot (read-only, public data) at http://{args.host}:{args.port}/", flush=True)
+    print(f"BTC TA copilot (read-only market data) at http://{args.host}:{args.port}/", flush=True)
     server.serve_forever()
 
 
