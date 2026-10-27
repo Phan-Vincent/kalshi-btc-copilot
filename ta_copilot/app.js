@@ -272,26 +272,40 @@ function renderShared(s, f) {
   $('chg').innerHTML = `${pct(px, s.ref_15m)} / ${pct(px, s.ref_1h)}`;
 
   const w = s.window;
+  const brti = s.brti || {};
+  $('brtiValue').textContent = brti.value == null ? '—' :
+    `${usd(brti.value)} · ${brti.age == null ? 'age unavailable' : brti.age.toFixed(1) + 's old'}` +
+    (brti.minus_composite == null ? '' : ` · BRTI − composite ${sgn(brti.minus_composite)}`);
+  $('brtiStatus').textContent = w?.settlement_basis === 'BRTI' ? 'BRTI live' :
+    `Proxy: BRTI unavailable (${brti.error || (brti.configured ? 'stale or disconnected' : 'not configured')})`;
   if (w) {
     $('ticker').textContent = w.ticker;
     $('discoverySource').textContent = w.discovery_source && w.discovery_source !== 'listing' ? `Market found via ${w.discovery_source}` : '';
     $('kalshiAge').textContent = w.age > 10 ? `Kalshi data ${Math.floor(w.age)} s old` : '';
     $('strike').textContent = w.strike == null ? 'Target pending' : usd(w.strike);
-    $('distanceLabel').textContent = (w.distance_source === 'projected 60s average' ? 'Projected 60s average' : 'Composite') + ' vs target';
+    $('distanceLabel').textContent = (w.distance_source === 'projected 60s average' ? 'Projected 60s average' :
+      w.distance_source === 'projected 60s BRTI average' ? 'Projected 60s BRTI average' :
+      w.settlement_basis === 'BRTI' ? 'BRTI' : 'Composite') + ' vs target';
     const side = w.distance == null ? '' : w.distance >= 0 ? 'bull' : 'bear';
     $('distBlock').className = 'dist-block ' + side;
     $('dist').innerHTML = w.distance == null ? '—' : `<span class="${side}">${sgn(w.distance)} ${w.distance >= 0 ? 'above' : 'below'}</span>`;
     const sigmaProblem = readingProblem(s, '1m');
     $('sig').textContent = sigmaProblem ? `Unavailable · ${sigmaProblem}` :
-      w.distance_sigmas == null ? '—' : `${w.distance_sigmas >= 0 ? '+' : '−'}${Math.abs(w.distance_sigmas).toFixed(2)}σ · sd ${usd(w.distance_sd_usd, 0)}`;
+      w.distance_sigmas == null ? '—' : `${w.distance_sigmas >= 0 ? '+' : '−'}${Math.abs(w.distance_sigmas).toFixed(2)}σ · sd ${usd(w.distance_sd_usd, 0)}${w.settlement_basis === 'BRTI' ? ' · vs BRTI' : ''}`;
     // Without a composite or target the server makes no projection and counts no samples.
-    $('settlementCoverage').textContent = w.distance_source === 'projected 60s average' && w.distance != null ?
+    $('settlementCoverage').textContent = (w.distance_source === 'projected 60s average' ||
+      w.distance_source === 'projected 60s BRTI average') && w.distance != null ?
       `${w.observed_seconds || 0}/60 s observed · ${60 - (w.observed_seconds || 0)} s projected ` +
       `(${w.missing_seconds || 0} missing elapsed seconds; remainder still ahead).` +
-      (w.required_remaining_avg != null ? ` Proxy: the remaining ${w.required_remaining_seconds} s need to average ${usd(w.required_remaining_avg)} (${sgn(w.required_remaining_move)} vs composite) to land on the target; missed seconds are filled with the composite.` : '') +
+      (w.required_remaining_avg != null ? ` ${w.settlement_basis === 'BRTI' ? 'BRTI' : 'Proxy'}: the remaining ${w.required_remaining_seconds} s need to average ${usd(w.required_remaining_avg)} (${sgn(w.required_remaining_move)} vs ${w.settlement_basis === 'BRTI' ? 'BRTI' : 'composite'}) to land on the target; missed seconds are filled with the ${w.settlement_basis === 'BRTI' ? 'current BRTI' : 'composite'}.` : '') +
       ` Historical proxy error is separate.` : '';
     $('requiredDrift').textContent = w.required_drift_per_sec == null ? '' :
-      `Settlement-average proxy: constant slope ${w.required_drift_per_sec >= 0 ? '+' : '−'}${usd(Math.abs(w.required_drift_per_sec))}/s needed from the current composite (one sample per remaining second); not BRTI.`;
+      (w.settlement_basis === 'BRTI' ?
+      `Brownian settlement-average proxy vs BRTI: constant slope ${w.required_drift_per_sec >= 0 ? '+' : '−'}${usd(Math.abs(w.required_drift_per_sec))}/s needed from the current BRTI (one sample per remaining second); not a probability.` :
+      `Settlement-average proxy: constant slope ${w.required_drift_per_sec >= 0 ? '+' : '−'}${usd(Math.abs(w.required_drift_per_sec))}/s needed from the current composite (one sample per remaining second); not BRTI.`);
+    const settlement = s.previous_settlement_average || w.settlement_average;
+    $('brtiSettlement').textContent = settlement ?
+      `BRTI settlement average${settlement.ticker ? ' · ' + settlement.ticker : ''}: ${settlement.value == null ? '—' : usd(settlement.value)} · ${settlement.observed_seconds}/60 s observed${settlement.complete ? ' · complete' : ''}` : '';
     const book = w.orderbook_age != null && w.orderbook_age <= 10 ? w.orderbook || {} : {};
     const q = w.display_quotes || {};
     $('yesLabel').textContent = 'YES bid / ask';
@@ -305,7 +319,7 @@ function renderShared(s, f) {
     $('stripAvg').textContent = s.composite == null || s.average_60s == null ? '—' : sgn(s.composite - s.average_60s);
     $('pathNote').textContent = w.path_partial ? 'Observed path is partial for this window.' : '';
     contextSpark('windowPath', f ? f.chart.candles : [], w.price_path, w, s.timeframe);
-    $('bookAge').textContent = w.orderbook_age == null ? '' : `· book ${w.orderbook_age.toFixed(1)}s old`;
+    $('bookAge').textContent = w.orderbook_age == null ? '' : `· book ${w.orderbook_age.toFixed(1)}s old${w.orderbook_source === 'websocket' ? '' : ' · REST fallback'}`;
     $('yesDepth').textContent = `${depth(book.yes_bid, book.yes_bids)} / ${depth(book.yes_ask, book.yes_asks)}`;
     $('noDepth').textContent = `${depth(book.no_bid, book.no_bids)} / ${depth(book.no_ask, book.no_asks)}`;
     const imb = x => x == null ? '—' : `${x >= 0 ? '+' : ''}${x.toFixed(2)}`;
@@ -327,6 +341,9 @@ function renderShared(s, f) {
     ['ticker', 'strike', 'dist', 'sig', 'yes', 'no'].forEach(id => $(id).textContent = id === 'ticker' ? '' : '—');
     $('distanceLabel').textContent = 'Composite vs target';
     $('settlementCoverage').textContent = '';
+    const settlement = s.previous_settlement_average;
+    $('brtiSettlement').textContent = settlement ?
+      `BRTI settlement average · ${settlement.ticker}: ${settlement.value == null ? '—' : usd(settlement.value)} · ${settlement.observed_seconds}/60 s observed${settlement.complete ? ' · complete' : ''}` : '';
     $('requiredDrift').textContent = '';
     $('discoverySource').textContent = '';
     $('distBlock').className = 'dist-block';

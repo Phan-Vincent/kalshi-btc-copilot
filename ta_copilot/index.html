@@ -116,11 +116,14 @@ footer { margin-top: 14px; font-size: 12px; color: var(--muted); }
       <div id="kalshiAge" class="muted" style="font-size:12px"></div>
       <div id="discoverySource" class="muted" style="font-size:12px"></div>
       <div class="row"><span class="muted">Composite spot proxy</span><span id="composite">—</span></div>
+      <div class="row"><span class="muted">BRTI</span><span id="brtiValue">—</span></div>
+      <div id="brtiStatus" class="record"></div>
       <div id="compositeQuality" class="record"></div>
       <div class="row"><span class="muted">Rolling 60s proxy average</span><span id="average60">—</span></div>
       <div class="row"><span class="muted">Target (floor strike)</span><span id="strike">—</span></div>
       <div class="row sigma-row"><span class="muted">Distance in σ (settle-avg model)</span><span id="sig">—</span></div>
       <div id="settlementCoverage" class="record"></div>
+      <div id="brtiSettlement" class="record"></div>
       <div id="requiredDrift" class="record"></div>
       <div class="row quote-row"><span class="muted" id="yesLabel">YES bid / ask</span><span id="yes">—</span></div>
       <div id="yesSource" class="muted quote-source"></div>
@@ -212,8 +215,8 @@ footer { margin-top: 14px; font-size: 12px; color: var(--muted); }
   </div>
 
   <footer>
-    Spot proxy: median of fresh Coinbase, Kraken, Bitstamp and Gemini BTC-USD last trades after exclusions. Candles: Coinbase Advanced Trade public market data. Kalshi: public market endpoint. Kalshi settles KXBTC15M on the 60-second CF Benchmarks BRTI average. This composite and its rolling average are not BRTI and can differ from settlement.
-    The tally counts indicator states and has not been validated as a trade signal. The Study 005 advice gate stays disabled. No account access, no orders.
+    Spot proxy: median of fresh Coinbase, Kraken, Bitstamp and Gemini BTC-USD last trades after exclusions. Candles: Coinbase Advanced Trade public market data. Kalshi: public market endpoint and, with a checked read-only key, its market-data WebSocket and BRTI. Kalshi settles KXBTC15M on the 60-second CF Benchmarks BRTI average. This composite and its rolling average are not BRTI and can differ from settlement.
+    The tally counts indicator states and has not been validated as a trade signal. The Study 005 advice gate stays disabled. No orders; any Kalshi key is read-only and never reads the portfolio.
     <div id="errors"></div>
   </footer>
 </div>

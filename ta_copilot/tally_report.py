@@ -53,7 +53,8 @@ EXPLORATORY_NOTE = ("Sections marked [exploratory] make many comparisons; expect
 # * optional levels contain finite numbers, nonnegative integer counts and boolean flags.
 RECORD_TYPES = ("open", "settled", "close", "minute", "settled_value")
 NUMERIC_FIELDS = ("composite", "composite_spot", "average_60s", "target", "sigma_1m_usd", "seconds_left",
-                  "proxy_avg_60s", "flow_imbalance_1m", "capture_delay_seconds", "flow_coverage_seconds")
+                  "proxy_avg_60s", "brti", "brti_age", "brti_avg_60s",
+                  "flow_imbalance_1m", "capture_delay_seconds", "flow_coverage_seconds")
 STRING_NUMERIC_FIELDS = ("expiration_value",)
 QUOTE_FIELDS = ("yes_bid", "yes_ask")
 TIME_FIELDS = ("captured_at", "recorded_at", "open_time", "close_time", "target_observed_at")
@@ -159,6 +160,9 @@ def record_problem(row):
     samples = row.get("samples")
     if samples is not None and (not is_count(samples) or samples < 0):
         return "bad samples"
+    brti_samples = row.get("brti_samples")
+    if brti_samples is not None and (not is_count(brti_samples) or not 0 <= brti_samples <= 60):
+        return "bad brti_samples"
     frames = row.get("timeframes")
     if frames is not None:
         if not isinstance(frames, dict) or not all(isinstance(f, dict) for f in frames.values()):
@@ -715,7 +719,7 @@ def proxy_section(closes, settled):
     return lines
 
 
-def calibration_section(opened, settled, minutes):
+def calibration_section(opened, settled, minutes, closes=None):
     """Observed settlement frequencies; exploratory and not a live estimate."""
     distance, market = {}, {}
     lock_hits = lock_count = 0
@@ -761,6 +765,24 @@ def calibration_section(opened, settled, minutes):
               ("<−2σ", "−2 to −1σ", "−1 to 0σ", "0 to 1σ", "1 to 2σ", "≥2σ") if bucket in distance]
     lines.append("Fresh YES mid (10¢ buckets):")
     lines += [line(f"{bucket * 10:02d}–{bucket * 10 + 9:02d}¢", *market[bucket]) for bucket in sorted(market)]
+    errors, side_count, mismatches = [], 0, 0
+    for ticker, row in (closes or {}).items():
+        if row.get("brti_samples") != 60 or record_problem(row):
+            continue
+        value = row.get("brti_avg_60s")
+        expiration = (settled.get(ticker) or {}).get("expiration_value")
+        if value is None or not finite_or_none(expiration, strings=True) or expiration is None:
+            continue
+        official = float(expiration)
+        errors.append(abs(value - official))
+        target = (opened.get(ticker) or {}).get("target")
+        if finite_or_none(target) and target is not None:
+            side_count += 1
+            mismatches += (value >= target) != (official >= target)
+    lines.append(f"Live BRTI close average vs expiration_value: {len(errors)} complete windows; "
+                 f"median |error| ${statistics.median(errors):.2f}, max |error| ${max(errors):.2f}; "
+                 f"side-vs-target mismatches {mismatches}/{side_count}." if errors else
+                 "Live BRTI close average vs expiration_value: 0 complete windows; side-vs-target mismatches 0/0.")
     lines.append(line("Minute-14 composite side lock-in accuracy", lock_hits, lock_count, "matched")
                  if lock_count else "Minute-14 composite side lock-in accuracy: 0 rows")
     return lines
@@ -778,7 +800,7 @@ def report(opened, settled, minutes=None, now=None, closes=None, calibration=Fal
     lines += levels_section(opened, settled, minutes)
     lines += primary_section(opened, minutes, now)
     if calibration:
-        lines += calibration_section(opened, settled, minutes)
+        lines += calibration_section(opened, settled, minutes, closes)
     return "\n".join(lines)
 
 
