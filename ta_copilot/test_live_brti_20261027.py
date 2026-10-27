@@ -484,3 +484,127 @@ class IntegrationTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+def trade_frame(sid, seq, ticker, trade_id, ms):
+    return {"type": "trade", "sid": sid, "seq": seq, "msg": {
+        "market_ticker": ticker, "trade_id": trade_id, "yes_price_dollars": "0.50",
+        "count_fp": "1", "taker_side": "yes", "ts_ms": ms}}
+
+
+def rest_trade(trade_id, at):
+    return {"ticker": "T", "trade_id": trade_id, "created_time": ta.iso(at),
+            "yes_price_dollars": "0.50", "count_fp": "1", "taker_side": "yes"}
+
+
+class AstraQATests(unittest.TestCase):
+    """Regressions for the 2026-10-27 GPT-6 Astra QA (history/QA_REPORT_20261027_astra.md)."""
+
+    def market_feed(self, now):
+        feed = ready_feed(now)
+        feed.market = {"ticker": "T", "open_time": ta.iso(1000), "close_time": ta.iso(1900), "floor_strike": 100}
+        feed.market_at = now
+        feed.context_ticker = "T"
+        return feed
+
+    def test_1_unbridged_websocket_rows_never_stop_rest_paging(self):
+        feed = self.market_feed(1100)
+        feed.kalshi_tape = {"rows": {"r1040": {**ta.kalshi_trade_rows({"trades": [rest_trade("r1040", 1040)]},
+                                                                      "T", 1000, 1900)[0]}},
+                            "from": 1000, "to": 1050}
+        feed.rest_tape_at = 1050
+        feed.ws_trade_start["T"] = 1090
+        feed.ws_trade_contiguous.add("T")
+        feed.handle_kalshi_frame(trade_frame(5, 1, "T", "w1095", 1095000), 1095)  # unbridged, pending
+        feed.handle_kalshi_frame(trade_frame(5, 3, "T", "w1097", 1097000), 1097)  # seq gap
+        pages = []
+        def get(url, params=None, timeout=8):
+            if url.endswith("/orderbook"):
+                return {"orderbook_fp": {"yes_dollars": [], "no_dollars": []}}
+            pages.append(params.get("cursor"))
+            if not params.get("cursor"):  # newest full page, overlapping only the WebSocket row
+                page = [rest_trade("w1095", 1095)] + [rest_trade(f"n{i}", 1096 + i / 100) for i in range(99)]
+                return {"trades": page, "cursor": "older"}
+            return {"trades": [rest_trade("r1075", 1075), rest_trade("r1040", 1040)], "cursor": ""}
+        with patch.object(ta, "get_json", side_effect=get), patch.object(ta.time, "time", return_value=1100):
+            feed.poll_market_context()
+        self.assertEqual(len(pages), 2, "REST paging stopped on an unbridged WebSocket row")
+        self.assertIn("r1075", feed.kalshi_tape["rows"])
+
+    def test_2_bridge_needs_a_rest_request_started_after_subscription(self):
+        clock = [1100.0]
+        feed = self.market_feed(1100)
+        feed.kalshi_tape = {"rows": {}, "from": 1000, "to": 1099}
+        feed.rest_tape_at = 1099
+        feed.kalshi_connected = True
+        feed.ws_trade_start["T"] = 1100.5
+        feed.ws_trade_contiguous.add("T")
+        def fetch(ticker, opened, reach, held_ids=()):
+            clock[0] = 1101.0  # the response lands after the subscription started
+            return [], False
+        def get(url, params=None, timeout=8):
+            return {"orderbook_fp": {"yes_dollars": [], "no_dollars": []}}
+        with patch.object(ta, "fetch_trades", side_effect=fetch), patch.object(ta, "get_json", side_effect=get), \
+                patch.object(ta.time, "time", side_effect=lambda: clock[0]):
+            feed.kalshi_last_at = 1101.0
+            feed.poll_market_context()
+            clock[0] = 1101.5
+            feed.kalshi_last_at = 1101.5
+            feed.poll_market_context()
+        self.assertEqual(feed.tape_source, "rest")
+
+    def test_3_seq_gap_on_a_control_frame_invalidates(self):
+        feed, socket = ta.Feed(), FakeSocket()
+        feed.market = {"ticker": "T", "open_time": ta.iso(1000), "close_time": ta.iso(1900)}
+        feed.ws_subs.sids.update({"orderbook_delta": 4, "trade": 5})
+        feed.ws_subs.tickers.update({4: {"T"}, 5: {"T"}})
+        feed.handle_kalshi_frame({"type": "orderbook_snapshot", "sid": 4, "seq": 10,
+            "msg": {"market_ticker": "T", "yes_dollars_fp": [["0.4000", "1.00"]]}}, 1100, socket)
+        feed.ws_trade_contiguous.add("T")
+        feed.handle_kalshi_frame(trade_frame(5, 10, "T", "a", 1100000), 1100, socket)
+        feed.handle_kalshi_frame({"type": "ok", "sid": 4, "seq": 12, "msg": {}}, 1101, socket)
+        feed.handle_kalshi_frame({"type": "ok", "sid": 5, "seq": 12, "msg": {}}, 1101, socket)
+        self.assertIsNone(feed.ws_books.view(4, "T"))
+        self.assertNotIn("T", feed.ws_trade_contiguous)
+        self.assertEqual({c["params"]["channels"][0] for c in socket.sent if c["cmd"] == "subscribe"},
+                         {"orderbook_delta", "trade"})
+
+    def test_4_trade_rollover_drops_previous_market_book(self):
+        now = 1900.8
+        feed = ready_feed(now)
+        feed.market = {"ticker": "U", "open_time": ta.iso(1900), "close_time": ta.iso(2800), "floor_strike": 100}
+        feed.market_at = now
+        feed.context_ticker = "T"
+        feed.book = ta.book_context({"orderbook_fp": {"yes_dollars": [["0.40", "1"]], "no_dollars": [["0.50", "1"]]}})
+        feed.book_at = now
+        feed.yes_mid_path.append({"time": 1899, "value": 0.45})
+        feed.handle_kalshi_frame(trade_frame(5, 1, "U", "u1", 1900500), now)
+        with patch.object(ta.time, "time", return_value=now):
+            window = feed.state("1m")["window"]
+        self.assertEqual(window["ticker"], "U")
+        self.assertIsNone(window["orderbook"])
+        self.assertEqual(window["yes_mid_path"], [])
+
+    def test_5_logged_sigma_stays_composite_based(self):
+        now = 1100
+        feed = self.market_feed(now)
+        for i, bar in enumerate(feed.bars["1m"]):  # nonzero realized sigma
+            bar["close"] = 100.0 + (i % 2)
+        feed.kalshi_key, feed.kalshi_scoped = object(), True
+        feed.brti_value, feed.brti_source_at = 110.0, now
+        with patch.object(ta.time, "time", return_value=now):
+            with_brti = feed.state("1m")
+            feed.kalshi_key = None
+            keyless = feed.state("1m")
+        self.assertEqual(with_brti["window"]["settlement_basis"], "BRTI")
+        self.assertEqual(with_brti["window"]["sigma_1m_usd"], keyless["window"]["sigma_1m_usd"])
+        self.assertEqual(ta.minute_record(with_brti, 1060)["sigma_1m_usd"],
+                         ta.minute_record(keyless, 1060)["sigma_1m_usd"])
+
+    def test_6_mid_path_keeps_a_full_window_and_keyless_cadence(self):
+        feed = self.market_feed(1100)
+        self.assertGreaterEqual(feed.yes_mid_path.maxlen, 900)
+        feed.book = ta.book_context({"orderbook_fp": {"yes_dollars": [["0.40", "1"]], "no_dollars": [["0.50", "1"]]}})
+        feed.book_at = 1100
+        feed.sample_composite(1101.05)  # keyless: only the REST context poll adds mid points
+        self.assertEqual(list(feed.yes_mid_path), [])
