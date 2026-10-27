@@ -883,10 +883,10 @@ class Feed:
         with urlopen(Request(url, method="GET", headers=headers), timeout=10) as response:
             return json.loads(response.read().decode())
 
-    def backfill_brti(self, now=None):
+    def backfill_brti(self, now=None, force=False):
         now = time.time() if now is None else now
         with self.lock:
-            if now - self.brti_backfill_at < 30:
+            if not force and now - self.brti_backfill_at < 30:
                 return False
             latest = int(now) - 1
             if all(second in self.brti_seconds for second in range(latest - 119, latest + 1)):
@@ -918,6 +918,7 @@ class Feed:
         """A lost trade update: REST paging takes over. Hold self.lock. Rows received
         since the last bridge stay pending, so they never pass for REST coverage."""
         self.ws_trade_contiguous.clear()
+        self.ws_trade_start.clear()
         self.ws_trade_seq.pop(sid, None)
         self.rest_tape_at = 0.0
         self.tape_source = "websocket_disconnected"
@@ -1001,12 +1002,12 @@ class Feed:
                     for second in list(self.brti_seconds):
                         if second < received_at - 1200:
                             del self.brti_seconds[second]
-            if ack == "subscribe" and kind == "subscribed" and frame["msg"]["channel"] == "trade":
+            if not trade_gap and ack == "subscribe" and kind == "subscribed" and frame["msg"]["channel"] == "trade":
                 sid = frame["msg"]["sid"]
                 for ticker in self.ws_subs.tickers.get(sid, ()):
                     self.ws_trade_start[ticker] = received_at
                     self.ws_trade_contiguous.add(ticker)
-            if ack == "update_subscription" and kind == "ok":
+            if not trade_gap and ack == "update_subscription" and kind == "ok":
                 sid = frame.get("sid")
                 if sid == self.ws_subs.sids.get("trade"):
                     for ticker in self.ws_subs.tickers.get(sid, ()):
@@ -1331,6 +1332,7 @@ class Feed:
     def sample_composite(self, at=None):
         at = time.time() if at is None else at
         close_row = None
+        defer_close = False
         with self.lock:
             value, details = composite_quote(self.venues, at)
             self.composite, self.composite_details = value, details
@@ -1338,6 +1340,7 @@ class Feed:
             boundary = int(at // 900) * 900
             if self.close_boundary is not None and boundary > self.close_boundary:
                 close_row = self._close_proxy(boundary, at)
+                defer_close = self.kalshi_key is not None
             self.close_boundary = boundary
             if self.samples and self.samples[-1][0] == int(at):
                 self.samples.pop()
@@ -1381,7 +1384,42 @@ class Feed:
                 except Exception as exc:
                     self._note("tally_log", exc)
         if close_row and self.tally_logger:
-            self.tally_logger.submit(close_row)
+            if defer_close:
+                threading.Thread(target=self._finalize_close, args=(close_row,), daemon=True).start()
+            else:
+                self.tally_logger.submit(close_row)
+
+    def _close_backfill(self):
+        with self.lock:
+            if not self.kalshi_scoped:
+                return
+        # A failure is not a feed error: nothing would clear it until a reconnect,
+        # so the watcher would alert on it; the close row records the true count.
+        try:
+            self.backfill_brti(force=True)
+        except Exception:
+            pass
+
+    def _finalize_close(self, row):
+        """Keep the captured composite; allow late exact BRTI seconds until B+10."""
+        boundary = parse_ts(row["close_time"])
+        attempted = False
+        while True:
+            now = time.time()
+            with self.lock:
+                held = [self.brti_seconds[t] for t in range(int(boundary) - 60, int(boundary))
+                        if self.brti_seconds.get(t) is not None]
+            if len(held) == 60 or now >= boundary + 10:
+                row = {**row, "brti_samples": len(held),
+                       "brti_avg_60s": statistics.fmean(held) if len(held) == 60 else None,
+                       "brti_finalized_at": iso(now)}
+                self.tally_logger.submit(row)
+                return
+            if not attempted and now >= boundary + 3:
+                attempted = True
+                # A slow REST response must not hold up the finalization deadline.
+                threading.Thread(target=self._close_backfill, daemon=True).start()
+            time.sleep(0.1)
 
     def _close_proxy(self, boundary, at):
         """Our 60 s composite mean over the settlement minute B-60..B-1, or None.
@@ -1827,16 +1865,16 @@ class Feed:
         brti_state["minus_composite"] = (brti_value - composite if kalshi_configured and
             brti_value is not None and composite is not None else None)
         previous_settlement = None
-        if (kalshi_configured and previous_market and
-                0 <= now - parse_ts(previous_market["close_time"]) < 30):
-            previous_settlement = {"ticker": previous_market["ticker"],
-                **brti_settlement_average(brti_seconds, parse_ts(previous_market["close_time"]), now)}
+        closed_markets = [m for m in (market, previous_market) if m and
+                          0 <= now - parse_ts(m["close_time"]) < 30]
+        if kalshi_configured and closed_markets:
+            closed = max(closed_markets, key=lambda m: parse_ts(m["close_time"]))
+            previous_settlement = {"ticker": closed["ticker"],
+                **brti_settlement_average(brti_seconds, parse_ts(closed["close_time"]), now)}
 
         window = None
         anchor = int(now // 900) * 900
-        if market and parse_ts(market["open_time"]) <= now and (
-                now < parse_ts(market["close_time"]) or
-                kalshi_configured and now < parse_ts(market["close_time"]) + 30):
+        if market and parse_ts(market["open_time"]) <= now < parse_ts(market["close_time"]):
             open_ts, close_ts = parse_ts(market["open_time"]), parse_ts(market["close_time"])
             anchor = int(open_ts)
             strike = optional_float(market.get("floor_strike"))
@@ -2572,14 +2610,27 @@ def cached_state(tf):
             current = time.time()
             elapsed = max(0, current - parse_ts(state["server_time"])) if "server_time" in state else 0
             state["server_time"] = iso(current)
+            if state.get("brti"):
+                state["brti"] = dict(state["brti"])
+                brti = state["brti"]
+                if brti.get("age") is not None:
+                    brti["age"] += elapsed
+                if brti.get("fresh") and brti["age"] > 2:
+                    state = FEED.state(tf)
+                    STATE_CACHE[tf] = (bucket, state)
+                    return state
+            if ((state.get("window") or {}).get("settlement_average") and
+                    current >= parse_ts(state["window"]["close_time"]) or
+                    state.get("previous_settlement_average")):
+                state = FEED.state(tf)
+                STATE_CACHE[tf] = (bucket, state)
+                return state
             if state.get("ready"):
                 state["spot_age"] += elapsed
                 state["stale"] = state["stale"] or state["spot_age"] > VENUE_MAX_AGE
                 if state.get("window"):
                     window = dict(state["window"])
-                    if current >= parse_ts(window["close_time"]) and not (
-                            window.get("settlement_average") and
-                            current < parse_ts(window["close_time"]) + 30):
+                    if current >= parse_ts(window["close_time"]):
                         state["window"] = None
                         state["exchange_closed"] = False
                         state["frames"] = dict(state.get("frames", {}))
