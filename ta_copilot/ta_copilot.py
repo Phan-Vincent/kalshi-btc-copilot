@@ -846,7 +846,7 @@ class Feed:
         # which it is known to be complete (see merge_tape).
         self.kalshi_tape = None
         self.tape_source = "rest"
-        self.yes_mid_path = deque(maxlen=460)
+        self.yes_mid_path = deque(maxlen=930)
         self.context_ticker = None
         self.book_source = "rest"
         self.kalshi_key = None
@@ -914,6 +914,14 @@ class Feed:
             return None
         return self.ws_books.view(sid, ticker)
 
+    def _trade_gap(self, sid):
+        """A lost trade update: REST paging takes over. Hold self.lock. Rows received
+        since the last bridge stay pending, so they never pass for REST coverage."""
+        self.ws_trade_contiguous.clear()
+        self.ws_trade_seq.pop(sid, None)
+        self.rest_tape_at = 0.0
+        self.tape_source = "websocket_disconnected"
+
     def _adopt_early_trades(self, ticker):
         """Fold trades received for ticker before it became the current market. Hold self.lock."""
         early = self.ws_early_trades.pop(ticker, {})
@@ -962,12 +970,21 @@ class Feed:
             # add_markets/delete_markets takes the next seq (seen live 2026-10-27).
             # Count it, or every rollover reads as a lost update.
             sid, seq = frame.get("sid"), frame.get("seq")
+            control_book_gap = trade_gap = False
             if kind not in ("orderbook_snapshot", "orderbook_delta", "trade") and type(seq) is int:
-                if self.ws_books.seq.get(sid) == seq - 1:
-                    self.ws_books.seq[sid] = seq
-                if self.ws_trade_seq.get(sid) == seq - 1:
-                    self.ws_trade_seq[sid] = seq
-            book_event = self.ws_books.apply(frame)
+                if sid in self.ws_books.seq:
+                    if self.ws_books.seq[sid] == seq - 1:
+                        self.ws_books.seq[sid] = seq
+                    else:
+                        self.ws_books.invalidate(sid)
+                        control_book_gap = True
+                if sid in self.ws_trade_seq:
+                    if self.ws_trade_seq[sid] == seq - 1:
+                        self.ws_trade_seq[sid] = seq
+                    else:
+                        self._trade_gap(sid)
+                        trade_gap = True
+            book_event = "gap" if control_book_gap else self.ws_books.apply(frame)
             ack = self.ws_subs.ack(frame)
             if kind == "error" or ack == "error":
                 raise ValueError("Kalshi subscription error")
@@ -999,11 +1016,7 @@ class Feed:
                 sid, seq = frame.get("sid"), frame.get("seq")
                 prior = self.ws_trade_seq.get(sid)
                 if prior is not None and seq != prior + 1:
-                    self.ws_trade_contiguous.clear()
-                    self.ws_trade_seq.pop(sid, None)
-                    self.ws_pending_ids.clear()
-                    self.rest_tape_at = 0.0
-                    self.tape_source = "websocket_disconnected"
+                    self._trade_gap(sid)
                     trade_gap = True
                 else:
                     self.ws_trade_seq[sid] = seq
@@ -1026,6 +1039,8 @@ class Feed:
                             self.tape_source = "rest"
                             self.ws_pending_ids.clear()
                             self.rest_tape_at = 0.0
+                            self.book, self.book_at, self.book_source = None, 0.0, "rest"
+                            self.yes_mid_path.clear()
                         if self.kalshi_tape is None:
                             covered = opened if self.ws_trade_start.get(ticker, float("inf")) <= opened else None
                             self.kalshi_tape = {"rows": {}, "from": covered, "to": 0.0}
@@ -1053,7 +1068,7 @@ class Feed:
                 self.kalshi_tape["to"] = received_at
         if book_event == "gap" and socket is not None:
             self._ws_resubscribe(socket, "orderbook_delta", received_at)
-        if row and trade_gap and socket is not None:
+        if trade_gap and socket is not None:
             self._ws_resubscribe(socket, "trade", received_at)
         return book_event
 
@@ -1103,7 +1118,6 @@ class Feed:
                         self.kalshi_last_at = time.time()
                         self.ws_trade_contiguous.clear()
                         self.ws_trade_start.clear()
-                        self.ws_pending_ids.clear()
                         self.rest_tape_at = 0.0
                         self.ws_books = kalshi_ws.BookStream()
                         self.ws_subs = kalshi_ws.Subscriptions()
@@ -1154,7 +1168,6 @@ class Feed:
             with self.lock:
                 self.kalshi_connected = False
                 self.ws_trade_contiguous.clear()
-                self.ws_pending_ids.clear()
                 self.rest_tape_at = 0.0
                 if self.book_source == "websocket":
                     self.book, self.book_at, self.book_source = None, 0.0, "rest"
@@ -1340,8 +1353,7 @@ class Feed:
             if (self.market and self.context_ticker == self.market["ticker"]
                     and (not self.yes_mid_path or self.yes_mid_path[-1]["time"] != int(at))):
                 ws_view = self._ws_book_view(self.market["ticker"], at)
-                mid = (book_context(ws_view)["yes_mid"] if ws_view else
-                       self.book.get("yes_mid") if self.book and at - self.book_at <= 10 else None)
+                mid = book_context(ws_view)["yes_mid"] if ws_view else None
                 if mid is not None:
                     self.yes_mid_path.append({"time": int(at), "value": mid})
             self.flow.advance(at)
@@ -1672,6 +1684,9 @@ class Feed:
                                                         if not self.ws_pending_ids else 0.0)}
             reach = tape_reach(base_tape)
             held_ids = set(base_tape["rows"]) if base_tape else set()
+        # A response can land after the subscription starts yet describe the book
+        # before it; only the request's start time bounds what it covers.
+        requested_at = time.time()
         raw, full = fetch_trades(ticker, opened, reach, held_ids)
         fetched_at = time.time()
         rows = kalshi_trade_rows({"trades": raw}, ticker, opened, closed)
@@ -1686,7 +1701,7 @@ class Feed:
                 if self.kalshi_tape is None:
                     self.kalshi_tape = {"rows": {}, "from": None, "to": fetched_at}
                 self.kalshi_tape["rows"].update(pending)
-            self.rest_tape_at = fetched_at
+            self.rest_tape_at = requested_at
             self.tape_source = "rest"
             self.kalshi_recent_trades = [{k: v for k, v in row.items() if k != "trade_id"}
                 for row in sorted(self.kalshi_tape["rows"].values(),
@@ -1871,6 +1886,9 @@ class Feed:
             window.update(window_distance(strike, composite, window["seconds_left"], sig,
                                           close_ts, window_points,
                                           brti_value if brti_fresh else None, brti_seconds))
+            if window["settlement_basis"] == "BRTI":
+                window["sigma_1m_usd"] = window_distance(strike, composite, window["seconds_left"], sig,
+                                                         close_ts, window_points)["sigma_1m_usd"]
             window["settlement_average"] = (brti_settlement_average(brti_seconds, close_ts, now)
                 if kalshi_configured and close_ts - 60 <= now < close_ts + 30 else None)
 
