@@ -1030,13 +1030,24 @@ class Feed:
                             covered = opened if self.ws_trade_start.get(ticker, float("inf")) <= opened else None
                             self.kalshi_tape = {"rows": {}, "from": covered, "to": 0.0}
                         self._adopt_early_trades(ticker)
-                        self.kalshi_tape["rows"][trade["trade_id"]] = trade
+                        rows = self.kalshi_tape["rows"]
+                        new = trade["trade_id"] not in rows
+                        rows[trade["trade_id"]] = trade
                         if self.tape_source == "websocket":
                             self.kalshi_tape["to"] = received_at
                         else:
                             self.ws_pending_ids.add(trade["trade_id"])
+                        # A busy window holds tens of thousands of trades and frames
+                        # arrive tens of times a second: re-sort only a small tape.
+                        if len(rows) <= 200:
+                            recent = sorted(rows.values(), key=lambda x: x["time"], reverse=True)[:30]
+                        elif new:
+                            recent = sorted([trade] + self.kalshi_recent_trades,
+                                            key=lambda x: x["time"], reverse=True)[:30]
+                        else:
+                            recent = self.kalshi_recent_trades
                         self.kalshi_recent_trades = [{k: v for k, v in r.items() if k != "trade_id"}
-                            for r in sorted(self.kalshi_tape["rows"].values(), key=lambda x: x["time"], reverse=True)[:30]]
+                                                     for r in recent]
             elif (self.kalshi_tape and self.tape_source == "websocket" and
                   self.context_ticker in self.ws_trade_contiguous):
                 self.kalshi_tape["to"] = received_at
@@ -1105,6 +1116,7 @@ class Feed:
                         with self.lock:
                             self._kalshi_error("brti", "backfill unavailable")
                     delay = 1
+                    maintain_at = 0.0
                     while True:
                         raw = socket.recv(timeout=10)
                         now = time.time()
@@ -1113,6 +1125,11 @@ class Feed:
                             self.handle_kalshi_frame(frame, now, socket)
                         except (ValueError, KeyError, TypeError, IndexError):
                             raise RuntimeError("Kalshi frame or subscription invalid") from None
+                        # Subscription upkeep once a second, or at once after a
+                        # control frame, not on each of ~80 market-data frames a second.
+                        if now < maintain_at and frame.get("type") not in ("subscribed", "ok", "unsubscribed"):
+                            continue
+                        maintain_at = now + 1
                         with self.lock:
                             expired = self.ws_subs.expired(now)
                         if expired:
