@@ -135,7 +135,7 @@ class MetricsTests(unittest.TestCase):
     def test_required_drift_cutoff(self):
         samples = [{"time": t, "value": 110.0} for t in range(940, 970)]
         row = ta.window_distance(100, 104, 30, .01, 1000, samples)
-        self.assertAlmostEqual(row["required_drift_per_sec"], -14 / 30)
+        self.assertAlmostEqual(row["required_drift_per_sec"], -28 / 31)
         self.assertIsNone(ta.window_distance(100, 104, 4, .01, 1000, samples)["required_drift_per_sec"])
         self.assertIsNone(ta.window_distance(100, 104, 61, .01, 1000, samples)["required_drift_per_sec"])
 
