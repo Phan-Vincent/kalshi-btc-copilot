@@ -39,7 +39,7 @@ case "${1:-deploy}" in
     check
     remote 'mkdir -p ~/btc-ta/state ~/btc-ta/fixtures ~/btc-ta/vendor ~/.config/systemd/user && chmod 700 ~/btc-ta ~/btc-ta/state'
     scp -q "$SRC/ta_copilot.py" "$SRC/kalshi_ws.py" "$SRC/stream_flow.py" "$SRC/sr_levels.py" "$SRC/ta_watch.py" "$SRC/tally_report.py" "$SRC/log_tools.py" "$SRC/acer_watch.py" "$SRC/index.html" "$SRC/app.js" "$SRC/README.md" "$SRC"/test_*.py "$HOST:btc-ta/"
-    scp -q "$SRC"/fixtures/* "$HOST:btc-ta/fixtures/"
+    scp -q -r "$SRC"/fixtures/* "$HOST:btc-ta/fixtures/"
     scp -q "$SRC/vendor/lightweight-charts-4.2.3.js" "$SRC/vendor/LICENSE" "$HOST:btc-ta/vendor/"
     if [ -f "$SRC/vendor/NOTICE" ]; then scp -q "$SRC/vendor/NOTICE" "$HOST:btc-ta/vendor/"; fi
     scp -q "$HERE/btc-ta-copilot.service" "$HERE/btc-ta-watch.service" "$HERE/btc-ta-watch.timer" "$HOST:.config/systemd/user/"

@@ -1,0 +1,8 @@
+{
+  "frames": {
+    "1m": {
+      "tally": {"bull": 5, "bear": 1, "neutral": 2, "lean": "bullish"},
+      "family": {"votes": {"trend": "bull", "momentum": "neutral", "flow": "bear"}, "net": 0, "lean": "mixed", "flow_ready": true}
+    }
+  }
+}

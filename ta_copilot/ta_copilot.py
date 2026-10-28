@@ -87,6 +87,7 @@ FAMILY_LEAN_MARGIN = 2        # family_lean needs |family_net| >= 2
 PROXY_RECORD_WINDOWS = 200    # proxy-vs-settlement readout uses the latest 200 windows
 PROXY_RECORD_MIN = 20         # below this, the readout says "too few to judge"
 MAX_MEMORY_WINDOWS = 500      # settled windows kept in memory before archiving into running counters
+RECENT_WINDOWS = 8            # latest closed windows shown in the recent-windows panel
 MINUTE_CAPTURE_SLACK = 2.0    # a minute row is written only within 2 s of :00
 MINUTE_BACKLOG_LIMIT = 60     # queued minute rows kept while appends fail
 MINUTE_RETRY_SECONDS = 5.0    # bounded cadence for retrying queued minute appends
@@ -1997,6 +1998,7 @@ class Feed:
                 "window": window, "frames": frames,
                 "tally_record": self.tally_logger.record if self.tally_logger else None,
                 "proxy_record": self.tally_logger.proxy if self.tally_logger else None,
+                "recent_windows": self.tally_logger.recent_windows if self.tally_logger else None,
                 "errors": errors, "vwap_anchor": iso(anchor)}
 
 
@@ -2116,6 +2118,18 @@ def settled_record(ticker, market, now):
     return record
 
 
+def close_order(item):
+    """Sort key for (ticker, close row): parsed close time, unparseable last."""
+    ticker, row = item
+    for key in ("close_time", "captured_at"):
+        if row.get(key):
+            try:
+                return (0, parse_ts(row[key]), "", ticker)
+            except Exception:
+                pass
+    return (1, 0.0, str(row.get("close_time") or ""), ticker)
+
+
 def proxy_summary(errors):
     """Median and 90th-percentile absolute error and mean signed error, in dollars."""
     if not errors:
@@ -2165,6 +2179,7 @@ class TallyLogger:
         # Replaced, never mutated, so request threads can read them lock-free.
         self.record = None
         self.proxy = None
+        self.recent_windows = None
 
     def submit(self, snapshot):
         try:
@@ -2413,7 +2428,11 @@ class TallyLogger:
                 and optional_float(self.expirations.get(t)) is not None
                 and optional_float(row.get("proxy_avg_60s")) is not None)
         ]
-        protected = set(scored_closes[-PROXY_RECORD_WINDOWS:]) | set(getattr(self, "pending_open", {})) | set(self.value_pending)
+        # The recent-windows panel needs the newest closes even when pruning;
+        # only guard a strict "latest 8" once there are more than 8 to choose.
+        recent_closes = (sorted(self.closes, key=lambda t: (*win_ts(t), t))[-RECENT_WINDOWS:]
+                         if len(self.closes) > RECENT_WINDOWS else [])
+        protected = set(scored_closes[-PROXY_RECORD_WINDOWS:]) | set(recent_closes) | set(getattr(self, "pending_open", {})) | set(self.value_pending)
         for ticker in all_tickers[:-limit]:
             if ticker not in self.settled or ticker in protected:
                 continue
@@ -2474,15 +2493,6 @@ class TallyLogger:
         coverage = {"total_closes": arch["total_closes"] + len(self.closes), "scored": arch["scored"],
                     "incomplete_samples": arch["incomplete_samples"], "awaiting_settlement": 0,
                     "missing_settlement": arch["missing_settlement"], "invalid_proxy": arch["invalid_proxy"]}
-        def close_order(item):
-            ticker, row = item
-            for key in ("close_time", "captured_at"):
-                if row.get(key):
-                    try:
-                        return (0, parse_ts(row[key]), "", ticker)
-                    except Exception:
-                        pass
-            return (1, 0.0, str(row.get("close_time") or ""), ticker)
         for ticker, row in sorted(self.closes.items(), key=close_order):
             settled = optional_float(self.expirations.get(ticker))
             proxy = optional_float(row.get("proxy_avg_60s"))
@@ -2502,6 +2512,49 @@ class TallyLogger:
         summary = proxy_summary(errors[-PROXY_RECORD_WINDOWS:])
         summary["coverage"] = coverage
         self.proxy = summary
+        self.refresh_recent_windows()
+
+    def refresh_recent_windows(self):
+        """Latest closed windows for the recent-settled panel, newest first.
+
+        A logger built without __init__ (tests) may lack opened/results, so
+        those are read through getattr like refresh_proxy's other inputs.
+        """
+        closes = getattr(self, "closes", {}) or {}
+        opened = getattr(self, "opened", {}) or {}
+        results = getattr(self, "results", {}) or {}
+        settled_set = getattr(self, "settled", set())
+        value_pending = getattr(self, "value_pending", {}) or {}
+        expirations = getattr(self, "expirations", {}) or {}
+
+        windows = []
+        for ticker, row in sorted(closes.items(), key=close_order)[-RECENT_WINDOWS:]:
+            value = optional_float(expirations.get(ticker))
+            item = {"ticker": ticker, "close_time": row.get("close_time"),
+                    "target": optional_float((opened.get(ticker) or {}).get("target")),
+                    "settlement": value, "result": results.get(ticker),
+                    "brti_avg_60s": optional_float(row.get("brti_avg_60s")),
+                    "brti_samples": row.get("brti_samples"),
+                    "proxy_avg_60s": optional_float(row.get("proxy_avg_60s")),
+                    "samples": row.get("samples")}
+            # Same exclusive precedence as refresh_proxy's coverage; a window with
+            # a settlement value is "settled" even if its proxy is unreadable.
+            if row.get("samples") != 60:
+                item["status"] = "incomplete_samples"
+            elif value is None and (ticker not in settled_set or ticker in value_pending):
+                item["status"] = "awaiting_settlement"
+            elif value is None:
+                item["status"] = "missing_settlement"
+            else:
+                item["status"] = "settled"
+            # Each error needs its own complete 60-sample average.
+            if value is not None and row.get("samples") == 60 and item["proxy_avg_60s"] is not None:
+                item["proxy_error"] = item["proxy_avg_60s"] - value
+            if value is not None and row.get("brti_samples") == 60 and item["brti_avg_60s"] is not None:
+                item["brti_error"] = item["brti_avg_60s"] - value
+            windows.append(item)
+        windows.reverse()
+        self.recent_windows = windows
 
     def capture_minute(self, now):
         """Capture one original minute snapshot inside the 2 s band, then queue it.

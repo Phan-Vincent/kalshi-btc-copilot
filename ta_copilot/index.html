@@ -107,32 +107,38 @@ footer { margin-top: 14px; font-size: 12px; color: var(--muted); }
         <span>Kraken uses trade time on WebSocket and fetch time on REST; Gemini uses fetch time. Coinbase and Bitstamp use exchange timestamps.</span>
       </details>
       <div class="muted" style="font-size:12px;margin-top:6px">Composite and average are proxies, not BRTI. They can differ from settlement.</div>
-      <div id="proxyRecord" class="muted" style="font-size:12px;margin-top:4px"></div>
-      <div id="proxyCoverage" class="record"></div>
+      <details><summary>Proxy vs settlement record</summary>
+        <div id="proxyRecord" class="muted" style="font-size:12px;margin-top:4px"></div>
+        <div id="proxyCoverage" class="record"></div>
+      </details>
     </div>
     <div class="card">
       <div class="label">Kalshi window <span id="ticker" class="muted" style="text-transform:none"></span></div>
       <div class="big" id="countdown">—</div>
       <div id="kalshiAge" class="muted" style="font-size:12px"></div>
-      <div id="discoverySource" class="muted" style="font-size:12px"></div>
       <div class="row"><span class="muted">Composite spot proxy</span><span id="composite">—</span></div>
       <div class="row"><span class="muted">BRTI</span><span id="brtiValue">—</span></div>
-      <div id="brtiStatus" class="record"></div>
-      <div id="compositeQuality" class="record"></div>
-      <div class="row"><span class="muted">Rolling 60s proxy average</span><span id="average60">—</span></div>
-      <div class="row"><span class="muted">Target (floor strike)</span><span id="strike">—</span></div>
+      <div id="distBlock" class="dist-block">
+        <div class="label" id="distanceLabel">Composite vs target</div>
+        <div class="dist-big" id="dist">—</div>
+        <div class="muted" id="distTarget" style="font-size:12px"></div>
+      </div>
       <div class="row sigma-row"><span class="muted">Distance in σ (settle-avg model)</span><span id="sig">—</span></div>
       <div id="settlementCoverage" class="record"></div>
-      <div id="brtiSettlement" class="record"></div>
-      <div id="requiredDrift" class="record"></div>
       <div class="row quote-row"><span class="muted" id="yesLabel">YES bid / ask</span><span id="yes">—</span></div>
       <div id="yesSource" class="muted quote-source"></div>
       <div class="row quote-row"><span class="muted" id="noLabel">NO bid / ask</span><span id="no">—</span></div>
       <div id="noSource" class="muted quote-source"></div>
-      <div id="distBlock" class="dist-block">
-        <div class="label" id="distanceLabel">Composite vs target</div>
-        <div class="dist-big" id="dist">—</div>
-      </div>
+      <details id="settleDetails">
+        <summary>Settlement details</summary>
+        <div id="discoverySource" class="muted" style="font-size:12px"></div>
+        <div id="brtiStatus" class="record"></div>
+        <div id="compositeQuality" class="record"></div>
+        <div class="row"><span class="muted">Rolling 60s proxy average</span><span id="average60">—</span></div>
+        <div class="row"><span class="muted">Target (floor strike)</span><span id="strike">—</span></div>
+        <div id="brtiSettlement" class="record"></div>
+        <div id="requiredDrift" class="record"></div>
+      </details>
     </div>
     <div class="card">
       <div class="label">Family lean · <span id="tallyTf">1m</span> · trend / momentum / flow <span id="tallyStale" class="stale-note"></span></div>
@@ -153,6 +159,14 @@ footer { margin-top: 14px; font-size: 12px; color: var(--muted); }
     <div><div class="label">Composite vs 60s avg</div><div class="big" id="stripAvg">—</div></div>
     <div><div class="label">High since open</div><div class="big" id="stripHigh">—</div></div>
     <div><div class="label">Low since open</div><div class="big" id="stripLow">—</div></div>
+  </div>
+
+  <div class="card">
+    <h2>Recent settled windows</h2>
+    <div style="overflow-x:auto">
+      <table><thead><tr><th>Close UTC</th><th>Target</th><th>Settlement</th><th>Result</th><th>BRTI 60s avg</th><th>Proxy 60s avg</th><th>Proxy error</th></tr></thead><tbody id="recentWindows"></tbody></table>
+    </div>
+    <div class="muted" style="font-size:12px;margin-top:6px">Observed values, descriptive, not a forecast.</div>
   </div>
 
   <div class="tabs" id="tabs">

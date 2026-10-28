@@ -1,0 +1,13 @@
+{
+  "brti": {"configured": true, "connected": false, "value": 64000, "age": 120.0, "fresh": false, "error": "stale or disconnected", "minus_composite": 0},
+  "window": {
+    "ticker": "KXBTC15M-STALE", "strike": 64000,
+    "open_time": "2026-10-27T19:50:00Z", "close_time": "2026-10-27T20:05:00Z",
+    "age": 1, "seconds_left": 300, "settlement_basis": "proxy", "distance_source": "composite",
+    "distance": 10, "distance_sigmas": 1.0, "distance_sd_usd": 10,
+    "observed_seconds": 0, "missing_seconds": 0, "required_remaining_seconds": null,
+    "required_remaining_avg": null, "required_remaining_move": null, "required_drift_per_sec": null,
+    "orderbook_age": null, "high_since_open": 64000, "low_since_open": 63900,
+    "price_path": [], "yes_mid_path": [], "recent_trades": [], "display_quotes": {}, "tape_summary": {}
+  }
+}

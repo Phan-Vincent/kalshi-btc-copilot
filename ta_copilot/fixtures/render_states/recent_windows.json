@@ -1,0 +1,56 @@
+{
+ "rows": [
+  {
+   "ticker": "KXBTC15M-S1",
+   "close_time": "2026-10-27T20:00:00Z",
+   "target": 64000,
+   "settlement": 64100,
+   "result": "yes",
+   "status": "settled",
+   "brti_avg_60s": 64050,
+   "brti_samples": 60,
+   "proxy_avg_60s": 64080,
+   "samples": 60,
+   "proxy_error": -20
+  },
+  {
+   "ticker": "KXBTC15M-S2",
+   "close_time": "2026-10-27T19:45:00Z",
+   "target": 64100,
+   "settlement": null,
+   "result": null,
+   "status": "awaiting_settlement",
+   "brti_avg_60s": null,
+   "brti_samples": null,
+   "proxy_avg_60s": 64110,
+   "samples": 60
+  },
+  {
+   "ticker": "KXBTC15M-S3",
+   "close_time": "2026-10-27T19:30:00Z",
+   "target": 64000,
+   "settlement": null,
+   "result": null,
+   "status": "incomplete_samples",
+   "brti_avg_60s": null,
+   "brti_samples": 30,
+   "proxy_avg_60s": null,
+   "samples": 45
+  },
+  {
+   "ticker": "KXBTC15M-S4",
+   "close_time": "2026-10-27T19:15:00Z",
+   "target": 63900,
+   "settlement": 63950,
+   "result": "no",
+   "status": "incomplete_samples",
+   "brti_avg_60s": 63948,
+   "brti_samples": 60,
+   "proxy_avg_60s": 63960,
+   "samples": 45,
+   "brti_error": -2
+  }
+ ],
+ "empty": [],
+ "missing": null
+}

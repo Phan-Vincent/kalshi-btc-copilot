@@ -17,6 +17,9 @@ let shown = null, shownAt = 0, shownServerMs = 0, streamHeardAt = 0, failure = n
 
 function localStorageGet(k) { try { return localStorage.getItem(k); } catch { return null; } }
 function localStorageSet(k, v) { try { localStorage.setItem(k, v); } catch {} }
+// The settlement details are collapsed by default; remember a manual toggle.
+$('settleDetails').open = localStorageGet('ta_settle_details') === '1';
+$('settleDetails').ontoggle = () => localStorageSet('ta_settle_details', $('settleDetails').open ? '1' : '0');
 
 const base = () => ({
   layout: {background: {color: 'transparent'}, textColor: css('--muted'), fontSize: 11},
@@ -289,6 +292,7 @@ function renderShared(s, f) {
     const side = w.distance == null ? '' : w.distance >= 0 ? 'bull' : 'bear';
     $('distBlock').className = 'dist-block ' + side;
     $('dist').innerHTML = w.distance == null ? '—' : `<span class="${side}">${sgn(w.distance)} ${w.distance >= 0 ? 'above' : 'below'}</span>`;
+    $('distTarget').textContent = w.strike == null ? 'Target pending' : 'Target ' + usd(w.strike);
     const sigmaProblem = readingProblem(s, '1m');
     $('sig').textContent = sigmaProblem ? `Unavailable · ${sigmaProblem}` :
       w.distance_sigmas == null ? '—' : `${w.distance_sigmas >= 0 ? '+' : '−'}${Math.abs(w.distance_sigmas).toFixed(2)}σ · sd ${usd(w.distance_sd_usd, 0)}${w.settlement_basis === 'BRTI' ? ' · vs BRTI' : ''}`;
@@ -347,6 +351,7 @@ function renderShared(s, f) {
     $('requiredDrift').textContent = '';
     $('discoverySource').textContent = '';
     $('distBlock').className = 'dist-block';
+    $('distTarget').textContent = '';
     $('countdown').textContent = s.exchange_closed ? 'Exchange closed' : 'No open window';
     $('yesLabel').textContent = 'YES bid / ask'; $('noLabel').textContent = 'NO bid / ask';
     $('yesSource').textContent = ''; $('noSource').textContent = '';
@@ -373,6 +378,21 @@ function renderShared(s, f) {
   renderMtf(s);
   const errs = Object.entries(s.errors || {});
   $('errors').textContent = errs.length ? 'Feed errors: ' + errs.map(([k, e]) => `${k} — ${e.error}`).join(' · ') : '';
+  renderRecentWindows(s);
+}
+
+function renderRecentWindows(s) {
+  const list = s.recent_windows;
+  const avg = (v, n) => v == null ? '—' : `${usd(v)} <span class="muted">(${n == null ? '—' : n}/60)</span>`;
+  // A settled value always shows; otherwise its status takes the outcome cells.
+  const rows = (list || []).map(w => `<tr><td>${esc(w.close_time ? w.close_time.slice(11, 16) : '—')}</td>` +
+    `<td>${w.target == null ? '—' : usd(w.target)}</td>` +
+    (w.settlement == null ? `<td colspan="2" class="muted">${esc((w.status || '').replace(/_/g, ' '))}</td>` :
+      `<td>${usd(w.settlement)}</td><td>${w.result === 'yes' || w.result === 'no'
+        ? `<span class="badge ${w.result === 'yes' ? 'bull' : 'bear'}">${w.result.toUpperCase()}</span>` : '—'}</td>`) +
+    `<td>${avg(w.brti_avg_60s, w.brti_samples)}</td><td>${avg(w.proxy_avg_60s, w.samples)}</td>` +
+    `<td>${w.proxy_error == null ? '—' : sgn(w.proxy_error)}</td></tr>`).join('');
+  $('recentWindows').innerHTML = rows || '<tr><td colspan="7" class="muted">No settled windows yet</td></tr>';
 }
 
 const leanClass = lean => lean === 'bullish' ? 'bull' : lean === 'bearish' ? 'bear' : 'neutral';
