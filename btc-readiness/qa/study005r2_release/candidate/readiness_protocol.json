@@ -1,10 +1,10 @@
 {
-    "study_id": "btc-prospective-005r2-20261102",
-    "start_utc": "2026-11-02T00:00:00+00:00",
-    "validation_start_utc": "2026-11-09T00:00:00+00:00",
-    "holdout_start_utc": "2026-11-16T00:00:00+00:00",
-    "end_utc": "2027-01-11T00:00:00+00:00",
-    "release_utc": "2027-01-13T00:00:00+00:00",
+    "study_id": "btc-prospective-005r2-20261116",
+    "start_utc": "2026-11-16T00:00:00+00:00",
+    "validation_start_utc": "2026-11-23T00:00:00+00:00",
+    "holdout_start_utc": "2026-11-30T00:00:00+00:00",
+    "end_utc": "2027-01-25T00:00:00+00:00",
+    "release_utc": "2027-01-27T00:00:00+00:00",
     "primary_strategy": "drift_free",
     "fee_multiplier": "1",
     "reaction_delay_seconds": 15,
@@ -82,7 +82,7 @@
     },
     "approval_policy": {
         "required": true,
-        "deadline_utc": "2026-11-01T00:00:00+00:00",
+        "deadline_utc": "2026-11-15T00:00:00+00:00",
         "approval_file": "activation_approval.json",
         "binding": "SHA256 release_manifest.json; approved_at precedes start; approval does not enable advice",
         "late_approval": "reject; prepare separately reviewed future-dated protocol, never shift automatically"

@@ -17,6 +17,6 @@ test_successful_pipeline_commits_once_and_rejects_old_commit (__main__.Acceptanc
 test_two_state_writers_do_not_lose_or_duplicate_updates (__main__.Acceptance.test_two_state_writers_do_not_lose_or_duplicate_updates) ... ok
 
 ----------------------------------------------------------------------
-Ran 17 tests in 0.548s
+Ran 17 tests in 0.574s
 
 OK

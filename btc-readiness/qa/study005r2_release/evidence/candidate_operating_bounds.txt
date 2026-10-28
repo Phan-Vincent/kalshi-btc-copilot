@@ -14,6 +14,6 @@ test_replay_retention_prunes_only_declared_observation_window (__main__.Operatin
 test_suspend_wall_only_jump_fails_closed (__main__.OperatingBounds.test_suspend_wall_only_jump_fails_closed) ... ok
 
 ----------------------------------------------------------------------
-Ran 14 tests in 0.738s
+Ran 14 tests in 0.837s
 
 OK
