@@ -38,10 +38,10 @@ test_not_activated_is_ok_with_info (test_acer_ops.StatusTests.test_not_activated
 test_not_activated_never_waits (test_acer_ops.StatusTests.test_not_activated_never_waits) ... ok
 test_reads_generation_timing_and_stale_is_crit (test_acer_ops.StatusTests.test_reads_generation_timing_and_stale_is_crit) ... ok
 test_startup_grace_then_crit (test_acer_ops.StatusTests.test_startup_grace_then_crit) ... ok
-test_status_never_queries_outcome_tables_and_is_read_only (test_acer_ops.StatusTests.test_status_never_queries_outcome_tables_and_is_read_only) ... /opt/homebrew/Cellar/python@3.15/3.15.0/Frameworks/Python.framework/Versions/3.15/lib/python3.15/copy.py:201: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x109225620>
+test_status_never_queries_outcome_tables_and_is_read_only (test_acer_ops.StatusTests.test_status_never_queries_outcome_tables_and_is_read_only) ... /opt/homebrew/Cellar/python@3.15/3.15.1/Frameworks/Python.framework/Versions/3.15/lib/python3.15/copy.py:200: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x1072a4c80>
   for key, value in x.items():
 ResourceWarning: Enable tracemalloc to get the object allocation traceback
-/opt/homebrew/Cellar/python@3.15/3.15.0/Frameworks/Python.framework/Versions/3.15/lib/python3.15/copy.py:201: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x109225540>
+/opt/homebrew/Cellar/python@3.15/3.15.1/Frameworks/Python.framework/Versions/3.15/lib/python3.15/copy.py:200: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x1072a5c40>
   for key, value in x.items():
 ResourceWarning: Enable tracemalloc to get the object allocation traceback
 ok
@@ -87,7 +87,10 @@ test_trade_cap_and_exact_breakdown (test_binary_risk.RiskTests.test_trade_cap_an
 test_unsupported_risk_structures_fail_closed (test_binary_risk.RiskTests.test_unsupported_risk_structures_fail_closed) ... ok
 test_unverified_evidence_fails (test_binary_risk.RiskTests.test_unverified_evidence_fails) ... ok
 test_wins_do_not_replenish_gross_loss_budget (test_binary_risk.RiskTests.test_wins_do_not_replenish_gross_loss_budget) ... ok
-test_abrupt_process_exit_at_each_transaction_boundary (test_coherent_runtime.CoherentRuntime.test_abrupt_process_exit_at_each_transaction_boundary) ... ok
+test_abrupt_process_exit_at_each_transaction_boundary (test_coherent_runtime.CoherentRuntime.test_abrupt_process_exit_at_each_transaction_boundary) ... /opt/homebrew/Cellar/python@3.15/3.15.1/Frameworks/Python.framework/Versions/3.15/lib/python3.15/copy.py:110: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x1072a5c40>
+  def deepcopy(x, memo=None):
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+ok
 test_clock_discontinuity_is_persistent_halt (test_coherent_runtime.CoherentRuntime.test_clock_discontinuity_is_persistent_halt) ... ok
 test_commit_before_process_memory_failure_recovers_exactly_once (test_coherent_runtime.CoherentRuntime.test_commit_before_process_memory_failure_recovers_exactly_once) ... ok
 test_corrupted_publication_detected_on_read_and_restart (test_coherent_runtime.CoherentRuntime.test_corrupted_publication_detected_on_read_and_restart) ... ok
@@ -137,10 +140,69 @@ test_reader_unavailable_envelope_never_reuses_snapshot (test_evidence_runner.Evi
 test_revoked_gate_after_collection_never_publishes (test_evidence_runner.EvidenceRunnerTests.test_revoked_gate_after_collection_never_publishes) ... ok
 test_study_collect_path_never_wires_an_orderly_stop (test_evidence_runner.EvidenceRunnerTests.test_study_collect_path_never_wires_an_orderly_stop) ... ok
 test_transient_read_error_records_degradation_and_next_poll_recovers (test_evidence_runner.EvidenceRunnerTests.test_transient_read_error_records_degradation_and_next_poll_recovers) ... ok
+test_discovery_messages (test_exchange_closed.CollectTests.test_discovery_messages) ... ok
+test_missing_or_non_bool_status_flags_are_not_proven_closed (test_exchange_closed.CollectTests.test_missing_or_non_bool_status_flags_are_not_proven_closed) ... ok
+test_two_eligible_contracts_stay_a_read_error_regardless_of_status (test_exchange_closed.CollectTests.test_two_eligible_contracts_stay_a_read_error_regardless_of_status) ... ok
+test_zero_eligible_and_both_active_stays_a_read_error (test_exchange_closed.CollectTests.test_zero_eligible_and_both_active_stays_a_read_error) ... ok
+test_zero_eligible_and_status_failure_stays_a_read_error (test_exchange_closed.CollectTests.test_zero_eligible_and_status_failure_stays_a_read_error) ... ok
+test_zero_eligible_and_trading_closed_is_exchange_closed (test_exchange_closed.CollectTests.test_zero_eligible_and_trading_closed_is_exchange_closed) ... ok
+test_exception_chains_and_cycles (test_exchange_closed.CollectorOnceTests.test_exception_chains_and_cycles) ... ok
+test_exchange_closed_is_an_expected_event_not_a_failure (test_exchange_closed.CollectorOnceTests.test_exchange_closed_is_an_expected_event_not_a_failure) ... ok
+test_fallback_status_503_is_preserved_and_inferred (test_exchange_closed.CollectorOnceTests.test_fallback_status_503_is_preserved_and_inferred) ... ok
+test_inferred_event_does_not_degrade_real_store (test_exchange_closed.CollectorOnceTests.test_inferred_event_does_not_degrade_real_store) ... ok
+test_observed_then_fifty_discovery_503s (test_exchange_closed.CollectorOnceTests.test_observed_then_fifty_discovery_503s) ... ok
+test_publication_503_stays_a_failure (test_exchange_closed.CollectorOnceTests.test_publication_503_stays_a_failure) ... ok
+test_snapshot_job_503_is_preserved_and_inferred (test_exchange_closed.CollectorOnceTests.test_snapshot_job_503_is_preserved_and_inferred) ... ok
+test_unproven_outside_window_and_non_503_fail (test_exchange_closed.CollectorOnceTests.test_unproven_outside_window_and_non_503_fail) ... ok
+test_acer_ops_names_exchange_closed_and_does_not_count_it_as_a_failure (test_exchange_closed.InferredReaderTests.test_acer_ops_names_exchange_closed_and_does_not_count_it_as_a_failure) ... ok
+test_missing_slots_names_exchange_closed_in_its_band (test_exchange_closed.InferredReaderTests.test_missing_slots_names_exchange_closed_in_its_band) ... ok
+test_release_tool_summary_names_exchange_closed_in_its_band (test_exchange_closed.InferredReaderTests.test_release_tool_summary_names_exchange_closed_in_its_band) ... ok
+test_shakedown_check_names_exchange_closed_and_does_not_count_it_as_a_failure (test_exchange_closed.InferredReaderTests.test_shakedown_check_names_exchange_closed_and_does_not_count_it_as_a_failure) ... ok
+test_no_72h_message_when_the_service_is_not_active (test_exchange_closed.MonitorMessageTests.test_no_72h_message_when_the_service_is_not_active) ... ok
+test_acer_ops_names_exchange_closed_and_does_not_count_it_as_a_failure (test_exchange_closed.ReaderTests.test_acer_ops_names_exchange_closed_and_does_not_count_it_as_a_failure) ... ok
+test_missing_slots_names_exchange_closed_in_its_band (test_exchange_closed.ReaderTests.test_missing_slots_names_exchange_closed_in_its_band) ... ok
+test_release_tool_summary_names_exchange_closed_in_its_band (test_exchange_closed.ReaderTests.test_release_tool_summary_names_exchange_closed_in_its_band) ... ok
+test_shakedown_check_names_exchange_closed_and_does_not_count_it_as_a_failure (test_exchange_closed.ReaderTests.test_shakedown_check_names_exchange_closed_and_does_not_count_it_as_a_failure) ... ok
+test_closed_polls_beyond_four_hours_need_operator_review (test_exchange_closed.RunLoopTests.test_closed_polls_beyond_four_hours_need_operator_review) ... /opt/homebrew/Cellar/python@3.15/3.15.1/Frameworks/Python.framework/Versions/3.15/lib/python3.15/threading.py:1444: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x1068f3300>
+  def _make_invoke_excepthook():
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+/opt/homebrew/Cellar/python@3.15/3.15.1/Frameworks/Python.framework/Versions/3.15/lib/python3.15/threading.py:1444: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x100b420a0>
+  def _make_invoke_excepthook():
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+ok
+test_closed_polls_do_not_reset_prior_failures (test_exchange_closed.RunLoopTests.test_closed_polls_do_not_reset_prior_failures) ... ok
+test_fifty_inferred_polls_do_not_stop_the_loop (test_exchange_closed.RunLoopTests.test_fifty_inferred_polls_do_not_stop_the_loop) ... ok
+test_forty_genuine_failures_still_stop_the_collector (test_exchange_closed.RunLoopTests.test_forty_genuine_failures_still_stop_the_collector) ... ok
+test_inferred_polls_do_not_reset_prior_failures (test_exchange_closed.RunLoopTests.test_inferred_polls_do_not_reset_prior_failures) ... ok
+test_mixed_pauses_preserve_four_hour_cap (test_exchange_closed.RunLoopTests.test_mixed_pauses_preserve_four_hour_cap) ... ok
+test_two_hours_of_closed_polls_do_not_stop_or_fail (test_exchange_closed.RunLoopTests.test_two_hours_of_closed_polls_do_not_stop_or_fail) ... ok
+test_dst_and_boundaries (test_exchange_closed.WindowTests.test_dst_and_boundaries) ... ok
 test_bound_dominates_every_grouping_at_0001 (test_fee_bound_proposal.FeeBoundProposalTests.test_bound_dominates_every_grouping_at_0001) ... ok
 test_bound_is_not_the_cent_precision_bound (test_fee_bound_proposal.FeeBoundProposalTests.test_bound_is_not_the_cent_precision_bound) ... ok
 test_bound_values (test_fee_bound_proposal.FeeBoundProposalTests.test_bound_values) ... ok
 test_rejects_out_of_scope_inputs (test_fee_bound_proposal.FeeBoundProposalTests.test_rejects_out_of_scope_inputs) ... ok
+test_adapter_without_direct_reader_keeps_original_error (test_listing_fallback.ListingFallbackTests.test_adapter_without_direct_reader_keeps_original_error) ... ok
+test_ambiguous_memory (test_listing_fallback.ListingFallbackTests.test_ambiguous_memory) ... ok
+test_derived_listing (test_listing_fallback.ListingFallbackTests.test_derived_listing) ... ok
+test_event_different_or_second_eligible_market (test_listing_fallback.ListingFallbackTests.test_event_different_or_second_eligible_market) ... ok
+test_event_empty_duplicate_or_malformed_markets (test_listing_fallback.ListingFallbackTests.test_event_empty_duplicate_or_malformed_markets) ... ok
+test_event_identity_and_series (test_listing_fallback.ListingFallbackTests.test_event_identity_and_series) ... ok
+test_event_without_markets (test_listing_fallback.ListingFallbackTests.test_event_without_markets) ... ok
+test_failed_remembered_read_does_not_try_derived (test_listing_fallback.ListingFallbackTests.test_failed_remembered_read_does_not_try_derived) ... ok
+test_false_status_flags (test_listing_fallback.ListingFallbackTests.test_false_status_flags) ... ok
+test_http_404_503 (test_listing_fallback.ListingFallbackTests.test_http_404_503) ... ok
+test_incomplete_discovery (test_listing_fallback.ListingFallbackTests.test_incomplete_discovery) ... ok
+test_long_direct_error_detail_capped (test_listing_fallback.ListingFallbackTests.test_long_direct_error_detail_capped) ... ok
+test_market_verification (test_listing_fallback.ListingFallbackTests.test_market_verification) ... ok
+test_memory_slots_pruned (test_listing_fallback.ListingFallbackTests.test_memory_slots_pruned) ... ok
+test_nested_event_markets (test_listing_fallback.ListingFallbackTests.test_nested_event_markets) ... ok
+test_nonboolean_status (test_listing_fallback.ListingFallbackTests.test_nonboolean_status) ... ok
+test_normal_listing (test_listing_fallback.ListingFallbackTests.test_normal_listing) ... ok
+test_normal_listing_event_membership (test_listing_fallback.ListingFallbackTests.test_normal_listing_event_membership) ... ok
+test_remembered_listing (test_listing_fallback.ListingFallbackTests.test_remembered_listing) ... ok
+test_status_unreadable (test_listing_fallback.ListingFallbackTests.test_status_unreadable) ... ok
+test_ticker_edt_est_and_live_samples (test_listing_fallback.ListingFallbackTests.test_ticker_edt_est_and_live_samples) ... ok
+test_two_eligible_or_duplicate_listing (test_listing_fallback.ListingFallbackTests.test_two_eligible_or_duplicate_listing) ... ok
 test_expired_publication_degrades_and_next_poll_recovers (test_operational_fixes.CollectorResilienceTests.test_expired_publication_degrades_and_next_poll_recovers) ... ok
 test_gate_revocation_after_failure_is_fatal (test_operational_fixes.CollectorResilienceTests.test_gate_revocation_after_failure_is_fatal) ... ok
 test_halted_store_is_fatal (test_operational_fixes.CollectorResilienceTests.test_halted_store_is_fatal) ... ok
@@ -196,6 +258,35 @@ test_shakedown_attestation_must_follow_current_boot (test_release_gate.ReleaseGa
 test_both_transports_use_bounded_reads (test_response_bounds.ResponseBounds.test_both_transports_use_bounded_reads) ... ok
 test_invalid_utf8_fails_closed (test_response_bounds.ResponseBounds.test_invalid_utf8_fails_closed) ... ok
 test_response_limit_exact_and_overflow (test_response_bounds.ResponseBounds.test_response_limit_exact_and_overflow) ... ok
+test_r2_01_monitor_counts_wan_failures_in_current_partial_hour (test_shakedown_qa.AdversarialQA20261025Tests.test_r2_01_monitor_counts_wan_failures_in_current_partial_hour) ... ok
+test_r2_02_monitor_uses_stops_preceding_lookback_window (test_shakedown_qa.AdversarialQA20261025Tests.test_r2_02_monitor_uses_stops_preceding_lookback_window) ... ok
+test_r2_03_inactivity_requires_parseable_string_hour (test_shakedown_qa.AdversarialQA20261025Tests.test_r2_03_inactivity_requires_parseable_string_hour) ... ok
+test_r2_03_seal_gate_rejects_unbacked_wan_counts_bool_slots_and_fake_inactivity_explained (test_shakedown_qa.AdversarialQA20261025Tests.test_r2_03_seal_gate_rejects_unbacked_wan_counts_bool_slots_and_fake_inactivity_explained) ... ok
+test_r2_04_first_slot_band_after_unaligned_start_matches_monitor (test_shakedown_qa.AdversarialQA20261025Tests.test_r2_04_first_slot_band_after_unaligned_start_matches_monitor) ... ok
+test_r2_05_shakedown_start_handles_empty_or_uninitialized_db (test_shakedown_qa.AdversarialQA20261025Tests.test_r2_05_shakedown_start_handles_empty_or_uninitialized_db) ... ok
+test_r2_05_shakedown_start_propagates_database_errors (test_shakedown_qa.AdversarialQA20261025Tests.test_r2_05_shakedown_start_propagates_database_errors) ... ok
+test_empty_hour_explained_by_reboot_reasons_still_passes (test_shakedown_qa.HourBlockTests.test_empty_hour_explained_by_reboot_reasons_still_passes) ... ok
+test_empty_hour_without_reasons_fails_the_seal (test_shakedown_qa.HourBlockTests.test_empty_hour_without_reasons_fails_the_seal) ... ok
+test_partial_hour_after_stop_does_not_block_the_seal (test_shakedown_qa.HourBlockTests.test_partial_hour_after_stop_does_not_block_the_seal) ... ok
+test_start_before_a_clock_hour_leaves_only_partial_edges (test_shakedown_qa.HourBlockTests.test_start_before_a_clock_hour_leaves_only_partial_edges) ... ok
+test_alert_names_excused_5xx (test_shakedown_qa.MonitorBoundaryTests.test_alert_names_excused_5xx) ... ok
+test_monitor_cap_and_wan_precedence (test_shakedown_qa.MonitorBoundaryTests.test_monitor_cap_and_wan_precedence) ... ok
+test_partial_first_hour_is_judged (test_shakedown_qa.MonitorBoundaryTests.test_partial_first_hour_is_judged) ... ok
+test_timer_boundary_includes_previous_1500_hour (test_shakedown_qa.MonitorBoundaryTests.test_timer_boundary_includes_previous_1500_hour) ... ok
+test_monitor_names_slot_event_and_reboot_misses (test_shakedown_qa.MonitorTests.test_monitor_names_slot_event_and_reboot_misses) ... ok
+test_seal_gate_rejects_blank_reasons_bad_hours_and_bad_rates (test_shakedown_qa.SealSchemaTests.test_seal_gate_rejects_blank_reasons_bad_hours_and_bad_rates) ... ok
+test_final_slot_counts_once_its_band_has_elapsed (test_shakedown_qa.SlotCoverageTests.test_final_slot_counts_once_its_band_has_elapsed) ... ok
+test_restart_after_the_band_keeps_the_stop_reason (test_shakedown_qa.SlotCoverageTests.test_restart_after_the_band_keeps_the_stop_reason) ... ok
+test_72_hour_503_excuse_and_429_failure (test_shakedown_qa.Upstream5xxTests.test_72_hour_503_excuse_and_429_failure) ... ok
+test_old_format_summary_still_passes (test_shakedown_qa.Upstream5xxTests.test_old_format_summary_still_passes) ... ok
+test_other_failures_still_count (test_shakedown_qa.Upstream5xxTests.test_other_failures_still_count) ... ok
+test_run_cap_rejects_even_zero_hourly_rates (test_shakedown_qa.Upstream5xxTests.test_run_cap_rejects_even_zero_hourly_rates) ... ok
+test_summary_tampering_is_rejected (test_shakedown_qa.Upstream5xxTests.test_summary_tampering_is_rejected) ... ok
+test_wan_wins_over_5xx (test_shakedown_qa.Upstream5xxTests.test_wan_wins_over_5xx) ... ok
+test_confirmed_outage_excuses_its_failures_and_miss (test_shakedown_qa.WanOutageTests.test_confirmed_outage_excuses_its_failures_and_miss) ... ok
+test_monitor_applies_the_same_excuse (test_shakedown_qa.WanOutageTests.test_monitor_applies_the_same_excuse) ... ok
+test_outage_excuses_nothing_unless_confirmed_short_and_corroborated (test_shakedown_qa.WanOutageTests.test_outage_excuses_nothing_unless_confirmed_short_and_corroborated) ... ok
+test_seal_gate_rejects_forged_or_inconsistent_wan_excuses (test_shakedown_qa.WanOutageTests.test_seal_gate_rejects_forged_or_inconsistent_wan_excuses) ... ok
 test_absent_for_evidence_without_the_field (test_study005r1_release.BindingTermReportTests.test_absent_for_evidence_without_the_field) ... ok
 test_tally_by_term_and_levels (test_study005r1_release.BindingTermReportTests.test_tally_by_term_and_levels) ... ok
 test_binding_term_diagnostics (test_study005r1_release.FeeAcceptanceTests.test_binding_term_diagnostics) ... ok
@@ -249,10 +340,10 @@ test_hypothetical_fill_is_costed_with_0001_acceptance (test_study005r1_release.S
 test_missing_slot_reasons_and_imputation_monotonicity (test_study005r2.CoverageTests.test_missing_slot_reasons_and_imputation_monotonicity) ... ok
 test_reboot_gap_explained_in_report_summary_and_status (test_study005r2.CoverageTests.test_reboot_gap_explained_in_report_summary_and_status) ... ok
 test_status_counts_enrolled_checkpoint_not_band_observation (test_study005r2.CoverageTests.test_status_counts_enrolled_checkpoint_not_band_observation) ... ok
-test_final_cutoff_is_an_expected_event_not_a_failure (test_study005r2.GateTests.test_final_cutoff_is_an_expected_event_not_a_failure) ... /opt/homebrew/Cellar/python@3.15/3.15.0/Frameworks/Python.framework/Versions/3.15/lib/python3.15/copy.py:201: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x1091c0900>
+test_final_cutoff_is_an_expected_event_not_a_failure (test_study005r2.GateTests.test_final_cutoff_is_an_expected_event_not_a_failure) ... /opt/homebrew/Cellar/python@3.15/3.15.1/Frameworks/Python.framework/Versions/3.15/lib/python3.15/copy.py:200: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x1071a6180>
   for key, value in x.items():
 ResourceWarning: Enable tracemalloc to get the object allocation traceback
-/opt/homebrew/Cellar/python@3.15/3.15.0/Frameworks/Python.framework/Versions/3.15/lib/python3.15/copy.py:201: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x10897ab20>
+/opt/homebrew/Cellar/python@3.15/3.15.1/Frameworks/Python.framework/Versions/3.15/lib/python3.15/copy.py:200: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x1072a7680>
   for key, value in x.items():
 ResourceWarning: Enable tracemalloc to get the object allocation traceback
 ok
@@ -278,6 +369,6 @@ test_trade_pages_are_requested_after_every_snapshot_request (test_study005r2.Tra
 test_window_sliver_is_valid_but_outside_analysis_is_filtered (test_study005r2.TradesTests.test_window_sliver_is_valid_but_outside_analysis_is_filtered) ... ok
 
 ----------------------------------------------------------------------
-Ran 248 tests in 15.414s
+Ran 330 tests in 19.980s
 
 OK
