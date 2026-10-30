@@ -177,7 +177,9 @@ class LevelsReportTests(unittest.TestCase):
                              + report.market_section({}, {}, minutes) + report.primary_section({}, minutes, now))
         actual = report.report({}, {}, minutes, now, closes={})
         addition = "\n".join(report.levels_section({}, {}, minutes))
-        self.assertEqual(actual.replace(addition + "\n", "", 1), baseline)
+        family_addition = "\n".join(report.family_opening_section({}, {}))
+        self.assertEqual(actual.replace(addition + "\n", "", 1)
+                         .replace(family_addition + "\n", "", 1), baseline)
         enriched = copy.deepcopy(minutes)
         for rows in enriched.values():
             for row in rows.values():

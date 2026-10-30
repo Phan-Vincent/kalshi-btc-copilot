@@ -391,8 +391,9 @@ function renderRecentWindows(s) {
       `<td>${usd(w.settlement)}</td><td>${w.result === 'yes' || w.result === 'no'
         ? `<span class="badge ${w.result === 'yes' ? 'bull' : 'bear'}">${w.result.toUpperCase()}</span>` : '—'}</td>`) +
     `<td>${avg(w.brti_avg_60s, w.brti_samples)}</td><td>${avg(w.proxy_avg_60s, w.samples)}</td>` +
-    `<td>${w.proxy_error == null ? '—' : sgn(w.proxy_error)}</td></tr>`).join('');
-  $('recentWindows').innerHTML = rows || '<tr><td colspan="7" class="muted">No settled windows yet</td></tr>';
+    `<td>${w.proxy_error == null ? '—' : sgn(w.proxy_error)}</td>` +
+    `<td>${w.brti_error == null ? '—' : sgn(w.brti_error)}</td></tr>`).join('');
+  $('recentWindows').innerHTML = rows || '<tr><td colspan="8" class="muted">No settled windows yet</td></tr>';
 }
 
 const leanClass = lean => lean === 'bullish' ? 'bull' : lean === 'bearish' ? 'bear' : 'neutral';

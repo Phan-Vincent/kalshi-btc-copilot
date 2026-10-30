@@ -47,6 +47,7 @@ SERIES = "KXBTC15M"
 UA = {"User-Agent": "BTC-TA-Copilot/1.0 (read-only)", "Cache-Control": "no-cache"}
 TIMEFRAMES = {"1m": 60, "5m": 300, "10m": 600, "15m": 900, "1h": 3600}
 MAX_BARS = 300
+CAPTURED_TICKERS_LIMIT = 200
 # Candle history quality, per timeframe. A frame is `stale` when its newest
 # fetched bar ended more than one bar plus HISTORY_SLACK seconds ago (the
 # ticker can patch the forming bar but cannot stand in for missing history),
@@ -827,7 +828,7 @@ class Feed:
         self.exchange_open_probe = False
         self.upcoming_markets = {}
         self.upcoming_at = 0.0
-        self.captured_tickers = set()
+        self.captured_tickers = {}
         self.errors = {}
         self.venues = {name: None for name in ("Coinbase", *VENUE_URLS)}
         self.composite = None
@@ -993,8 +994,14 @@ class Feed:
                     else:
                         self._trade_gap(sid)
                         trade_gap = True
-            book_event = "gap" if control_book_gap else self.ws_books.apply(frame)
+            book_event = "gap" if control_book_gap else self.ws_books.apply(
+                frame, self.ws_subs.book_tickers(sid))
+            pending = self.ws_subs.pending.get(frame.get("id"))
             ack = self.ws_subs.ack(frame)
+            if ack == "update_subscription" and kind == "ok" and pending:
+                params = pending[1]
+                if params["action"] == "delete_markets":
+                    self.ws_books.drop(params["sid"], params["market_tickers"])
             if kind == "error" or ack == "error":
                 raise ValueError("Kalshi subscription error")
             if book_event == "gap" and self.book_source == "websocket":
@@ -1471,7 +1478,9 @@ class Feed:
                                       if self.flow.window_open is not None else None),
                     "bars": {tf: [dict(b) for b in rows] for tf, rows in self.bars.items()}}
         if self.tally_logger.submit(snapshot):
-            self.captured_tickers.add(ticker)
+            self.captured_tickers[ticker] = None
+            if len(self.captured_tickers) > CAPTURED_TICKERS_LIMIT:
+                del self.captured_tickers[next(iter(self.captured_tickers))]
 
     def poll_upcoming(self):
         now = time.time()

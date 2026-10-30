@@ -55,6 +55,7 @@ h1 { font-size: 18px; margin: 0; letter-spacing: -.01em; }
 table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
 td, th { padding: 5px 4px; border-bottom: 1px solid var(--line); text-align: left; font-size: 13px; }
 th { color: var(--muted); font-weight: 500; font-size: 12px; }
+.recent-windows td, .recent-windows th { white-space: nowrap; }
 td:last-child, th:last-child { text-align: right; }
 tr:last-child td { border-bottom: 0; }
 .badge { display: inline-block; font-size: 11px; font-weight: 700; padding: 1px 7px; border-radius: 5px; text-transform: uppercase; }
@@ -164,7 +165,7 @@ footer { margin-top: 14px; font-size: 12px; color: var(--muted); }
   <div class="card">
     <h2>Recent settled windows</h2>
     <div style="overflow-x:auto">
-      <table><thead><tr><th>Close UTC</th><th>Target</th><th>Settlement</th><th>Result</th><th>BRTI 60s avg</th><th>Proxy 60s avg</th><th>Proxy error</th></tr></thead><tbody id="recentWindows"></tbody></table>
+      <table class="recent-windows"><thead><tr><th>Close UTC</th><th>Target</th><th>Settlement</th><th>Result</th><th>BRTI 60s avg</th><th>Proxy 60s avg</th><th>Proxy error</th><th>BRTI error</th></tr></thead><tbody id="recentWindows"></tbody></table>
     </div>
     <div class="muted" style="font-size:12px;margin-top:6px">Observed values, descriptive, not a forecast.</div>
   </div>

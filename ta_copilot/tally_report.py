@@ -57,7 +57,7 @@ NUMERIC_FIELDS = ("composite", "composite_spot", "average_60s", "target", "sigma
                   "flow_imbalance_1m", "capture_delay_seconds", "flow_coverage_seconds")
 STRING_NUMERIC_FIELDS = ("expiration_value",)
 QUOTE_FIELDS = ("yes_bid", "yes_ask")
-TIME_FIELDS = ("captured_at", "recorded_at", "open_time", "close_time", "target_observed_at")
+TIME_FIELDS = ("captured_at", "recorded_at", "open_time", "close_time", "target_observed_at", "brti_finalized_at")
 COUNT_FIELDS = ("bull", "bear", "neutral", "family_net")
 
 
@@ -413,6 +413,31 @@ def legacy_section(opened, settled):
         lines.append(f"{tf}: bullish {count['bullish']}, bearish {count['bearish']}, mixed {count['mixed']}; hit rate {rate}")
         if n < 100:
             lines.append("  n under 100: too small to mean anything.")
+    return lines
+
+
+def family_opening_section(opened, settled):
+    counts = {"up": 0, "down": 0, "no lean": 0}
+    hits = scored = 0
+    for ticker, row in opened.items():
+        net = family_net(row, "1m")
+        if net is None:
+            continue
+        lean = "up" if net > 0 else "down" if net < 0 else "no lean"
+        counts[lean] += 1
+        outcome = settled.get(ticker, {}).get("result")
+        if lean == "no lean" or outcome not in ("yes", "no"):
+            continue
+        scored += 1
+        hits += (lean == "up") == (outcome == "yes")
+    interval = wilson95(hits, scored)
+    rate = (f"{hits}/{scored} ({hits / scored:.1%}); Wilson 95% "
+            f"[{interval[0]:.1%}, {interval[1]:.1%}]" if interval else "0/0; Wilson 95% unavailable")
+    lines = ["", "== Family: opening lean vs settlement " + EXPLORATORY + " (not pre-declared) ==",
+             "1m family_net: positive = up, negative = down, zero = no lean; no lean and unresolved outcomes excluded.",
+             f"1m: up {counts['up']}, down {counts['down']}, no lean {counts['no lean']}; hit rate {rate}"]
+    if scored < 100:
+        lines.append("  n under 100: too small to mean anything.")
     return lines
 
 
@@ -792,6 +817,7 @@ def report(opened, settled, minutes=None, now=None, closes=None, calibration=Fal
     minutes = minutes or {}
     now = now or datetime.now(timezone.utc)
     lines = legacy_section(opened, settled)
+    lines += family_opening_section(opened, settled)
     lines += settlement_section(opened, settled)
     if closes is not None:
         lines += proxy_section(closes, settled)

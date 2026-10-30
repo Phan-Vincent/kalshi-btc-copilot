@@ -165,7 +165,7 @@ class BookStream:
         self.books = {}
         self.synced = set()
 
-    def apply(self, frame):
+    def apply(self, frame, tickers=None):
         kind = frame.get("type")
         if kind not in ("orderbook_snapshot", "orderbook_delta"):
             return None
@@ -179,6 +179,9 @@ class BookStream:
             self.invalidate(sid)
             return "gap"
         self.seq[sid] = seq
+        # Late deleted-market frames still consume the shared sid sequence.
+        if tickers is not None and ticker not in tickers:
+            return None
         if kind == "orderbook_snapshot":
             self.books[(sid, ticker)] = {
                 side: {str(p): _decimal(c) for p, c in msg.get(side + "_dollars_fp", [])
@@ -199,6 +202,11 @@ class BookStream:
         else:
             book[side].pop(price, None)
         return "delta"
+
+    def drop(self, sid, tickers):
+        for ticker in tickers:
+            self.books.pop((sid, ticker), None)
+            self.synced.discard((sid, ticker))
 
     def invalidate(self, sid):
         self.seq.pop(sid, None)
@@ -269,6 +277,19 @@ class Subscriptions:
                     if old == sid:
                         del self.sids[channel]
         return cmd
+
+    def book_tickers(self, sid):
+        """Tickers whose book frames on sid are kept, or None when sid is untracked.
+
+        Includes markets with an add_markets command still pending, since the
+        new market's snapshot can arrive before the ok."""
+        if sid not in self.tickers:
+            return None
+        adding = {ticker for cmd, params, _ in self.pending.values()
+                  if cmd == "update_subscription" and params.get("sid") == sid
+                  and params.get("action") == "add_markets"
+                  for ticker in params.get("market_tickers", [])}
+        return self.tickers[sid] | adding
 
     def expired(self, now):
         return any(now - sent > 5 for _, _, sent in self.pending.values())
