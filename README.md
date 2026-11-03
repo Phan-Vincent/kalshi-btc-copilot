@@ -137,14 +137,14 @@ These are honest, interim numbers as of 2026-10-03.
 
 ## What was redacted
 
-This copy is generated from the private repository by an export script that refuses to finish if any denylisted string survives. Compared with the private repo:
+This copy is generated from the private repository with its full commit history: every commit is redacted with the same rules, and the export refuses to publish if any denylisted string survives in any file, path or commit message. Compared with the private repo:
 
 - **Account-derived fee evidence** (`fee_evidence_summary.json`, `fee_evidence_refresh_summary.json`, every copy): replaced with a stub marked `"redacted": true`. These held order and fill counts from the author's account. Raw fills and orders were never committed.
 - **Account figures in the prose:** the account balance and the order and fill counts quoted in reports are removed or replaced with `[redacted]` or a qualitative summary ("every decisive order matched $0.0001"). Two reviewer files built entirely on that evidence (`reasonix_out/fee_review.txt`, `prompt_fee.txt`) are stubbed. No order IDs, fills, balances, positions or P&L from the account remain.
 - **Kept on purpose:** the study's risk limits (5% of verified account value per trade, capped at $25; $30 a day; one position). They are configuration in `risk_limits.json` and the risk engine, not account data, and the tests depend on them.
 - **Personal identifiers:** the server's and laptop's hostnames, the Tailscale tailnet name, local usernames, home-directory paths and the ChatGPT project and Claude scratch-workspace IDs captured in agent logs are replaced with `laptop`, `homelab`, `homelab.example-tailnet.ts.net`, `/Users/you`, `g-p-PROJECT` and `scratch-workspaces/WORKSPACE`.
 - **Removed files:** two retired agent-instruction files (they described a local credential setup and contained scheduler session IDs), and a personal backup helper script.
-- **Not included:** git history (this copy starts fresh), runtime state and logs, and agent run transcripts.
+- **Not included:** runtime state and logs, and agent run transcripts. Commit history is kept, redacted the same way as the files.
 
 Because files inside `sealed/` were edited by the redaction, their hashes no longer match `release_manifest.json`. **The sealed releases here will not verify; they are for reading.** Seal your own release from `candidate/` if you want to run the study.
 
